@@ -14,6 +14,7 @@ import {
   FLAVOR_GROUP_NAMES,
   flavorGroupMeta,
   normalizeBlocks,
+  ElementList,
   stepIndent,
   longformTextToRuns,
 } from 'post-renderer'
@@ -1683,6 +1684,32 @@ function useElementBody({
   return { wrapElement, renderAfterElements }
 }
 
+/**
+ * Thân element của **một** thẻ cards.
+ *
+ * Là một component chứ không phải một lời gọi `useElementBody` trong vòng lặp:
+ * mỗi thẻ cần ô nhớ riêng — menu nào đang mở, con trỏ sắp rơi vào khối nào —
+ * và React đối chiếu hook theo thứ tự gọi, nên gọi chúng trong một vòng lặp có
+ * số lượng đổi là lệch ô ngay khi thêm hoặc bớt một thẻ.
+ */
+function CardBody({
+  elements,
+  write,
+  palette,
+}: {
+  elements: ReportBlock[]
+  write: (next: ReportBlock[]) => void
+  palette: Palette
+}) {
+  const { wrapElement, renderAfterElements } = useElementBody({ elements, write, palette })
+  return (
+    <>
+      <ElementList elements={elements} palette={palette} wrap={wrapElement} />
+      {renderAfterElements()}
+    </>
+  )
+}
+
 function BitesizeEditor({
   post,
   module,
@@ -1872,6 +1899,20 @@ function CardsEditor({ post, module, onChange }: { post: PostDetail; module?: Mo
         renderCardTitle={(title, i) => <EditableField value={title} onCommit={(v) => updateCard(i, { title: v })} />}
         renderCardSub={(sub, i) => <EditableField value={sub} onCommit={(v) => updateCard(i, { sub: v })} />}
         renderCardTag={(tag, i) => <EditableField value={tag} onCommit={(v) => updateCard(i, { tag: v })} />}
+        /*
+         * Thân thẻ nay có cả khối từ kho element, sau ba khối riêng của cards.
+         * Chủ site, 17/09: *"sao không design nó thành OOP system plugin hay gì
+         * để sau các template cứ đăng ký các module thôi"* — đây là cards nối
+         * vào đúng cái kho ấy, và nó dùng chung `useElementBody` với memo và
+         * bitesize, nên sửa mặt soạn một lần là cả ba cùng ăn.
+         */
+        renderCardBody={(card, i) => (
+          <CardBody
+            elements={(card.elements ?? []) as ReportBlock[]}
+            write={(next) => updateCard(i, { elements: next })}
+            palette={paletteFrom(card.hue)}
+          />
+        )}
         // Cards.tsx only renders renderPartHeading's result when renderPartBody is
         // *not* also provided — with both set, its computed `heading` value is
         // silently dropped and only renderPartBody's return is shown. So the part

@@ -146,3 +146,50 @@ describe('Cards', () => {
     expect(screen.getByLabelText('definition-0')).toHaveValue(post.cards[0].sub)
   })
 })
+
+describe('Cards — khối lấy từ kho element', () => {
+  /** Thẻ mở ra bằng cách bấm vào chính nó; thân thẻ chỉ vẽ khi đang mở. */
+  const open = (term: string) => fireEvent.click(screen.getByText(term))
+
+  const withElements: CardsPostData = {
+    ...post,
+    cards: post.cards.map((c, i) =>
+      i === 0
+        ? { ...c, elements: [{ type: 'heading', text: 'Đọc thêm', level: 3 }] }
+        : c,
+    ),
+  }
+
+  it('vẽ element trong thân thẻ, sau ba khối riêng của cards', () => {
+    render(<Cards post={withElements} />)
+    open('Floral')
+
+    // Khối riêng của cards vẫn còn — đây là *thêm vào*, không phải *thay thế*.
+    expect(screen.getByText('Cách nếm')).toBeInTheDocument()
+    expect(screen.getByText('Đọc thêm')).toBeInTheDocument()
+  })
+
+  it('thẻ không có element thì không vẽ thêm gì', () => {
+    render(<Cards post={withElements} />)
+    open('Honeyed')
+
+    expect(screen.getByText('Chú ý hậu vị sau khi nuốt.')).toBeInTheDocument()
+    expect(screen.queryByText('Đọc thêm')).not.toBeInTheDocument()
+  })
+
+  it('renderCardBody nhận cả vùng element, kèm đúng số thứ tự thẻ', () => {
+    // Màn soạn cần chỗ này: mỗi thẻ một component riêng, vì mỗi thẻ giữ trạng
+    // thái soạn của nó.
+    render(
+      <Cards
+        post={withElements}
+        renderCardBody={(card, i) => <div data-testid={`than-${i}`}>{card.title}</div>}
+      />,
+    )
+    open('Floral')
+
+    expect(screen.getByTestId('than-0')).toHaveTextContent('Floral')
+    // Bộ vẽ mặc định nhường chỗ hẳn, không vẽ chồng lên.
+    expect(screen.queryByText('Đọc thêm')).not.toBeInTheDocument()
+  })
+})

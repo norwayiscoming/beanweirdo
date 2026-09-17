@@ -1,5 +1,7 @@
 import { Fragment, type ReactNode } from 'react'
 import { useMemo, useState } from 'react'
+import { ElementList } from './elements'
+import { paletteFrom } from './palette'
 import { ink, paper, sans, serif, wrapTitle } from './tokens'
 import type { CardData, CardPart, CardsPostData } from './types'
 
@@ -17,6 +19,15 @@ export type CardsOverrides = {
   wrapCard?: (card: ReactNode, cardIndex: number) => ReactNode
   /** Shown under the last card — where the editor puts "add a card". */
   renderAfterCards?: () => ReactNode
+  /**
+   * Thay cả vùng element ở cuối thân thẻ.
+   *
+   * Màn soạn dùng nó vì mỗi thẻ cần trạng thái soạn riêng — menu nào đang mở,
+   * con trỏ sắp rơi vào khối nào — và React không cho gọi hook trong một vòng
+   * lặp có số lượng đổi. Trả về một component cho mỗi thẻ thì mỗi thẻ có ô nhớ
+   * của nó.
+   */
+  renderCardBody?: (card: CardData, cardIndex: number) => ReactNode
 }
 
 export type CardsProps = CardsOverrides & {
@@ -364,6 +375,17 @@ export function Cards({ post, breadcrumb, mobile = false, ...overrides }: CardsP
                     {c.parts.map((p, pi) => (
                       <CardPartBlock key={pi} part={p} cardIndex={i} partIndex={pi} overrides={overrides} />
                     ))}
+                    {/*
+                      * Khối lấy từ kho, xếp sau ba khối riêng của cards. Màn
+                      * soạn nhận cả chỗ này bằng `renderCardBody` — nó cần
+                      * trạng thái riêng cho từng thẻ, thứ chỉ một component
+                      * riêng mới giữ được.
+                      */}
+                    {overrides.renderCardBody ? (
+                      overrides.renderCardBody(c, i)
+                    ) : (
+                      <ElementList elements={c.elements} palette={paletteFrom(c.hue)} mobile={mobile} />
+                    )}
                   </div>
                 )}
               </div>

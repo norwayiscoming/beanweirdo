@@ -114,6 +114,16 @@ export type CardData = {
   /** italic tag line, e.g. "hương hoa · sourness" */
   tag: string
   parts: CardPart[]
+  /**
+   * Khối thêm vào cuối thân thẻ, lấy từ kho element dùng chung.
+   *
+   * `parts` ở nguyên: cột điểm căn phải, hộp nền của callout, nhãn in hoa giãn
+   * chữ — đó là hình dạng riêng của cards, và một bộ vẽ dùng chung sẽ san
+   * phẳng đúng cái ấy. Nên đây là *thêm vào*, không phải *thay thế*: người
+   * viết đặt được heading, đoạn văn, danh sách, ảnh vào thân thẻ như ở mọi
+   * template khác, mà ba khối cũ vẫn là của cards.
+   */
+  elements?: unknown[]
 }
 
 export type CardsPostData = {
