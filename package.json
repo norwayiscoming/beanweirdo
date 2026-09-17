@@ -19,15 +19,5 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p packages/post-renderer/tsconfig.json && tsc --noEmit -p backend/tsconfig.json",
     "test": "npm run typecheck && vitest run"
-  },
-  "dependencies": {
-    "@lexical/code": "^0.50.0",
-    "@lexical/link": "^0.50.0",
-    "@lexical/list": "^0.50.0",
-    "@lexical/markdown": "^0.50.0",
-    "@lexical/react": "^0.50.0",
-    "@lexical/rich-text": "^0.50.0",
-    "@lexical/utils": "^0.50.0",
-    "lexical": "^0.50.0"
   }
 }
