@@ -239,8 +239,10 @@ describe('long-form: thao tác cấu trúc', () => {
     const onChange = vi.fn()
     render(<EditorCanvas template={'longform' as never} post={lf(two)} onChange={onChange} onHeroDrop={vi.fn()} />)
     await userEvent.click(screen.getAllByRole('button', { name: 'thêm khối' }).at(-1)!)
-    await userEvent.click(screen.getByRole('button', { name: 'công thức' }))
-    expect((onChange.mock.lastCall?.[0].body as { k: string }[])[2].k).toBe('formula')
+    await userEvent.click(screen.getByRole('button', { name: 'Công thức' }))
+    // Khối chèn nay lấy từ kho, nên nó mang `type` chứ không phải `k` — cùng
+    // hình dạng với khối của bốn khuôn kia.
+    expect((onChange.mock.lastCall?.[0].body as { type: string }[])[2].type).toBe('formula')
   })
 
   it('xoá một khối thì khối kia còn nguyên', async () => {

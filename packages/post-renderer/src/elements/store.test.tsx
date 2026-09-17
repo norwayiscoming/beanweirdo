@@ -6,10 +6,15 @@ import { paletteFrom } from '../palette'
 const palette = paletteFrom('#C25C7C')
 
 describe('kho', () => {
-  it('có đủ chín element cũ, cộng danh sách', () => {
+  it('kho gồm đúng những khối mọi khuôn bài dùng chung', () => {
+    // `aside` và `formula` vốn là hình dạng riêng của long-form. Chúng vào kho
+    // để menu `+` của mọi khuôn là **một** menu — chừng nào một khối còn nằm
+    // ngoài kho thì khuôn giữ nó còn phải có menu riêng.
     expect(allElements().map((e) => e.name).sort()).toEqual([
+      'aside',
       'callout',
       'chart',
+      'formula',
       'heading',
       'image',
       'list',

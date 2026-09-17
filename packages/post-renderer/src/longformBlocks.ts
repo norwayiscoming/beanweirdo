@@ -45,6 +45,9 @@ export function stepIndent(b: LongformBlock, by: 1 | -1): LongformBlock {
  */
 export function normalizeBlocks(blocks: readonly LongformBlock[] | undefined): LongformBlock[] {
   return (blocks ?? []).map((b) => {
+    // Khối lấy từ kho không có `k` và không có `ind` — để nguyên, đừng nắn nó
+    // theo từ vựng của long-form.
+    if ((b as { k?: string }).k === undefined) return b as LongformBlock
     const legacy = (b as { k: string }).k === 'cont'
     // `cont` luôn được vẽ lùi vào, kể cả khi không mang cờ nào — bậc của nó là
     // một, chứ không phải không.

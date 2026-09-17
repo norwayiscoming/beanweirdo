@@ -1420,45 +1420,16 @@ function LongformEditor({
   const drag = useRowDrag((from, to) => write(move(blocks, from, to)))
 
   /*
-   * Khối trắng theo loại. Tiêu đề mở ra một tầng mới, đoạn văn là thứ hay thêm
-   * nhất, còn công thức và ghi chú là hai khối long-form có mà nơi khác không.
+   * Khối trắng nay lấy từ kho (`blankReportBlock`), không còn bảng riêng ở
+   * đây — đó chính là chỗ làm menu của long-form khác mọi khuôn khác.
+   *
+   * `LABEL` ở lại vì `RowShell` cần gọi tên khối **cũ** cho đúng khi nói "xoá
+   * đoạn văn"; bài đang có 400 khối viết bằng từ vựng ấy.
    */
-  const BLANK: Record<string, LongformBlock> = {
-    p: { k: 'p', runs: [{ t: '', w: '300', s: 'normal' }] },
-    h2: { k: 'h2', runs: [{ t: '', w: '300', s: 'normal' }] },
-    h3: { k: 'h3', runs: [{ t: '', w: '300', s: 'normal' }] },
-    li: { k: 'li', runs: [{ t: '', w: '300', s: 'normal' }], lvl: 1 },
-    formula: { k: 'formula', v: '' },
-    note: { k: 'note', runs: [{ t: '', w: '300', s: 'normal' }] },
-  }
   const LABEL: Record<string, string> = {
     p: 'đoạn văn', h2: 'tiêu đề', h3: 'tiêu đề nhỏ', li: 'gạch đầu dòng',
     formula: 'công thức', note: 'ghi chú',
   }
-  /*
-   * Ký hiệu lấy đúng bộ mà menu chèn của các khuôn khác đang dùng, để một
-   * người quen soạn memo mở longform ra vẫn đọc menu bằng mắt trong một nhịp.
-   */
-  const KIND_GLYPH: Record<string, string> = {
-    p: '¶', h2: 'H', h3: 'h', li: '•', formula: 'ƒ', note: '※',
-  }
-  /*
-   * Menu `+` chỉ bày thứ **không gõ ra được**.
-   *
-   * Chủ site: *"đoạn văn lại làm mọi thứ tách khối mất, thích đoạn thì enter 2
-   * phát là được, làm gì có đoạn văn?"* — đúng luật `InsertMenu` của các khuôn
-   * kia đã theo (`mode: 'things'`). Đoạn văn, tiêu đề, gạch đầu dòng đều gõ
-   * thẳng trong ô chữ bằng `# `, `## `, `- `; bày chúng ra menu là mời người
-   * viết cắt dải chữ của chính mình thành từng khối rời.
-   */
-  const TYPEABLE = new Set(['p', 'h2', 'h3', 'li'])
-  const KINDS = Object.keys(BLANK)
-    .filter((type) => !TYPEABLE.has(type))
-    .map((type) => ({
-      type,
-      label: LABEL[type] ?? type,
-      glyph: KIND_GLYPH[type] ?? '▢',
-    }))
 
   return (
     <PostRenderer
@@ -1479,12 +1450,11 @@ function LongformEditor({
           return (
             <div key={i} className="awc-rep-block">
               <div className="awc-gutter">
-                <KindPlus
+                <InsertPlus
                   open={menuAt === i}
                   onToggle={() => setMenuAt(menuAt === i ? null : i)}
-                  kinds={KINDS}
                   onInsert={(t) => {
-                    write(insertAt(blocks, run.at[1] + 1, BLANK[t]))
+                    write(insertAt(blocks, run.at[1] + 1, blankReportBlock(t) as never))
                     setMenuAt(null)
                   }}
                 />
@@ -1505,12 +1475,11 @@ function LongformEditor({
             onRemove={() => write(removeAt(blocks, i, true))}
             onDuplicate={() => write(duplicateAt(blocks, i))}
             plus={
-              <KindPlus
+              <InsertPlus
                 open={menuAt === i}
                 onToggle={() => setMenuAt(menuAt === i ? null : i)}
-                kinds={KINDS}
                 onInsert={(t) => {
-                  write(insertAt(blocks, i + 1, BLANK[t]))
+                  write(insertAt(blocks, i + 1, blankReportBlock(t) as never))
                   setMenuAt(null)
                 }}
               />
@@ -1547,12 +1516,11 @@ function LongformEditor({
       renderAfterBlocks={() => (
         <div className="awc-rep-block">
           <div className="awc-gutter" style={{ opacity: 1 }}>
-            <KindPlus
+            <InsertPlus
               open={menuAt === -1}
               onToggle={() => setMenuAt(menuAt === -1 ? null : -1)}
-              kinds={KINDS}
               onInsert={(t) => {
-                write(insertAt(blocks, blocks.length, BLANK[t]))
+                write(insertAt(blocks, blocks.length, blankReportBlock(t) as never))
                 setMenuAt(null)
               }}
             />
@@ -2874,38 +2842,6 @@ function FieldNotesEditor({
  * Nay nút nằm ngoài cột chữ và chỉ hiện khi rê chuột lên khối; menu nổi lên
  * trên chữ chứ không đẩy chữ đi.
  */
-/**
- * Nút `+` ở máng, cho khuôn bài giữ danh sách loại khối của riêng nó.
- *
- * Longform là khuôn duy nhất như vậy: `aside`, `formula` và độ lùi `ind` của
- * nó không có element tương ứng trong kho, và bài đã đăng có 159 đoạn dùng
- * `ind`. Nên nó vẫn giữ loại khối riêng — nhưng **cách chèn** thì giống hệt
- * mọi khuôn khác, vì chỗ ấy là thói quen của tay người viết, không phải chuyện
- * dữ liệu lưu ra sao.
- */
-function KindPlus({
-  open,
-  onToggle,
-  kinds,
-  onInsert,
-}: {
-  open: boolean
-  onToggle: () => void
-  kinds: { type: string; label: string; glyph: string }[]
-  onInsert: (type: string) => void
-}) {
-  return (
-    <>
-      <button type="button" onClick={onToggle} aria-expanded={open} aria-label="thêm khối">
-        +
-      </button>
-      {open && (
-        <BlockMenu onClose={onToggle} onInsert={onInsert} kinds={kinds} />
-      )}
-    </>
-  )
-}
-
 function InsertPlus({
   open,
   onToggle,
@@ -2934,14 +2870,11 @@ function InsertPlus({
 function BlockMenu({
   filter,
   mode,
-  kinds,
   onInsert,
   onClose,
 }: {
   filter?: string
   mode?: 'all' | 'things'
-  /** Danh sách viết sẵn, cho khuôn bài không đọc loại khối từ kho. */
-  kinds?: { type: string; label: string; glyph: string }[]
   onInsert: (type: string) => void
   onClose: () => void
 }) {
@@ -2963,23 +2896,7 @@ function BlockMenu({
 
   return (
     <div className="awc-menu-pop" ref={box}>
-      {kinds ? (
-        <div className="awc-insert-menu">
-          <div className="awc-insert-group">
-            <div className="awc-insert-cat">Chữ</div>
-            {kinds.map((k) => (
-              <button key={k.type} type="button" onClick={() => onInsert(k.type)}>
-                <span className="awc-insert-glyph" aria-hidden>
-                  {k.glyph}
-                </span>
-                {k.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <InsertMenu filter={filter} mode={mode} onInsert={onInsert} />
-      )}
+      <InsertMenu filter={filter} mode={mode} onInsert={onInsert} />
     </div>
   )
 }

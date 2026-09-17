@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, Fragment, useContext, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { ElementList } from './elements'
 import { paletteFrom, type Palette } from './palette'
 import { sans, serif, wrapTitle } from './tokens'
 import type { LongformBlock, LongformPostData, LongformRun } from './types'
@@ -848,6 +849,17 @@ export function Longform({
                 )}
 
                 {b.k === 'aside' && <AsideBlock palette={palette} items={b.items ?? []} at={at} />}
+
+                {/*
+                  * Khối lấy từ kho dùng chung.
+                  *
+                  * Long-form giữ được mọi element như bốn khuôn kia, nên menu
+                  * `+` của nó không cần là một bản riêng nữa. Khối cũ vẫn vẽ
+                  * bằng từ vựng cũ ở trên; hai cách cùng đi được trong một bài.
+                  */}
+                {(b as { k?: string }).k === undefined && (
+                  <ElementList elements={[b]} palette={palette} mobile={mobile} />
+                )}
               </>
             )
 
