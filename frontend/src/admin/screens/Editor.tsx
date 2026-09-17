@@ -1377,6 +1377,8 @@ function LongformEditor({
    */
   const blocks = normalizeBlocks(getBody<LongformBlock>(post))
   const write = (next: LongformBlock[]) => onChange({ body: next })
+  /** Khối đang mở menu chèn; `-1` là cái máng ở cuối bài. */
+  const [menuAt, setMenuAt] = useState<number | null>(null)
   const at = (i: number, f: (b: LongformBlock) => LongformBlock) =>
     write(blocks.map((b, j) => (j === i ? f(b) : b)))
 
@@ -1434,6 +1436,18 @@ function LongformEditor({
     p: 'đoạn văn', h2: 'tiêu đề', h3: 'tiêu đề nhỏ', li: 'gạch đầu dòng',
     formula: 'công thức', note: 'ghi chú',
   }
+  /*
+   * Ký hiệu lấy đúng bộ mà menu chèn của các khuôn khác đang dùng, để một
+   * người quen soạn memo mở longform ra vẫn đọc menu bằng mắt trong một nhịp.
+   */
+  const KIND_GLYPH: Record<string, string> = {
+    p: '¶', h2: 'H', h3: 'h', li: '•', formula: 'ƒ', note: '※',
+  }
+  const KINDS = Object.keys(BLANK).map((type) => ({
+    type,
+    label: LABEL[type] ?? type,
+    glyph: KIND_GLYPH[type] ?? '▢',
+  }))
 
   return (
     <PostRenderer
@@ -1447,22 +1461,40 @@ function LongformEditor({
           onMove={(dir) => write(move(blocks, i, i + dir))}
           onRemove={() => write(removeAt(blocks, i, true))}
           onDuplicate={() => write(duplicateAt(blocks, i))}
+          plus={
+            <KindPlus
+              open={menuAt === i}
+              onToggle={() => setMenuAt(menuAt === i ? null : i)}
+              kinds={KINDS}
+              onInsert={(t) => {
+                write(insertAt(blocks, i + 1, BLANK[t]))
+                setMenuAt(null)
+              }}
+            />
+          }
         >
           {drawn}
         </RowShell>
       )}
+      /*
+       * Trước đây chỗ này là một hàng sáu cái nút "+ đoạn văn", "+ tiêu đề"…
+       * nằm dưới đáy bài — chỉ longform còn kiểu ấy, và nó chỉ thêm được vào
+       * cuối. Nay là đúng cái máng `+` của mọi khuôn khác, và chèn được vào
+       * giữa bài.
+       */
       renderAfterBlocks={() => (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '18px 0 8px' }}>
-          {Object.keys(BLANK).map((kind) => (
-            <button
-              key={kind}
-              type="button"
-              className="awc-plus-btn"
-              onClick={() => write(insertAt(blocks, blocks.length, BLANK[kind]))}
-            >
-              + {LABEL[kind]}
-            </button>
-          ))}
+        <div className="awc-rep-block">
+          <div className="awc-gutter" style={{ opacity: 1 }}>
+            <KindPlus
+              open={menuAt === -1}
+              onToggle={() => setMenuAt(menuAt === -1 ? null : -1)}
+              kinds={KINDS}
+              onInsert={(t) => {
+                write(insertAt(blocks, blocks.length, BLANK[t]))
+                setMenuAt(null)
+              }}
+            />
+          </div>
         </div>
       )}
       renderText={(text, i, sub) => (
@@ -2781,6 +2813,38 @@ function FieldNotesEditor({
  * Nay nút nằm ngoài cột chữ và chỉ hiện khi rê chuột lên khối; menu nổi lên
  * trên chữ chứ không đẩy chữ đi.
  */
+/**
+ * Nút `+` ở máng, cho khuôn bài giữ danh sách loại khối của riêng nó.
+ *
+ * Longform là khuôn duy nhất như vậy: `aside`, `formula` và độ lùi `ind` của
+ * nó không có element tương ứng trong kho, và bài đã đăng có 159 đoạn dùng
+ * `ind`. Nên nó vẫn giữ loại khối riêng — nhưng **cách chèn** thì giống hệt
+ * mọi khuôn khác, vì chỗ ấy là thói quen của tay người viết, không phải chuyện
+ * dữ liệu lưu ra sao.
+ */
+function KindPlus({
+  open,
+  onToggle,
+  kinds,
+  onInsert,
+}: {
+  open: boolean
+  onToggle: () => void
+  kinds: { type: string; label: string; glyph: string }[]
+  onInsert: (type: string) => void
+}) {
+  return (
+    <>
+      <button type="button" onClick={onToggle} aria-expanded={open} aria-label="thêm khối">
+        +
+      </button>
+      {open && (
+        <BlockMenu onClose={onToggle} onInsert={onInsert} kinds={kinds} />
+      )}
+    </>
+  )
+}
+
 function InsertPlus({
   open,
   onToggle,
@@ -2809,11 +2873,14 @@ function InsertPlus({
 function BlockMenu({
   filter,
   mode,
+  kinds,
   onInsert,
   onClose,
 }: {
   filter?: string
   mode?: 'all' | 'things'
+  /** Danh sách viết sẵn, cho khuôn bài không đọc loại khối từ kho. */
+  kinds?: { type: string; label: string; glyph: string }[]
   onInsert: (type: string) => void
   onClose: () => void
 }) {
@@ -2835,7 +2902,23 @@ function BlockMenu({
 
   return (
     <div className="awc-menu-pop" ref={box}>
-      <InsertMenu filter={filter} mode={mode} onInsert={onInsert} />
+      {kinds ? (
+        <div className="awc-insert-menu">
+          <div className="awc-insert-group">
+            <div className="awc-insert-cat">Chữ</div>
+            {kinds.map((k) => (
+              <button key={k.type} type="button" onClick={() => onInsert(k.type)}>
+                <span className="awc-insert-glyph" aria-hidden>
+                  {k.glyph}
+                </span>
+                {k.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <InsertMenu filter={filter} mode={mode} onInsert={onInsert} />
+      )}
     </div>
   )
 }

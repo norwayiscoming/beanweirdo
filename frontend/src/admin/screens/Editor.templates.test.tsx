@@ -338,7 +338,9 @@ describe('long-form: thao tác cấu trúc', () => {
   it('thêm một đoạn thì nó vào cuối bài', async () => {
     const onChange = vi.fn()
     render(<EditorCanvas template={'longform' as never} post={lf(two)} onChange={onChange} onHeroDrop={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: '+ đoạn văn' }))
+    // Máng `+` ở cuối bài, rồi chọn loại trong menu — giống mọi khuôn khác.
+    await userEvent.click(screen.getAllByRole('button', { name: 'thêm khối' }).at(-1)!)
+    await userEvent.click(screen.getByRole('button', { name: 'đoạn văn' }))
     const body = onChange.mock.lastCall?.[0].body as { k: string }[]
     expect(body).toHaveLength(3)
     expect(body[2].k).toBe('p')
@@ -347,7 +349,8 @@ describe('long-form: thao tác cấu trúc', () => {
   it('có khối công thức và ghi chú — hai thứ long-form có mà nơi khác không', async () => {
     const onChange = vi.fn()
     render(<EditorCanvas template={'longform' as never} post={lf(two)} onChange={onChange} onHeroDrop={vi.fn()} />)
-    await userEvent.click(screen.getByRole('button', { name: '+ công thức' }))
+    await userEvent.click(screen.getAllByRole('button', { name: 'thêm khối' }).at(-1)!)
+    await userEvent.click(screen.getByRole('button', { name: 'công thức' }))
     expect((onChange.mock.lastCall?.[0].body as { k: string }[])[2].k).toBe('formula')
   })
 
