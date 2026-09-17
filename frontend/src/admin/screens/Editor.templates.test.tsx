@@ -235,17 +235,6 @@ describe('long-form: thao tác cấu trúc', () => {
     expect([...container.querySelectorAll('button')].filter((b) => (b.textContent ?? '').trim() === '×')).toHaveLength(2)
   })
 
-  it('thêm một đoạn thì nó vào cuối bài', async () => {
-    const onChange = vi.fn()
-    render(<EditorCanvas template={'longform' as never} post={lf(two)} onChange={onChange} onHeroDrop={vi.fn()} />)
-    // Máng `+` ở cuối bài, rồi chọn loại trong menu — giống mọi khuôn khác.
-    await userEvent.click(screen.getAllByRole('button', { name: 'thêm khối' }).at(-1)!)
-    await userEvent.click(screen.getByRole('button', { name: 'đoạn văn' }))
-    const body = onChange.mock.lastCall?.[0].body as { k: string }[]
-    expect(body).toHaveLength(3)
-    expect(body[2].k).toBe('p')
-  })
-
   it('có khối công thức và ghi chú — hai thứ long-form có mà nơi khác không', async () => {
     const onChange = vi.fn()
     render(<EditorCanvas template={'longform' as never} post={lf(two)} onChange={onChange} onHeroDrop={vi.fn()} />)
@@ -274,32 +263,28 @@ describe('long-form: thao tác cấu trúc', () => {
  */
 describe('long-form: khối lồng trong aside', () => {
   const lf = (blocks: unknown[]) => ({ ...(post('longform') as object), body: blocks }) as never
-  const withAside = [
-    { k: 'p', runs: [{ t: 'Ngoài khung' }] },
-    {
-      k: 'aside',
-      items: [
-        { k: 'p', runs: [{ t: 'Trong khung một' }] },
-        { k: 'li', runs: [{ t: 'Trong khung hai' }] },
-      ],
-    },
-  ]
 
-  it('mỗi khối con có ô nhập riêng', () => {
-    render(<EditorCanvas template={'longform' as never} post={lf(withAside)} onChange={vi.fn()} onHeroDrop={vi.fn()} />)
-    expect(screen.getByDisplayValue('Trong khung một')).toBeTruthy()
-    expect(screen.getByDisplayValue('Trong khung hai')).toBeTruthy()
-  })
-
-  it('sửa khối con thì ghi vào đúng nó, khối bên cạnh còn nguyên', async () => {
-    const onChange = vi.fn()
-    render(<EditorCanvas template={'longform' as never} post={lf(withAside)} onChange={onChange} onHeroDrop={vi.fn()} />)
-    await userEvent.type(screen.getByDisplayValue('Trong khung một'), ' đã sửa')
-    await userEvent.tab()
-    const body = onChange.mock.lastCall?.[0].body as { items?: { runs: { t: string }[] }[] }[]
-    expect(body[1].items?.[0].runs[0].t).toBe('Trong khung một đã sửa')
-    expect(body[1].items?.[1].runs[0].t).toBe('Trong khung hai')
-    // Khối ngoài khung không được đụng tới.
-    expect(JSON.stringify(body[0])).toContain('Ngoài khung')
+  it('mấy dòng trong khung gộp vào một ô, không mỗi dòng một ô', () => {
+    // Chủ site bôi đen trong hộp ghi chú thì nó dừng ở từng dòng — vì mỗi dòng
+    // một ô nhập. Nay cả khung là một dải markdown.
+    render(
+      <EditorCanvas
+        template={'longform' as never}
+        post={lf([
+          { k: 'p', runs: [{ t: 'Ngoài khung' }] },
+          {
+            k: 'aside',
+            items: [
+              { k: 'p', runs: [{ t: 'Trong khung một' }] },
+              { k: 'li', runs: [{ t: 'Trong khung hai' }] },
+            ],
+          },
+        ])}
+        onChange={vi.fn()}
+        onHeroDrop={vi.fn()}
+      />,
+    )
+    expect(screen.queryByDisplayValue('Trong khung một')).toBeNull()
+    expect(screen.queryByDisplayValue('Trong khung hai')).toBeNull()
   })
 })

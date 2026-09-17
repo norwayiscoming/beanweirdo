@@ -1442,11 +1442,23 @@ function LongformEditor({
   const KIND_GLYPH: Record<string, string> = {
     p: '¶', h2: 'H', h3: 'h', li: '•', formula: 'ƒ', note: '※',
   }
-  const KINDS = Object.keys(BLANK).map((type) => ({
-    type,
-    label: LABEL[type] ?? type,
-    glyph: KIND_GLYPH[type] ?? '▢',
-  }))
+  /*
+   * Menu `+` chỉ bày thứ **không gõ ra được**.
+   *
+   * Chủ site: *"đoạn văn lại làm mọi thứ tách khối mất, thích đoạn thì enter 2
+   * phát là được, làm gì có đoạn văn?"* — đúng luật `InsertMenu` của các khuôn
+   * kia đã theo (`mode: 'things'`). Đoạn văn, tiêu đề, gạch đầu dòng đều gõ
+   * thẳng trong ô chữ bằng `# `, `## `, `- `; bày chúng ra menu là mời người
+   * viết cắt dải chữ của chính mình thành từng khối rời.
+   */
+  const TYPEABLE = new Set(['p', 'h2', 'h3', 'li'])
+  const KINDS = Object.keys(BLANK)
+    .filter((type) => !TYPEABLE.has(type))
+    .map((type) => ({
+      type,
+      label: LABEL[type] ?? type,
+      glyph: KIND_GLYPH[type] ?? '▢',
+    }))
 
   return (
     <PostRenderer
@@ -1514,6 +1526,24 @@ function LongformEditor({
        * cuối. Nay là đúng cái máng `+` của mọi khuôn khác, và chèn được vào
        * giữa bài.
        */
+      /*
+       * Mấy dòng bên trong một `aside` cũng gộp thành một ô, cùng lý do với
+       * tầng ngoài: chủ site bôi đen trong hộp ghi chú thì nó vẫn dừng ở từng
+       * dòng. Ảnh trong hộp vẫn do trang tự vẽ.
+       */
+      wrapAsideItem={(drawn, i, sub) => {
+        const items = blocks[i]?.items ?? []
+        const inner = toLongformRuns(items)
+        const run = runAtIndex(inner, sub)
+        if (run?.kind !== 'text') return drawn
+        if (sub !== run.at[0]) return null
+        return (
+          <LiveText
+            text={run.text}
+            onCommit={(md) => at(i, (b) => ({ ...b, items: writeLongformRun(items, run.at, md) }))}
+          />
+        )
+      }}
       renderAfterBlocks={() => (
         <div className="awc-rep-block">
           <div className="awc-gutter" style={{ opacity: 1 }}>

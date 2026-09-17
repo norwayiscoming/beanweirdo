@@ -121,6 +121,14 @@ export type LongformEdit = {
   wrapBlock?: (drawn: ReactNode, at: number, kind: string) => ReactNode
   /** Vẽ dưới khối cuối — chỗ khung sửa đặt nút "thêm khối". */
   renderAfterBlocks?: () => ReactNode
+  /**
+   * Bọc một khối con bên trong `aside`, cùng lý do với `wrapBlock`.
+   *
+   * Khung sửa gộp mấy dòng chữ liền nhau vào **một** ô nhập, nên nó cần trả
+   * `null` ở những dòng đã nằm trong ô của dòng trước. Ảnh thì vẫn để trang
+   * tự vẽ — móc này chỉ bọc, không thay bộ vẽ.
+   */
+  wrapAsideItem?: (drawn: ReactNode, at: number, sub: number, kind: string) => ReactNode
 }
 
 const EditContext = createContext<LongformEdit>({})
@@ -256,9 +264,13 @@ function NoteBody({ runs, at }: { runs?: LongformRun[]; at?: number }) {
 
 /** Blocks nested inside an `aside` — quieter, on its own sand ground. */
 function AsideBlock({ items, palette, at }: { items: LongformBlock[]; palette: Palette; at?: number }) {
-  return (
-    <div style={{ background: '#F3EEE1', padding: '24px 26px 20px', margin: '22px 0 26px' }}>
-      {items.map((a, i) => {
+  const { wrapAsideItem } = useContext(EditContext)
+  /*
+   * Mỗi dòng vẽ xong thì đưa qua `wrapAsideItem` trước khi ra màn hình. Khung
+   * sửa cần chỗ ấy để gộp mấy dòng chữ liền nhau vào một ô nhập — không có nó
+   * thì bôi đen bằng chuột dừng ở từng dòng, đúng chỗ chủ site báo.
+   */
+  const draw = (a: LongformBlock, i: number) => {
         const pad = padOf(a)
         if (a.k === 'p')
           return (
@@ -336,6 +348,14 @@ function AsideBlock({ items, palette, at }: { items: LongformBlock[]; palette: P
             </div>
           )
         return null
+  }
+
+  return (
+    <div style={{ background: '#F3EEE1', padding: '24px 26px 20px', margin: '22px 0 26px' }}>
+      {items.map((a, i) => {
+        const drawn = draw(a, i)
+        const wrapped = wrapAsideItem && at !== undefined ? wrapAsideItem(drawn, at, i, a.k) : drawn
+        return <Fragment key={i}>{wrapped}</Fragment>
       })}
     </div>
   )
@@ -355,6 +375,7 @@ export function Longform({
   mobile = false,
   renderText,
   wrapBlock,
+  wrapAsideItem,
   renderAfterBlocks,
 }: LongformProps) {
   // Everything this template tints comes from the one colour the post wears.
@@ -420,7 +441,7 @@ export function Longform({
   const anyFolded = Object.values(folded).some(Boolean)
 
   return (
-    <EditContext.Provider value={{ renderText }}>
+    <EditContext.Provider value={{ renderText, wrapAsideItem }}>
     <div
       style={{
         background: '#FCFCFA',
