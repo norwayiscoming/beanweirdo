@@ -38,7 +38,7 @@ function basePost(overrides: Partial<Omit<PostDetail, 'body'>> & { body?: unknow
 }
 
 describe('EditorCanvas — article', () => {
-  it('edits title, section heading/body and pull quote through the real Article overrides', async () => {
+  it('sửa được tiêu đề bài và câu trích qua đúng override của Article', async () => {
     const onChange = vi.fn()
     const post = basePost({
       body: [{ h: 'Nó là gì', p: 'nội dung cũ' }],
@@ -51,15 +51,9 @@ describe('EditorCanvas — article', () => {
     await userEvent.tab()
     expect(onChange).toHaveBeenLastCalledWith({ en: 'Senses of Flavors!' })
 
-    const heading = screen.getByDisplayValue('Nó là gì')
-    await userEvent.type(heading, '!')
-    await userEvent.tab()
-    expect(onChange).toHaveBeenLastCalledWith({ body: [{ h: 'Nó là gì!', p: 'nội dung cũ' }] })
-
-    const body = screen.getByDisplayValue('nội dung cũ')
-    await userEvent.type(body, ' thêm')
-    await userEvent.tab()
-    expect(onChange).toHaveBeenLastCalledWith({ body: [{ h: 'Nó là gì', p: 'nội dung cũ thêm' }] })
+    // Tiêu đề và thân của mọi phần nay nhập vào một ô duy nhất, ở dạng
+    // markdown — xem `articleFlow.ts`. jsdom không dựng `contenteditable`
+    // nên chỗ gõ ấy đo bằng Playwright, không đo ở đây.
 
     const pull = screen.getByDisplayValue('trích dẫn cũ')
     await userEvent.type(pull, '!')

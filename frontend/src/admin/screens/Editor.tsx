@@ -15,7 +15,6 @@ import {
   flavorGroupMeta,
   normalizeBlocks,
   ElementList,
-  stepIndent,
   longformTextToRuns,
 } from 'post-renderer'
 import type {
@@ -84,6 +83,8 @@ import { withPastedBlocks } from '../lib/pasteBlocks'
 import { toRuns, writeRun } from '../lib/flow'
 import { emptyHistory, historyKey, inverseOf, record, redo, undo, type History } from '../lib/editHistory'
 import { blockKey, neighbour, type BlockFocus } from '../lib/blockKeys'
+import { runAtIndex, toLongformRuns, writeLongformRun } from '../lib/longformFlow'
+import { runAtSection, toSectionRuns, writeSectionRun } from '../lib/articleFlow'
 import { LiveText } from '../components/LiveText'
 import { applyMark, markFor } from '../lib/marks'
 import { useRowDrag } from '../lib/useRowDrag'
@@ -1268,6 +1269,7 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
     if (next !== sections) onChange({ body: next })
   }
   const drag = useRowDrag((from, to) => setSections(move(sections, from, to)))
+  const sectionRuns = toSectionRuns(sections)
 
   function updateSection(index: number, patch: Partial<SectionData>) {
     onChange({ body: sections.map((s, i) => (i === index ? { ...s, ...patch } : s)) })
@@ -1309,18 +1311,37 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
         />
       )}
       renderFurtherReadingItem={(item, i) => <EditableField value={item} onCommit={(v) => updateFurtherReading(i, v)} />}
-      wrapSection={(section, i) => (
-        <RowShell
-          noun="phần"
-          index={i}
-          drag={drag}
-          onMove={(dir) => setSections(move(sections, i, i + dir))}
-          onRemove={() => setSections(removeAt(sections, i, true))}
-          onDuplicate={() => setSections(duplicateAt(sections, i))}
-        >
-          {section}
-        </RowShell>
-      )}
+      wrapSection={(section, i) => {
+        /*
+         * Mọi phần liền nhau nhập vào **một** ô duy nhất, để bôi đen đi được
+         * từ đoạn này sang đoạn kia. Phần có ảnh đứng riêng: ảnh không viết ra
+         * markdown được, gộp vào thì nó biến mất khỏi chỗ soạn.
+         */
+        const run = runAtSection(sectionRuns, i)
+        if (run?.kind === 'text') {
+          if (i !== run.at[0]) return null
+          return (
+            <div key={i} className="awc-rep-block">
+              <LiveText
+                text={run.text}
+                onCommit={(md) => setSections(writeSectionRun(sections, run.at, md))}
+              />
+            </div>
+          )
+        }
+        return (
+          <RowShell
+            noun="phần"
+            index={i}
+            drag={drag}
+            onMove={(dir) => setSections(move(sections, i, i + dir))}
+            onRemove={() => setSections(removeAt(sections, i, true))}
+            onDuplicate={() => setSections(duplicateAt(sections, i))}
+          >
+            {section}
+          </RowShell>
+        )
+      }}
       renderAfterSections={() => (
         <AddRow label="phần" onAdd={() => setSections(insertAt(sections, sections.length, { h: '', p: '' }))} />
       )}
@@ -1379,6 +1400,7 @@ function LongformEditor({
   const write = (next: LongformBlock[]) => onChange({ body: next })
   /** Khối đang mở menu chèn; `-1` là cái máng ở cuối bài. */
   const [menuAt, setMenuAt] = useState<number | null>(null)
+  const runs = toLongformRuns(blocks)
   const at = (i: number, f: (b: LongformBlock) => LongformBlock) =>
     write(blocks.map((b, j) => (j === i ? f(b) : b)))
 
@@ -1393,29 +1415,6 @@ function LongformEditor({
     if (sub !== undefined)
       return { ...b, items: (b.items ?? []).map((c, j) => (j === sub ? setText(c, v) : c)) }
     return b.k === 'formula' ? { ...b, v } : { ...b, runs: longformTextToRuns(v) }
-  }
-
-  /**
-   * Tab lùi vào, Shift+Tab lùi ra.
-   *
-   * Đoạn văn lùi theo `ind`, gạch đầu dòng lùi theo cấp lồng `lvl` của nó —
-   * cùng một cử chỉ cho cùng một ý, dù trong kho là hai trường khác nhau.
-   * Khối không có gì để lùi thì để Tab chạy như thường: nó nhảy sang ô sau,
-   * đó là điều người dùng chờ đợi ở bàn phím.
-   */
-  const onKeyDown = (i: number) => (e: KeyboardEvent<HTMLElement>, current: string) => {
-    if (e.key !== 'Tab') return
-    const b = blocks[i]
-    if (!b || (b.k !== 'p' && b.k !== 'li')) return
-    e.preventDefault()
-    const by = e.shiftKey ? -1 : 1
-    // Chữ đang gõ và bậc lùi đi cùng một lần ghi. Nộp chữ rồi lùi thành hai
-    // lần, lần sau dựng từ `blocks` cũ, và chữ vừa gõ mất.
-    at(i, (x) => {
-      const text = { ...x, runs: longformTextToRuns(current) }
-      if (x.k === 'li') return { ...text, lvl: Math.max(1, Math.min(3, (x.lvl ?? 1) + by)) }
-      return stepIndent(text, by)
-    })
   }
 
   const drag = useRowDrag((from, to) => write(move(blocks, from, to)))
@@ -1453,29 +1452,62 @@ function LongformEditor({
     <PostRenderer
       template="longform"
       post={toLongformData(post, module)}
-      wrapBlock={(drawn, i, kind) => (
-        <RowShell
-          noun={LABEL[kind] ?? 'khối'}
-          index={i}
-          drag={drag}
-          onMove={(dir) => write(move(blocks, i, i + dir))}
-          onRemove={() => write(removeAt(blocks, i, true))}
-          onDuplicate={() => write(duplicateAt(blocks, i))}
-          plus={
-            <KindPlus
-              open={menuAt === i}
-              onToggle={() => setMenuAt(menuAt === i ? null : i)}
-              kinds={KINDS}
-              onInsert={(t) => {
-                write(insertAt(blocks, i + 1, BLANK[t]))
-                setMenuAt(null)
-              }}
-            />
-          }
-        >
-          {drawn}
-        </RowShell>
-      )}
+      wrapBlock={(drawn, i, kind) => {
+        /*
+         * Mọi khối chữ liền nhau nhập vào **một** ô duy nhất.
+         *
+         * Chủ site: *"tôi không dùng chuột bôi đen được vậy? nó vẫn cứ bị bôi
+         * đen theo paragraph ấy"* — vì mỗi khối một ô nhập, và trình duyệt
+         * không cho một vùng chọn trải qua hai ô. Cả dải vẽ một lần, ở khối
+         * đầu dải; những khối sau trong cùng dải không vẽ gì.
+         */
+        const run = runAtIndex(runs, i)
+        if (run?.kind === 'text') {
+          if (i !== run.at[0]) return null
+          return (
+            <div key={i} className="awc-rep-block">
+              <div className="awc-gutter">
+                <KindPlus
+                  open={menuAt === i}
+                  onToggle={() => setMenuAt(menuAt === i ? null : i)}
+                  kinds={KINDS}
+                  onInsert={(t) => {
+                    write(insertAt(blocks, run.at[1] + 1, BLANK[t]))
+                    setMenuAt(null)
+                  }}
+                />
+              </div>
+              <LiveText
+                text={run.text}
+                onCommit={(md) => write(writeLongformRun(blocks, run.at, md))}
+              />
+            </div>
+          )
+        }
+        return (
+          <RowShell
+            noun={LABEL[kind] ?? 'khối'}
+            index={i}
+            drag={drag}
+            onMove={(dir) => write(move(blocks, i, i + dir))}
+            onRemove={() => write(removeAt(blocks, i, true))}
+            onDuplicate={() => write(duplicateAt(blocks, i))}
+            plus={
+              <KindPlus
+                open={menuAt === i}
+                onToggle={() => setMenuAt(menuAt === i ? null : i)}
+                kinds={KINDS}
+                onInsert={(t) => {
+                  write(insertAt(blocks, i + 1, BLANK[t]))
+                  setMenuAt(null)
+                }}
+              />
+            }
+          >
+            {drawn}
+          </RowShell>
+        )
+      }}
       /*
        * Trước đây chỗ này là một hàng sáu cái nút "+ đoạn văn", "+ tiêu đề"…
        * nằm dưới đáy bài — chỉ longform còn kiểu ấy, và nó chỉ thêm được vào
@@ -1509,7 +1541,6 @@ function LongformEditor({
            * khối là loại gì trước khi ghi.
            */
           onCommit={(v) => at(i, (b) => setText(b, v, sub))}
-          onKeyDown={sub === undefined ? onKeyDown(i) : undefined}
           style={{ font: 'inherit', color: 'inherit', letterSpacing: 'inherit' }}
         />
       )}

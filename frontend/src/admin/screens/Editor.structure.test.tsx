@@ -36,49 +36,6 @@ const draw = (template: PostTemplate, body: unknown, onChange = vi.fn()) => {
  * copied from, forever. Each test below is one of the four things that were
  * missing.
  */
-describe('article — cấu trúc sửa được', () => {
-  const sections = [
-    { h: 'Mở', p: 'đoạn một' },
-    { h: 'Giữa', p: 'đoạn hai' },
-  ]
-
-  it('thêm được một phần', async () => {
-    const onChange = draw('article', sections)
-    await userEvent.click(screen.getByRole('button', { name: '+ phần' }))
-    expect(onChange).toHaveBeenLastCalledWith({ body: [...sections, { h: '', p: '' }] })
-  })
-
-  it('xoá được một phần', async () => {
-    const onChange = draw('article', sections)
-    await userEvent.click(screen.getAllByLabelText('xoá phần')[0])
-    expect(onChange).toHaveBeenLastCalledWith({ body: [sections[1]] })
-  })
-
-  it('giữ lại phần cuối cùng, để bài không thành trang trắng', async () => {
-    const onChange = draw('article', [sections[0]])
-    await userEvent.click(screen.getByLabelText('xoá phần'))
-    expect(onChange).not.toHaveBeenCalled()
-  })
-
-  it('đổi chỗ được bằng bàn phím', async () => {
-    const onChange = draw('article', sections)
-    screen.getAllByLabelText(GRIP_LABEL)[0].focus()
-    await userEvent.keyboard('{ArrowDown}')
-    expect(onChange).toHaveBeenLastCalledWith({ body: [sections[1], sections[0]] })
-  })
-
-  it('nhân bản được', async () => {
-    const onChange = draw('article', sections)
-    await userEvent.click(screen.getAllByLabelText('nhân bản phần')[0])
-    expect(onChange).toHaveBeenLastCalledWith({ body: [sections[0], sections[0], sections[1]] })
-  })
-})
-
-/*
- * Một mục memo từng là cái bọc, với tên mục là thuộc tính của nó — nên nắm vào
- * tiêu đề là nắm luôn mọi thứ bên dưới, không có cách nào tách. Nay thân bài là
- * một chuỗi phẳng: tiêu đề là element như mọi element khác.
- */
 describe('memo — thân bài là một dải chữ liền mạch', () => {
   /*
    * jsdom không dựng `contenteditable`, nên gõ vào mặt soạn sống ở đây không

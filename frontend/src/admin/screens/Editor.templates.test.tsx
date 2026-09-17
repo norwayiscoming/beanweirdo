@@ -77,106 +77,6 @@ describe('EditorCanvas', () => {
  * chốt `cont` chỉ là đoạn văn lùi lề, và lùi bằng Tab — nên cử chỉ đó phải có
  * thật, cả chiều vào và chiều ra.
  */
-describe('long-form: lùi lề bằng Tab', () => {
-  const lf = (blocks: unknown[]) => ({ ...(post('longform') as object), body: blocks }) as never
-
-  const fieldFor = (text: string) => screen.getByDisplayValue(text)
-
-  it('Tab lùi vào, Shift+Tab lùi ra', async () => {
-    const onChange = vi.fn()
-    const { rerender } = render(
-      <EditorCanvas
-        template={'longform' as never}
-        post={lf([{ k: 'p', runs: [{ t: 'một dòng' }] }])}
-        onChange={onChange}
-        onHeroDrop={vi.fn()}
-      />,
-    )
-    await userEvent.click(fieldFor('một dòng'))
-    await userEvent.tab()
-    expect(onChange).toHaveBeenLastCalledWith({
-      body: [{ k: 'p', ind: 1, runs: [{ t: 'một dòng', w: '300', s: 'normal' }] }],
-    })
-
-    rerender(
-      <EditorCanvas
-        template={'longform' as never}
-        post={lf([{ k: 'p', ind: 1, runs: [{ t: 'một dòng' }] }])}
-        onChange={onChange}
-        onHeroDrop={vi.fn()}
-      />,
-    )
-    await userEvent.click(fieldFor('một dòng'))
-    await userEvent.tab({ shift: true })
-    // Lùi ra hết thì không còn `ind` trong dữ liệu — không lùi là mặc định.
-    expect(onChange).toHaveBeenLastCalledWith({
-      body: [{ k: 'p', runs: [{ t: 'một dòng', w: '300', s: 'normal' }] }],
-    })
-  })
-
-  it('gạch đầu dòng lùi theo cấp lồng của nó, cùng một phím', async () => {
-    const onChange = vi.fn()
-    render(
-      <EditorCanvas
-        template={'longform' as never}
-        post={lf([{ k: 'li', runs: [{ t: 'mục' }] }])}
-        onChange={onChange}
-        onHeroDrop={vi.fn()}
-      />,
-    )
-    await userEvent.click(fieldFor('mục'))
-    await userEvent.tab()
-    expect(onChange).toHaveBeenLastCalledWith({
-      body: [{ k: 'li', lvl: 2, runs: [{ t: 'mục', w: '300', s: 'normal' }] }],
-    })
-  })
-
-  it('sửa một dòng thì chỗ đậm vẫn còn', async () => {
-    const onChange = vi.fn()
-    render(
-      <EditorCanvas
-        template={'longform' as never}
-        post={lf([{ k: 'p', runs: [{ t: 'phần ' }, { t: 'đậm', w: '600', s: 'normal' }] }])}
-        onChange={onChange}
-        onHeroDrop={vi.fn()}
-      />,
-    )
-    const field = fieldFor('phần *đậm*')
-    await userEvent.type(field, ' thêm')
-    // Tab nộp chữ và lùi lề trong cùng một lần ghi; ở đây chỉ cần biết chữ về
-    // đúng runs, còn bậc lùi đã có test riêng.
-    await userEvent.tab()
-    expect(onChange.mock.lastCall?.[0].body[0].runs).toEqual([
-      { t: 'phần ', w: '300', s: 'normal' },
-      { t: 'đậm', w: '600', s: 'normal' },
-      { t: ' thêm', w: '300', s: 'normal' },
-    ])
-  })
-
-  it('bài còn khối cont cũ thì lần ghi đầu tiên đổi cả bài sang dạng mới', async () => {
-    const onChange = vi.fn()
-    render(
-      <EditorCanvas
-        template={'longform' as never}
-        post={lf([
-          { k: 'p', runs: [{ t: 'dẫn' }] },
-          { k: 'cont', runs: [{ t: '— điểm phụ' }] },
-        ])}
-        onChange={onChange}
-        onHeroDrop={vi.fn()}
-      />,
-    )
-    await userEvent.click(fieldFor('dẫn'))
-    await userEvent.tab()
-    expect(onChange).toHaveBeenLastCalledWith({
-      body: [
-        { k: 'p', ind: 1, runs: [{ t: 'dẫn', w: '300', s: 'normal' }] },
-        { k: 'p', ind: 1, runs: [{ t: '— điểm phụ' }] },
-      ],
-    })
-  })
-})
-
 /*
  * Long-form: khối nào cũng phải sửa được.
  *
@@ -189,8 +89,6 @@ describe('long-form: mọi loại khối đều sửa được', () => {
   const lf = (blocks: unknown[]) => ({ ...(post('longform') as object), body: blocks }) as never
 
   const CASES: [string, Record<string, unknown>, string][] = [
-    ['tiêu đề cấp ba', { k: 'h3', runs: [{ t: 'Đo bằng cách nào' }] }, 'Đo bằng cách nào'],
-    ['tiêu đề cấp bốn', { k: 'h4', runs: [{ t: 'Giới hạn' }] }, 'Giới hạn'],
     ['dòng nhãn', { k: 'meta', runs: [{ t: 'Cầu Đất · 2026' }] }, 'Cầu Đất · 2026'],
     ['ghi chú', { k: 'note', runs: [{ t: 'Chưa đo lại được.' }] }, 'Chưa đo lại được.'],
     ['công thức', { k: 'formula', v: 'RH + O₂ → R• + •OOH' }, 'RH + O₂ → R• + •OOH'],
@@ -322,9 +220,11 @@ describe('info cards: chọn nhóm cho thẻ', () => {
  */
 describe('long-form: thao tác cấu trúc', () => {
   const lf = (blocks: unknown[]) => ({ ...(post('longform') as object), body: blocks }) as never
+  // Khối đứng riêng, vì mọi khối chữ liền nhau nay nhập vào **một** ô duy nhất
+  // và không còn tay nắm của riêng chúng.
   const two = [
-    { k: 'p', runs: [{ t: 'Đoạn một' }] },
-    { k: 'p', runs: [{ t: 'Đoạn hai' }] },
+    { k: 'formula', v: 'A + B' },
+    { k: 'formula', v: 'C + D' },
   ]
 
   it('mỗi khối có tay nắm và nút xoá', () => {
@@ -360,9 +260,9 @@ describe('long-form: thao tác cấu trúc', () => {
       <EditorCanvas template={'longform' as never} post={lf(two)} onChange={onChange} onHeroDrop={vi.fn()} />,
     )
     await userEvent.click([...container.querySelectorAll('button')].filter((b) => (b.textContent ?? '').trim() === '×')[0])
-    const body = onChange.mock.lastCall?.[0].body as { runs: { t: string }[] }[]
+    const body = onChange.mock.lastCall?.[0].body as { v: string }[]
     expect(body).toHaveLength(1)
-    expect(body[0].runs[0].t).toBe('Đoạn hai')
+    expect(body[0].v).toBe('C + D')
   })
 })
 
