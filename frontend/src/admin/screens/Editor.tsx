@@ -7,6 +7,7 @@ import {
   type ClipboardEvent,
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
 } from 'react'
 import {
   PostRenderer,
@@ -1549,6 +1550,139 @@ function InlineField({
  * trên. Chúng nằm trong `body` jsonb chứ không thành cột mới — đúng cách bốn
  * template kia mang phần riêng của chúng.
  */
+/**
+ * Thân bài bằng element, dùng chung cho mọi template có thân bài.
+ *
+ * Trước đây memo và bitesize mỗi bên giữ một bản y hệt của cùng chín mươi dòng
+ * này. Sửa một chỗ trong mặt soạn thì phải nhớ sửa đủ hai nơi, và cái nào quên
+ * thì template ấy âm thầm tụt lại — đúng câu hỏi chủ site đặt ra: *"nhiều cái
+ * đã sửa rồi mà các template khác không ăn"*.
+ *
+ * Nên nó là một chỗ. Template nào có thân bài thì gọi hàm này và cắm hai thứ
+ * nó trả về vào `PostRenderer`; không template nào giữ bản riêng nữa.
+ *
+ * `report` chưa dùng: thân bài của nó nằm trong lưới hai cột, có cột ghi chú
+ * neo theo khối và có kéo–thả với vạch rơi. Đó là khác biệt thật, không phải
+ * trùng lặp, nên gộp vào đây sẽ phải mang theo cả hai đường — để riêng thì
+ * trung thực hơn.
+ */
+function useElementBody({
+  elements,
+  write,
+  palette,
+}: {
+  elements: ReportBlock[]
+  write: (next: ReportBlock[]) => void
+  palette: Palette
+}) {
+  const [menuAt, setMenuAt] = useState<number | null>(null)
+  /** Khối vừa được mở ra bằng bàn phím, và chỗ con trỏ cần rơi vào. */
+  const [spot, setSpot] = useState<BlockFocus | null>(null)
+  /** Khối đang mở menu `/`, và mấy chữ gõ sau dấu ấy. */
+  const [slash, setSlash] = useState<{ at: number; query: string } | null>(null)
+  const { runAt } = useFlow(elements)
+  const drag = useRowDrag((from, to) => write(move(elements, from, to)))
+
+  const insertPlus = (at: number, insertAtIndex: number) => (
+    <InsertPlus
+      open={menuAt === at}
+      onToggle={() => setMenuAt(menuAt === at ? null : at)}
+      onInsert={(t) => {
+        write(insertAt(elements, insertAtIndex, blankReportBlock(t)))
+        setMenuAt(null)
+      }}
+    />
+  )
+
+  const wrapElement = (_drawn: ReactNode, i: number): ReactNode => {
+    const run = runAt(i)
+    /*
+     * Cả dải chữ vẽ một lần, ở element đầu dải. Những element sau
+     * trong cùng dải không vẽ gì — chữ của chúng đã nằm trong ô ấy.
+     */
+    if (run?.kind === 'text') {
+      if (i !== run.at[0]) return null
+      return (
+        <div key={i} className="awc-rep-block">
+          <div className="awc-gutter">{insertPlus(i, run.at[1] + 1)}</div>
+          <LiveText text={run.text} onCommit={(md) => write(writeRun(elements, run.at, md))} />
+        </div>
+      )
+    }
+    return (
+      <div key={i}>
+        <RowShell
+          noun="khối"
+          index={i}
+          drag={drag}
+          onMove={(dir) => write(move(elements, i, i + dir))}
+          onRemove={() => write(removeAt(elements, i))}
+          onDuplicate={() => write(duplicateAt(elements, i))}
+          plus={insertPlus(i, i + 1)}
+        >
+          <ReportBlockFields
+            block={elements[i]}
+            palette={palette}
+            focus={spot?.at === i}
+            focusCaret={spot?.caret}
+            onFocused={() => setSpot(null)}
+            onChange={(next) => write(elements.map((x, k) => (k === i ? next : x)))}
+            onArrowOut={(dir) => {
+              const to = neighbour(elements, i, dir)
+              if (!to) return false
+              setSpot(to)
+              return true
+            }}
+            onSlash={(query) => setSlash(query === null ? null : { at: i, query })}
+            onTextKey={(e, current) => {
+              const field = e.target as HTMLTextAreaElement
+              const caret = field.selectionStart ?? 0
+              const out = blockKey(elements, i, e, current, caret, field.selectionEnd !== caret)
+              if (!out) return
+              e.preventDefault()
+              write(out.blocks)
+              setSpot(out.focus ?? null)
+            }}
+            onPasteBlocks={(text) => {
+              const next = withPastedBlocks(elements, i, text)
+              if (!next) return false
+              write(next)
+              return true
+            }}
+          />
+        </RowShell>
+        {slash?.at === i && (
+          <BlockMenu
+            filter={slash.query}
+            onClose={() => setSlash(null)}
+            onInsert={(type) => {
+              write(
+                elements.map((b, k) =>
+                  k === i ? ({ ...blankReportBlock(type), id: b.id } as ReportBlock) : b,
+                ),
+              )
+              setSlash(null)
+              setSpot({ at: i, caret: 0 })
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
+  /** Bài rỗng vẫn phải có một chỗ bấm để bắt đầu. */
+  const renderAfterElements = (): ReactNode =>
+    elements.length === 0 ? (
+      <div className="awc-rep-block">
+        <div className="awc-gutter" style={{ opacity: 1 }}>
+          {insertPlus(-1, 0)}
+        </div>
+      </div>
+    ) : null
+
+  return { wrapElement, renderAfterElements }
+}
+
 function BitesizeEditor({
   post,
   module,
@@ -1574,14 +1708,12 @@ function BitesizeEditor({
    */
   const elements = (body.elements ?? []) as ReportBlock[]
   const palette = paletteFrom(post.theme_color ?? module?.accent ?? REPORT_BLUE)
-  const [menuAt, setMenuAt] = useState<number | null>(null)
   const writeElements = (next: ReportBlock[]) => write({ elements: next })
-  /** Khối vừa được mở ra bằng bàn phím, và chỗ con trỏ cần rơi vào. */
-  const [spot, setSpot] = useState<BlockFocus | null>(null)
-  /** Khối đang mở menu `/`, và mấy chữ gõ sau dấu ấy. */
-  const [slash, setSlash] = useState<{ at: number; query: string } | null>(null)
-  const { runAt } = useFlow(elements)
-  const drag = useRowDrag((from, to) => writeElements(move(elements, from, to)))
+  const { wrapElement, renderAfterElements } = useElementBody({
+    elements,
+    write: writeElements,
+    palette,
+  })
   const control: CSSProperties = {
     fontFamily: sans,
     fontSize: 12.5,
@@ -1630,114 +1762,8 @@ function BitesizeEditor({
         renderSub={(sub) => (
           <InlineField value={sub} placeholder="Chữ trong ô ảnh phụ" onCommit={(v) => write({ sub: v })} />
         )}
-        wrapElement={(_drawn, i) => {
-          const run = runAt(i)
-          /*
-           * Cả dải chữ vẽ một lần, ở element đầu dải. Những element sau
-           * trong cùng dải không vẽ gì — chữ của chúng đã nằm trong ô ấy.
-           */
-          if (run?.kind === 'text') {
-            if (i !== run.at[0]) return null
-            return (
-              <div key={i} className="awc-rep-block">
-                <div className="awc-gutter">
-                  <InsertPlus
-                    open={menuAt === i}
-                    onToggle={() => setMenuAt(menuAt === i ? null : i)}
-                    onInsert={(t) => {
-                      writeElements(insertAt(elements, run.at[1] + 1, blankReportBlock(t)))
-                      setMenuAt(null)
-                    }}
-                  />
-                </div>
-                <LiveText
-                  text={run.text}
-                  onCommit={(md) => writeElements(writeRun(elements, run.at, md))}
-                />
-              </div>
-            )
-          }
-          return (
-          <div key={i}>
-            <RowShell
-              noun="khối"
-              index={i}
-              drag={drag}
-              onMove={(dir) => writeElements(move(elements, i, i + dir))}
-              onRemove={() => writeElements(removeAt(elements, i))}
-              onDuplicate={() => writeElements(duplicateAt(elements, i))}
-              plus={
-                <InsertPlus
-                  open={menuAt === i}
-                  onToggle={() => setMenuAt(menuAt === i ? null : i)}
-                  onInsert={(t) => {
-                    writeElements(insertAt(elements, i + 1, blankReportBlock(t)))
-                    setMenuAt(null)
-                  }}
-                />
-              }
-            >
-              <ReportBlockFields
-                block={elements[i]}
-                palette={palette}
-                focus={spot?.at === i}
-                focusCaret={spot?.caret}
-                onFocused={() => setSpot(null)}
-                onChange={(next) => writeElements(elements.map((x, k) => (k === i ? next : x)))}
-                onArrowOut={(dir) => {
-                  const to = neighbour(elements, i, dir)
-                  if (!to) return false
-                  setSpot(to)
-                  return true
-                }}
-                onSlash={(query) => setSlash(query === null ? null : { at: i, query })}
-                onTextKey={(e, current) => {
-                  const field = e.target as HTMLTextAreaElement
-                  const caret = field.selectionStart ?? 0
-                  const out = blockKey(elements, i, e, current, caret, field.selectionEnd !== caret)
-                  if (!out) return
-                  e.preventDefault()
-                  writeElements(out.blocks)
-                  setSpot(out.focus ?? null)
-                }}
-                onPasteBlocks={(text) => {
-                  const next = withPastedBlocks(elements, i, text)
-                  if (!next) return false
-                  writeElements(next)
-                  return true
-                }}
-              />
-            </RowShell>
-            {slash?.at === i && (
-              <BlockMenu
-                filter={slash.query}
-                onClose={() => setSlash(null)}
-                onInsert={(type) => {
-                  writeElements(elements.map((b, k) => (k === i ? ({ ...blankReportBlock(type), id: b.id } as ReportBlock) : b)))
-                  setSlash(null)
-                  setSpot({ at: i, caret: 0 })
-                }}
-              />
-            )}
-          </div>
-          )
-        }}
-        renderAfterElements={() =>
-          elements.length === 0 ? (
-            <div className="awc-rep-block">
-              <div className="awc-gutter" style={{ opacity: 1 }}>
-                <InsertPlus
-                  open={menuAt === -1}
-                  onToggle={() => setMenuAt(menuAt === -1 ? null : -1)}
-                  onInsert={(t) => {
-                    writeElements(insertAt(elements, 0, blankReportBlock(t)))
-                    setMenuAt(null)
-                  }}
-                />
-              </div>
-            </div>
-          ) : null
-        }
+        wrapElement={wrapElement}
+        renderAfterElements={renderAfterElements}
       />
     </div>
   )
@@ -1755,7 +1781,6 @@ function MemoEditor({
   const palette = paletteFrom(post.theme_color ?? module?.accent ?? REPORT_BLUE, post.theme_color ? undefined : module?.on_color)
   const data = toMemoData(post, module)
   const elements = flatElements(post.body as { sections?: never[]; elements?: unknown[] }) as ReportBlock[]
-  const [menuAt, setMenuAt] = useState<number | null>(null)
 
   /** Một dòng thông số, sửa tại chỗ; phần còn lại của thân bài giữ nguyên. */
   const specs = ((post.body as { specs?: { k: string; v: string }[] } | null)?.specs ?? [])
@@ -1773,12 +1798,7 @@ function MemoEditor({
     void sections
     onChange({ body: { ...rest, elements: next } })
   }
-  const drag = useRowDrag((from, to) => write(move(elements, from, to)))
-  /** Khối vừa được mở ra bằng bàn phím, và chỗ con trỏ cần rơi vào. */
-  const [spot, setSpot] = useState<BlockFocus | null>(null)
-  /** Khối đang mở menu `/`, và mấy chữ gõ sau dấu ấy. */
-  const [slash, setSlash] = useState<{ at: number; query: string } | null>(null)
-  const { runAt } = useFlow(elements)
+  const { wrapElement, renderAfterElements } = useElementBody({ elements, write, palette })
 
   return (
     <PostRenderer
@@ -1809,114 +1829,8 @@ function MemoEditor({
       renderSpecValue={(value, i) => (
         <EditableField value={value} placeholder="giá trị" onCommit={(v) => setSpec(i, { v })} />
       )}
-      wrapElement={(_drawn, i) => {
-        const run = runAt(i)
-        /*
-         * Cả dải chữ vẽ một lần, ở element đầu dải. Những element sau
-         * trong cùng dải không vẽ gì — chữ của chúng đã nằm trong ô ấy.
-         */
-        if (run?.kind === 'text') {
-          if (i !== run.at[0]) return null
-          return (
-            <div key={i} className="awc-rep-block">
-              <div className="awc-gutter">
-                <InsertPlus
-                  open={menuAt === i}
-                  onToggle={() => setMenuAt(menuAt === i ? null : i)}
-                  onInsert={(t) => {
-                    write(insertAt(elements, run.at[1] + 1, blankReportBlock(t)))
-                    setMenuAt(null)
-                  }}
-                />
-              </div>
-              <LiveText
-                text={run.text}
-                onCommit={(md) => write(writeRun(elements, run.at, md))}
-              />
-            </div>
-          )
-        }
-        return (
-        <div key={i}>
-          <RowShell
-            noun="khối"
-            index={i}
-            drag={drag}
-            onMove={(dir) => write(move(elements, i, i + dir))}
-            onRemove={() => write(removeAt(elements, i))}
-            onDuplicate={() => write(duplicateAt(elements, i))}
-            plus={
-              <InsertPlus
-                open={menuAt === i}
-                onToggle={() => setMenuAt(menuAt === i ? null : i)}
-                onInsert={(t) => {
-                  write(insertAt(elements, i + 1, blankReportBlock(t)))
-                  setMenuAt(null)
-                }}
-              />
-            }
-          >
-            <ReportBlockFields
-              block={elements[i]}
-              palette={palette}
-              focus={spot?.at === i}
-              focusCaret={spot?.caret}
-              onFocused={() => setSpot(null)}
-              onChange={(next) => write(elements.map((x, k) => (k === i ? next : x)))}
-              onArrowOut={(dir) => {
-                const to = neighbour(elements, i, dir)
-                if (!to) return false
-                setSpot(to)
-                return true
-              }}
-              onSlash={(query) => setSlash(query === null ? null : { at: i, query })}
-              onTextKey={(e, current) => {
-                const field = e.target as HTMLTextAreaElement
-                const caret = field.selectionStart ?? 0
-                const out = blockKey(elements, i, e, current, caret, field.selectionEnd !== caret)
-                if (!out) return
-                e.preventDefault()
-                write(out.blocks)
-                setSpot(out.focus ?? null)
-              }}
-              onPasteBlocks={(text) => {
-                const next = withPastedBlocks(elements, i, text)
-                if (!next) return false
-                write(next)
-                return true
-              }}
-            />
-          </RowShell>
-          {slash?.at === i && (
-            <BlockMenu
-              filter={slash.query}
-              onClose={() => setSlash(null)}
-              onInsert={(type) => {
-                write(elements.map((b, k) => (k === i ? ({ ...blankReportBlock(type), id: b.id } as ReportBlock) : b)))
-                setSlash(null)
-                setSpot({ at: i, caret: 0 })
-              }}
-            />
-          )}
-        </div>
-        )
-      }}
-      renderAfterElements={() =>
-        elements.length === 0 ? (
-          <div className="awc-rep-block">
-            <div className="awc-gutter" style={{ opacity: 1 }}>
-              <InsertPlus
-                open={menuAt === -1}
-                onToggle={() => setMenuAt(menuAt === -1 ? null : -1)}
-                onInsert={(t) => {
-                  write(insertAt(elements, 0, blankReportBlock(t)))
-                  setMenuAt(null)
-                }}
-              />
-            </div>
-          </div>
-        ) : null
-      }
+      wrapElement={wrapElement}
+      renderAfterElements={renderAfterElements}
     />
   )
 }
