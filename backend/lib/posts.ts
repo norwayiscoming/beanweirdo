@@ -54,6 +54,7 @@ export const POST_COLUMNS = [
   'previous_status',
   'hero_image_url',
   'hero_caption',
+  'thumbnail_url',
   'theme_color',
   'pull_quote',
   'further_reading',
@@ -85,6 +86,12 @@ export interface PostRow {
   status: PostStatus
   template: PostTemplate
   hero_image_url: string | null
+  /**
+   * The first image found inside `body`, kept as a column so a listing never
+   * has to read `body` to draw a 44px square. Derived, never sent by a client:
+   * the two places that write `body` recompute it.
+   */
+  thumbnail_url: string | null
   /** Màu riêng của bài; rỗng nghĩa là theo màu module. */
   theme_color: string | null
   published_at: string | null
@@ -93,9 +100,11 @@ export interface PostRow {
   updated_at: string
 }
 
-// `body` is selected but never returned: it is where a post keeps its pictures,
-// and the listing wants one of them. Sending the whole thing to the browser to
-// find a thumbnail would mean shipping a 100KB article to draw a 44px square.
+// `body` used to be in this list. Not because a listing shows an article, but
+// because the thumbnail was computed from it on the way out — so opening
+// /ad-post shipped every post's entire text to the browser to draw a row of
+// 44px squares. `thumbnail_url` holds that answer now (migration note:
+// docs/inbox/qa/2026-09-18-qa-39-thumbnail-url.sql) and `body` is gone from here.
 /**
  * Kept as one literal string because Supabase types the query from it; an
  * array joined at runtime widens to `string` and the row type is lost.
@@ -106,17 +115,24 @@ export interface PostRow {
  * and cannot see the real schema.
  */
 export const POST_SUMMARY_COLUMNS =
-  'id, module_id, en, vi, kind, date_label, status, template, hero_image_url, theme_color, sort_order, pinned, created_at, updated_at, published_at, body'
+  'id, module_id, en, vi, kind, date_label, status, template, hero_image_url, thumbnail_url, theme_color, sort_order, pinned, created_at, updated_at, published_at'
 
 export const POST_DETAIL_COLUMNS = '*'
 
-/** The first `src` anywhere in a block tree, however the template nests them. */
-function findSrc(value: unknown, depth = 0): string | null {
+/**
+ * The first `src` anywhere in a block tree, however the template nests them.
+ *
+ * Exported because it is now run when a post is *written* rather than when a
+ * listing is read: `POST /api/posts` and `PATCH /api/posts/:id` put the result
+ * in `posts.thumbnail_url`. One input, `body`, so there is exactly one moment
+ * to recompute it — whenever `body` is written, and never otherwise.
+ */
+export function firstImageIn(value: unknown, depth = 0): string | null {
   if (depth > 4 || value === null || typeof value !== 'object') return null
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = findSrc(item, depth + 1)
+      const found = firstImageIn(item, depth + 1)
       if (found) return found
     }
     return null
@@ -127,7 +143,7 @@ function findSrc(value: unknown, depth = 0): string | null {
   if (typeof obj.imageUrl === 'string' && obj.imageUrl) return obj.imageUrl
 
   for (const key of ['fig', 'items', 'sections', 'blocks', 'cards']) {
-    const found = findSrc(obj[key], depth + 1)
+    const found = firstImageIn(obj[key], depth + 1)
     if (found) return found
   }
   return null
@@ -194,9 +210,15 @@ export function toPostSummary(row: PostRow): PostSummary {
     template: row.template,
     hero_image_url: row.hero_image_url,
     theme_color: row.theme_color,
-    // The one field with no column behind it: a listing wants a picture, and
-    // takes the post's cover or the first image inside it.
-    thumbnail_url: row.hero_image_url || findSrc(row.body),
+    /*
+     * Cover first, then whatever the post has inside it.
+     *
+     * Only the second half is stored. `hero_image_url` is already a column of
+     * its own, so folding it into `thumbnail_url` would give that column two
+     * inputs and two moments where it could go stale. Composed here instead,
+     * the stored value depends on `body` alone.
+     */
+    thumbnail_url: row.hero_image_url || row.thumbnail_url,
     sort_order: row.sort_order,
     pinned: row.pinned,
     created_at: row.created_at,
