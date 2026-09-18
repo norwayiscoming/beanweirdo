@@ -86,6 +86,7 @@ import { blockKey, neighbour, type BlockFocus } from '../lib/blockKeys'
 import { runAtIndex, toLongformRuns, writeLongformRun } from '../lib/longformFlow'
 import { runAtSection, toSectionRuns, writeSectionRun } from '../lib/articleFlow'
 import { LiveText } from '../components/LiveText'
+import type { LiveEdges } from '../components/liveKeys'
 import { applyMark, markFor } from '../lib/marks'
 import { useRowDrag } from '../lib/useRowDrag'
 import {
@@ -586,7 +587,7 @@ function EditorStyles() {
        * còn bị cắt ở hai đầu, và không nút nào nằm trên chữ.
        */
       .awc-rep-block{ position: relative; padding-left: 122px; margin-bottom: 2px; }
-      .awc-gutter{ position: absolute; left: 0; top: 0; width: 114px; display: flex; align-items: center; gap: 2px; }
+      .awc-gutter{ position: absolute; left: 0; top: 0; width: 114px; display: flex; align-items: center; gap: 2px; transition: top .08s; }
       /*
        * Ẩn từng NÚT, không ẩn cả máng.
        *
@@ -608,8 +609,8 @@ function EditorStyles() {
        * Dùng dấu con: luật này mà với tới nút trong menu thì mỗi mục của menu
        * bị ép thành ô 26×26 và chữ vỡ mỗi dòng một từ.
        */
-      .awc-gutter > button, .awc-gutter > .awc-block-controls > button{ flex: 0 0 26px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 15px; line-height: 1; color: #8C8674; background: transparent; border: none; border-radius: 4px; cursor: pointer; padding: 0; }
-      .awc-gutter > button:hover, .awc-gutter > .awc-block-controls > button:hover{ background: #EFEADA; color: #23211A; }
+      .awc-gutter > button, .awc-gutter > .awc-block-controls > button{ flex: 0 0 28px; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 500; line-height: 1; color: #5C5647; background: transparent; border: 1px solid transparent; border-radius: 5px; cursor: pointer; padding: 0; }
+      .awc-gutter > button:hover, .awc-gutter > .awc-block-controls > button:hover{ background: #EFEADA; border-color: #DCD5C0; color: #23211A; }
       /* Menu nổi lên trên chữ, không đẩy chữ đi chỗ khác. */
       .awc-menu-pop{ position: absolute; left: 114px; top: 26px; z-index: 20; background: #fff; border: 1px solid #EBE5D3; border-radius: 8px; box-shadow: 0 10px 32px rgba(35,33,26,.16); padding: 8px; max-height: 340px; overflow-y: auto; width: 264px; }
 
@@ -1448,34 +1449,29 @@ function LongformEditor({
         if (run?.kind === 'text') {
           if (i !== run.at[0]) return null
           return (
-            <div key={i} className="awc-rep-block">
-              <div className="awc-gutter">
-                <InsertPlus
-                  open={menuAt === i}
-                  onToggle={() => setMenuAt(menuAt === i ? null : i)}
-                  onInsert={(t) => {
-                    write(insertAt(blocks, run.at[1] + 1, blankReportBlock(t) as never))
-                    setMenuAt(null)
-                  }}
-                />
-              </div>
-              <LiveText
-                text={run.text}
-                onCommit={(md) => write(writeLongformRun(blocks, run.at, md))}
-                onBackspaceAtStart={() => {
-                  const before = run.at[0] - 1
-                  if (before < 0) return false
-                  write(removeAt(blocks, before, true))
-                  return true
-                }}
-                onDeleteAtEnd={() => {
-                  const after = run.at[1] + 1
-                  if (after >= blocks.length) return false
-                  write(removeAt(blocks, after, true))
-                  return true
-                }}
-              />
-            </div>
+            <LiveRun
+              key={i}
+              text={run.text}
+              menuOpen={menuAt === i}
+              onToggleMenu={() => setMenuAt(menuAt === i ? null : i)}
+              onCommit={(md) => write(writeLongformRun(blocks, run.at, md))}
+              onInsertAfterLine={(lineIndex, t) => {
+                write(insertAt(blocks, run.at[0] + lineIndex + 1, blankReportBlock(t) as never))
+                setMenuAt(null)
+              }}
+              onBackspaceAtStart={() => {
+                const before = run.at[0] - 1
+                if (before < 0) return false
+                write(removeAt(blocks, before, true))
+                return true
+              }}
+              onDeleteAtEnd={() => {
+                const after = run.at[1] + 1
+                if (after >= blocks.length) return false
+                write(removeAt(blocks, after, true))
+                return true
+              }}
+            />
           )
         }
         return (
@@ -1625,6 +1621,79 @@ function InlineField({
  * template kia mang phần riêng của chúng.
  */
 /**
+ * Một dải chữ, kèm cái máng `+` **bám theo dòng con trỏ đang ở**.
+ *
+ * Chủ site: *"cái [+] ấy tôi muốn nó đi theo con trỏ chuột chứ giờ cái button
+ * [+] chỉ hiển thị ở hàng bên trên thôi"*.
+ *
+ * Trước đây một khối là một dòng, nên cái máng ghim ở đỉnh khối cũng chính là
+ * đỉnh dòng. Từ khi mấy khối chữ liền nhau gộp vào **một** ô, một dải dài mấy
+ * chục dòng vẫn chỉ có một cái máng nằm chết ở dòng đầu — muốn chèn vào giữa
+ * bài thì không có chỗ nào để bấm.
+ *
+ * Nên chỗ này đo: con trỏ đang ở trên dòng nào trong ô, rồi dời cái máng xuống
+ * đúng dòng ấy. Chèn thì chèn vào **sau** dòng đó, không phải đầu dải.
+ */
+function LiveRun({
+  text,
+  menuOpen,
+  onToggleMenu,
+  onCommit,
+  onInsertAfterLine,
+  onBackspaceAtStart,
+  onDeleteAtEnd,
+}: {
+  text: string
+  menuOpen: boolean
+  onToggleMenu: () => void
+  onCommit: (markdown: string) => void
+  /** `line` là dòng thứ mấy trong dải, đếm từ 0. */
+  onInsertAfterLine: (line: number, type: string) => void
+} & LiveEdges) {
+  const host = useRef<HTMLDivElement>(null)
+  /** Dòng con trỏ đang ở, và nó nằm cách đỉnh dải bao nhiêu. */
+  const [line, setLine] = useState<{ index: number; top: number }>({ index: 0, top: 0 })
+
+  /*
+   * Đo bằng hình chữ nhật thật của từng dòng, không tính theo chiều cao trung
+   * bình: tiêu đề, đoạn văn và danh sách cao khác nhau, nên chia đều là lệch
+   * ngay từ dòng thứ hai.
+   */
+  const follow = (e: { clientY: number }) => {
+    const box = host.current
+    const input = box?.querySelector('.awc-live-input')
+    if (!box || !input) return
+    const lines = Array.from(input.children) as HTMLElement[]
+    const top = box.getBoundingClientRect().top
+    for (let i = 0; i < lines.length; i++) {
+      const r = lines[i].getBoundingClientRect()
+      if (e.clientY >= r.top && e.clientY <= r.bottom) {
+        setLine({ index: i, top: Math.round(r.top - top) })
+        return
+      }
+    }
+  }
+
+  return (
+    <div className="awc-rep-block" ref={host} onMouseMove={follow}>
+      <div className="awc-gutter" style={{ top: line.top }}>
+        <InsertPlus
+          open={menuOpen}
+          onToggle={onToggleMenu}
+          onInsert={(t) => onInsertAfterLine(line.index, t)}
+        />
+      </div>
+      <LiveText
+        text={text}
+        onCommit={onCommit}
+        onBackspaceAtStart={onBackspaceAtStart}
+        onDeleteAtEnd={onDeleteAtEnd}
+      />
+    </div>
+  )
+}
+
+/**
  * Thân bài bằng element, dùng chung cho mọi template có thân bài.
  *
  * Trước đây memo và bitesize mỗi bên giữ một bản y hệt của cùng chín mươi dòng
@@ -1677,30 +1746,39 @@ function useElementBody({
     if (run?.kind === 'text') {
       if (i !== run.at[0]) return null
       return (
-        <div key={i} className="awc-rep-block">
-          <div className="awc-gutter">{insertPlus(i, run.at[1] + 1)}</div>
-          <LiveText
-            text={run.text}
-            onCommit={(md) => write(writeRun(elements, run.at, md))}
-            /*
-             * Bảng, ảnh, biểu đồ không phải chữ nên chúng đứng ngoài ô soạn.
-             * Không có hai móc này thì xoá ngược tới chúng là cụt đường, và
-             * cách duy nhất còn lại là với tay ra chuột.
-             */
-            onBackspaceAtStart={() => {
-              const before = run.at[0] - 1
-              if (before < 0) return false
-              write(removeAt(elements, before))
-              return true
-            }}
-            onDeleteAtEnd={() => {
-              const after = run.at[1] + 1
-              if (after >= elements.length) return false
-              write(removeAt(elements, after))
-              return true
-            }}
-          />
-        </div>
+        <LiveRun
+          key={i}
+          text={run.text}
+          menuOpen={menuAt === i}
+          onToggleMenu={() => setMenuAt(menuAt === i ? null : i)}
+          onCommit={(md) => write(writeRun(elements, run.at, md))}
+          /*
+           * Chèn vào **sau dòng con trỏ đang ở**, không phải cuối dải. Dải chữ
+           * và element trong kho khớp nhau một-một theo thứ tự, nên dòng thứ
+           * `line` của dải là element `run.at[0] + line`.
+           */
+          onInsertAfterLine={(lineIndex, t) => {
+            write(insertAt(elements, run.at[0] + lineIndex + 1, blankReportBlock(t)))
+            setMenuAt(null)
+          }}
+          /*
+           * Bảng, ảnh, biểu đồ không phải chữ nên chúng đứng ngoài ô soạn.
+           * Không có hai móc này thì xoá ngược tới chúng là cụt đường, và
+           * cách duy nhất còn lại là với tay ra chuột.
+           */
+          onBackspaceAtStart={() => {
+            const before = run.at[0] - 1
+            if (before < 0) return false
+            write(removeAt(elements, before))
+            return true
+          }}
+          onDeleteAtEnd={() => {
+            const after = run.at[1] + 1
+            if (after >= elements.length) return false
+            write(removeAt(elements, after))
+            return true
+          }}
+        />
       )
     }
     return (
