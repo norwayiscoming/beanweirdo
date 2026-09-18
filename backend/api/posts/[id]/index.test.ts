@@ -149,3 +149,81 @@ describe('PATCH /api/posts/:id', () => {
     expect(res.statusCode).toBe(404)
   })
 })
+
+/*
+ * `thumbnail_url` là cột dẫn xuất: khách gọi không đặt được nó (nó không nằm
+ * trong PATCHABLE), và nó chỉ phụ thuộc vào `body`. Nên đúng một chỗ tính lại
+ * nó — chính là chỗ ghi `body` này.
+ */
+describe('PATCH /api/posts/:id — ảnh đại diện đi theo thân bài', () => {
+  it('tính lại khi thân bài đổi', async () => {
+    const builder = queryBuilder({ data: { id: 'p1' }, error: null })
+    fromMock.mockReturnValue(builder)
+
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { body: [{ k: 'fig', src: '/vua-dan.png' }] },
+    })
+    const res = mockRes()
+    await handler(req, res)
+    expect(res.statusCode).toBe(200)
+
+    const written = builder.update.mock.calls[0][0] as Record<string, unknown>
+    expect(written.thumbnail_url).toBe('/vua-dan.png')
+    // Và câu trả lời vẫn không kéo `body` về.
+    expect(builder.select.mock.calls[0][0]).not.toContain('body')
+  })
+
+  it('xoá hết ảnh khỏi bài thì ô đại diện cũng trống theo', async () => {
+    const builder = queryBuilder({ data: { id: 'p1' }, error: null })
+    fromMock.mockReturnValue(builder)
+
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { body: [{ k: 'p', text: 'chữ thôi' }] },
+    })
+    const res = mockRes()
+    await handler(req, res)
+
+    const written = builder.update.mock.calls[0][0] as Record<string, unknown>
+    expect(written.thumbnail_url).toBeNull()
+  })
+
+  it('không đụng tới nó khi lần sửa này không chạm thân bài', async () => {
+    const builder = queryBuilder({ data: { id: 'p1' }, error: null })
+    fromMock.mockReturnValue(builder)
+
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { en: 'Tên khác' },
+    })
+    const res = mockRes()
+    await handler(req, res)
+
+    const written = builder.update.mock.calls[0][0] as Record<string, unknown>
+    expect(written).not.toHaveProperty('thumbnail_url')
+  })
+
+  it('khách gọi không tự đặt được nó', async () => {
+    const builder = queryBuilder({ data: { id: 'p1' }, error: null })
+    fromMock.mockReturnValue(builder)
+
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { en: 'Tên khác', thumbnail_url: '/tu-dat.png' },
+    })
+    const res = mockRes()
+    await handler(req, res)
+
+    const written = builder.update.mock.calls[0][0] as Record<string, unknown>
+    expect(written).not.toHaveProperty('thumbnail_url')
+  })
+})

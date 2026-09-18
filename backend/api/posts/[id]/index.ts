@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { withCors } from '../../../lib/cors.js'
 import { requireAuth } from '../../../lib/auth.js'
 import { getSupabase } from '../../../lib/supabase.js'
-import { POST_DETAIL_COLUMNS, toPostDetail, type PostRow } from '../../../lib/posts.js'
+import { firstImageIn, POST_DETAIL_COLUMNS, toPostDetail, type PostRow } from '../../../lib/posts.js'
 
 function getId(req: VercelRequest): string | null {
   const raw = req.query.id
@@ -79,6 +79,18 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
   }
 
   patch.updated_at = new Date().toISOString()
+
+  /*
+   * `thumbnail_url` is derived, so it is written here and nowhere else.
+   *
+   * It is not in PATCHABLE on purpose: a client cannot set it, and it cannot
+   * drift, because the only thing it depends on is `body` and this is the only
+   * route that changes `body` after a post exists. Recomputed from the incoming
+   * value rather than read back, so this stays one statement.
+   */
+  if (Object.prototype.hasOwnProperty.call(patch, 'body')) {
+    patch.thumbnail_url = firstImageIn(patch.body)
+  }
 
   /*
    * Answer with the columns this PATCH wrote, and never with `body`.

@@ -3,6 +3,7 @@ import { withCors } from '../../lib/cors.js'
 import { requireAuth } from '../../lib/auth.js'
 import { getSupabase } from '../../lib/supabase.js'
 import {
+  firstImageIn,
   POST_STATUSES,
   POST_SUMMARY_COLUMNS,
   POST_TEMPLATES,
@@ -227,6 +228,9 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
       date_label: formatDateLabel(new Date()),
       sort_order: null,
       body: startingBody,
+      // Derived from the body being written, in the same statement that writes
+      // it. A template or a copied post can arrive with pictures already in it.
+      thumbnail_url: firstImageIn(startingBody),
       lead: copied?.lead ?? null,
       theme_color,
       hero_image_url: copied?.hero_image_url ?? null,
