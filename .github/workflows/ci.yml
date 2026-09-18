@@ -7,19 +7,12 @@
 # then start vitest; run back to back that is 12s + 36s. Split, the wall clock
 # is the slowest job, not the sum.
 #
-# `schedule` looks redundant next to `push: branches: [main]`, and is not.
-# GitHub will not start a workflow for a push made with a GitHub App
-# installation token, and every merge here is performed by the `claude[bot]`
-# App: the merge commit 3f15954 lists `claude[bot]` (id 209825114) as its
-# committer and started nothing, while c5678d3 on PR #3, pushed from a sandbox
-# as the `claude` user (id 81847), started run 1 and passed. So the `push`
-# trigger above fires for a human and never for a merge, which left everything
-# on `main` unverified after the fact. A scheduled run is started by GitHub
-# itself rather than by any token, so it always fires.
-#
-# `workflow_dispatch` is the same story from the other side: until 16:35 UTC on
-# 2026-09-18 this repository had zero runs of anything, and finding that out
-# required opening a pull request. Now it is one button.
+# `workflow_dispatch` is here because this repository had zero workflow runs of
+# anything until 2026-09-18 16:35 UTC, and finding that out took opening a pull
+# request. Why it sat idle is not established; what is established is that
+# since then both triggers work, merges by the `claude[bot]` App included (run
+# 2, `event: push` on `main` at 43d5ceb, success). The button is how the next
+# person checks in one click instead of by opening a pull request.
 name: ci
 
 on:
@@ -27,10 +20,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # 01:00 UTC, i.e. 08:00 in Hanoi — a red `main` is waiting in the morning
-  # rather than discovered days later.
-  schedule:
-    - cron: '0 1 * * *'
 
 # A new push makes the run in progress pointless, so let it go.
 concurrency:
