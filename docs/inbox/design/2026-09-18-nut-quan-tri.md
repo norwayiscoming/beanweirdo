@@ -198,3 +198,51 @@ Chưa làm, để chủ site quyết:
    được ở trạng thái nghỉ, và vùng bấm cao tối thiểu 24px.
 2. Nêu rõ trong nhóm 08 rằng luật "xoá thẳng, không hỏi lại" áp cho thao tác trên
    **một** dòng dữ liệu, chứ không cho thao tác xoá hàng loạt không hoàn tác được.
+
+---
+
+## Bổ sung — bố cục ba màn (cùng nhánh, cùng PR)
+
+### [ĐỔI HÀNH VI] `/ad-page-content` — thanh mục lục dính
+
+Mới: `CONTENT_SECTIONS` và `ContentIndex` trong `Cms.tsx`. Bảy mục —
+Trang chủ · Tag · Ghi chép · Lưu trữ · Mục lục · Module · Quản trị — mỗi mục là
+một nút nhảy tới đúng tiêu đề của nó. Mục đang xem sáng lên bằng
+`IntersectionObserver`.
+
+Trước: một mạch cuộn liền, sửa một chữ ở khối Quản trị phải cuộn qua sáu khối kia.
+
+Đặt **ở trên** chứ không phải bên trái như bản đề xuất đã vẽ: biểu mẫu bên dưới
+chạy hai và ba cột trong 1080px, một rail dọc sẽ ăn mất bề ngang của chính những
+hàng rộng nhất. Nói ra để khỏi tưởng là quên.
+
+`IntersectionObserver` không có trong jsdom nên có bọc `typeof` — thanh vẫn nhảy
+được trong test, chỉ không sáng lên. Không thêm polyfill cho việc đó.
+
+Mỗi tiêu đề mục nay có `id` và `scrollMarginTop: 64` để thanh dính không che
+mất tiêu đề vừa nhảy tới.
+
+### [ĐỔI HÀNH VI] `/ad-post` — thanh lọc dính
+
+`PostsPanel`: hàng lọc + nút "Bài mới" nay `position: sticky, top: 0`, nền
+`paper.cream`. Danh sách bài dài hơn một màn, nên bộ lọc đang bật và nút tạo bài
+là đúng hai thứ cần thấy trong lúc cuộn.
+
+### [ĐỔI HÀNH VI] `/ad-sitemap` — thanh lưu dính đáy
+
+`RoutesPanel`: nút "Lưu đường dẫn" chuyển từ đầu panel xuống một thanh
+`position: sticky, bottom: 0`, chỉ hiện khi `changed`.
+
+Thanh này nói rõ **bao nhiêu từ đang khác bản đang chạy** (hàm `countChanges`,
+đếm cả `modules`), hoặc báo "còn chỗ viết sai, chưa lưu được" khi `checkWords`
+trả về lỗi. Thêm nút "Huỷ" đặt `draft` về `live`.
+
+Trước: nút lưu nằm ở đầu panel — tức đúng chỗ nó không bao giờ cần tới, vì sửa
+tới từ nào thì nút đã cuộn khuất.
+
+### Kiểm lại sau phần bổ sung
+
+- `npm test` — 125 file, 1249 phép thử xanh.
+- `npx vite build` — xanh.
+- Vẫn **chưa mở trình duyệt xem**. Ba thứ dính (`sticky`) ở trên là loại thay đổi
+  chỉ nhìn mới biết đúng, nên đây là phần cần chủ site soi kỹ nhất sau khi đăng nhập.

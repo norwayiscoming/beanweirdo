@@ -180,11 +180,20 @@ export function PostsPanel({
         ))}
       </div>
 
+      {/*
+        Sticky: the list runs well past one screen, and the filter you are on
+        plus the one button that starts a post are exactly what you want while
+        scrolling it.
+      */}
       <div
         style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
           display: 'flex',
           alignItems: 'center',
           gap: 16,
+          background: paper.cream,
           borderBottom: `1px solid ${paper.rule}`,
           marginBottom: 4,
           flexWrap: 'wrap',
