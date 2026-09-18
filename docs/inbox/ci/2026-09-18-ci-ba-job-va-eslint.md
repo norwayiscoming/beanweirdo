@@ -110,6 +110,55 @@ lý do ở mục dưới. Cron `0 1 * * *`, tức 08:00 giờ Hà Nội.
 - `test`: trước là `typecheck && vitest run`, nay là
   `lint && typecheck && vitest run` — cổng đầy đủ khi chạy ở máy.
 
+### [ĐỔI HÀNH VI] Xoá 10 file test, tỉa 3 file
+
+Chủ site chốt danh sách lúc 16:43 ngày 2026-09-18.
+
+**Xoá cả file — đọc mã nguồn bằng regex thay vì chạy mã (5 file):**
+
+- `frontend/src/lib/rulesOfHooks.test.ts` — dò hook đứng sau `return` bằng lề
+  chữ. Chính file này ghi "dự án không có eslint, nên luật này không có ai canh
+  ngoài chỗ này". Nay có `react-hooks/rules-of-hooks` đọc AST, nên nó thừa.
+  **Luật vẫn được canh, chặt hơn trước.**
+- `frontend/src/lib/templateModel.test.ts` — kiểm văn xuôi trong `logic.ts`.
+- `frontend/src/screens/siteCopyReach.test.ts`
+- `frontend/src/screens/prose.test.ts`
+- `frontend/src/lib/brand.test.ts` — kiểm file PNG có trên đĩa.
+
+**Xoá cả file — khoá con số CSS (5 file):**
+
+- `packages/post-renderer/src/Memo.design.test.tsx` — `80px`, `34px`, màu cụ thể
+- `packages/post-renderer/src/mobile.test.tsx`
+- `frontend/src/content/notes.mobile.test.ts`
+- `frontend/src/screens/Landing.mobile.test.ts`
+- `frontend/src/screens/ImageBand.mobile.test.tsx`
+
+**Tỉa một phần — bỏ chỗ đọc nguồn, giữ chỗ kiểm hành vi (3 file):**
+
+- `frontend/src/screens/ModuleScreen.plates.test.ts` — bỏ cả
+  `describe('chú thích ảnh trên trang module')` (chỉ grep `ModuleScreen.tsx`)
+  và ba dòng đọc nguồn trong `describe('tiêu đề module dài')`. **Giữ** phần
+  kiểm `wrapTitle.hyphens`, `wrapTitle.hyphenateLimitChars`, `PLATE_WIDTH`,
+  `PLATE_HEIGHT` và `plateRatio` — đó là tính toán thật.
+- `frontend/src/lib/postToRenderer.test.ts` — bỏ
+  `it('the API answers in the database's own field names')`, chỗ đọc
+  `backend/lib/posts.ts` rồi bóc interface bằng regex. **Giữ** toàn bộ phần
+  chuyển đổi và phần màu.
+- `frontend/src/lib/postThumbFocus.test.ts` — bỏ
+  `it('không chỗ nào vẽ ảnh bài bằng center/cover viết tay nữa')`. **Giữ**
+  `it('coverStyle đọc điểm căn từ đường dẫn')`.
+
+Sau khi xoá, `readFileSync` trong file test chỉ còn ở hai chỗ, đều cố ý giữ:
+`packages/post-renderer/src/templateContract.test.ts` (luật **09.10**) và
+`backend/api/integration.test.ts`.
+
+**Xoá bao nhiêu test, được bao nhiêu thời gian:** 128 file → 118 file,
+1291 test → 1216 test. `test:unit` từ 36.7s xuống **35.4s**.
+
+Tức là **1,3 giây**. Đúng như đã báo trước khi xoá: các file này giòn chứ không
+chậm. Lý do xoá là chúng đỏ khi đổi tên biến hay đổi một con số thiết kế, trong
+khi hành vi không sai — không phải vì chúng tốn thời gian.
+
 ## Vì sao CI chưa từng chạy — đã truy ra
 
 GitHub **không** khởi động workflow cho một push thực hiện bằng token của
@@ -138,18 +187,18 @@ vẫn bật; PR #3 chứng minh điều đó.
 | Job | Thời gian | Kết quả |
 |---|---|---|
 | `npm run lint` | 5.0s | 0 lỗi, 1 cảnh báo |
-| `npm run typecheck` | 11.1s | xanh |
-| `npm run test:unit` | 36.7s | 128 file, 1291 pass, 2 skip |
-| `npm run test:unit -- --shard=1/2` | 17.9s | 64 file |
-| `npm run test:unit -- --shard=2/2` | 20.5s | 64 file |
+| `npm run typecheck` | 11.3s | xanh |
+| `npm run test:unit` | 35.4s | 118 file, 1216 pass, 2 skip |
+| `npm run test:unit -- --shard=1/2` | 17.6s | 59 file |
+| `npm run test:unit -- --shard=2/2` | 19.9s | 59 file |
 
-So sánh cùng điều kiện, cùng 128 file: cấu hình **cũ 46.4s**, cấu hình
-**mới 36.7s**.
+So sánh cùng điều kiện, cùng 128 file, chưa xoá gì: cấu hình **cũ 46.4s**,
+cấu hình **mới 36.7s**. Xoá 10 file rồi thì còn 35.4s.
 
-Tường CI ở máy = `npm ci` + shard chậm nhất ≈ 9 + 20.5 ≈ **30s**.
+Tường CI ở máy = `npm ci` + shard chậm nhất ≈ 9 + 19.9 ≈ **29s**.
 
 Quy đổi ra runner: pipeline cũ đo ở máy 66s mà chạy thật mất 96s, tức runner
-chậm hơn khoảng **1.45 lần**. Áp tỉ lệ đó lên 30s ra **khoảng 43 giây**. Đây là
+chậm hơn khoảng **1.45 lần**. Áp tỉ lệ đó lên 29s ra **khoảng 42 giây**. Đây là
 phép ngoại suy từ một điểm dữ liệu, không phải số đo — phải có một run thật
 của `ci.yml` mới chốt được.
 
@@ -168,12 +217,10 @@ import trong file test.
 
 ## Còn treo — cần chủ site
 
-1. **Thời gian Vercel chưa đo được.** Connector Vercel trả về danh sách team
-   rỗng trong phiên này, nên phần CD của mục tiêu "CI + CD < 60s" chưa có số.
-2. **Danh sách 13 file đề nghị xoá chưa được chốt**, nên chưa xoá file nào.
-   Riêng `frontend/src/lib/rulesOfHooks.test.ts` giờ đã có
-   `react-hooks/rules-of-hooks` làm thay bằng AST, nên nó đã thừa thật.
-3. **`schedule` là thứ tôi tự thêm**, không nằm trong yêu cầu ban đầu. Lý do ở
+1. **Phần CD không đo.** Chủ site nói không cần, nên mục tiêu "CI + CD < 60s"
+   ở đây chỉ chứng minh nửa CI. Connector Vercel cũng không truy cập được từ
+   phiên này.
+2. **`schedule` là thứ tôi tự thêm**, không nằm trong yêu cầu ban đầu. Lý do ở
    mục trên. Một run mỗi ngày; không muốn thì xoá bốn dòng.
 
 ## Đề xuất luật (ý kiến, chưa làm)
