@@ -34,6 +34,8 @@ import { ModuleImages } from '../admin/components/ModuleImages'
 import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
 import { coverStyle } from '../lib/imageFocus'
+import { rootsOf } from '../lib/contentTree'
+import { moduleMapRow, type MapRow } from '../lib/siteMapRows'
 import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
 import type { FeatureOverride } from '../content/notes'
@@ -211,8 +213,41 @@ function ContentIndex() {
   )
 }
 
-/** One page on the site map, and what it holds. */
-type MapRow = { label: string; desc: string; kids: string[] }
+
+/**
+ * The rows under a page, however deep they run.
+ *
+ * Each step in indents by the same amount rather than by a different rule per
+ * level, so the fourth level needs nothing written for it.
+ */
+function MapKids({ rows, depth = 0 }: { rows: MapRow[]; depth?: number }) {
+  return (
+    <>
+      {rows.map((k, ki) => (
+        <div key={`${k.label}-${ki}`}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 12,
+              padding: `4px 0 4px ${26 + depth * 18}px`,
+              borderLeft: `1px solid ${paper.rule}`,
+              margin: '4px 0 0 6px',
+              fontFamily: sans,
+              fontWeight: 300,
+              fontSize: 12.5,
+              color: ink.soft,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>{k.label}</div>
+            {k.desc && <div style={{ color: ink.muted }}>{k.desc}</div>}
+          </div>
+          {k.kids.length > 0 && <MapKids rows={k.kids} depth={depth + 1} />}
+        </div>
+      ))}
+    </>
+  )
+}
 
 /** Names where a field turns up on the site — identification, not instruction. */
 function Where({ children }: { children: ReactNode }) {
@@ -764,8 +799,8 @@ export function Cms() {
    * Content management holds its own three tabs. Phần còn lại giữ luật và
    * tham chiếu, thứ chính trang ấy bày ra tốt hơn một dòng trong sơ đồ.
    */
-  function childrenOf(key: string): string[] {
-    if (key === 'cms') return TABS.map((t) => t.t)
+  function childrenOf(key: string): MapRow[] {
+    if (key === 'cms') return TABS.map((t) => ({ label: t.t, desc: '', kids: [] }))
     return []
   }
 
@@ -783,6 +818,8 @@ export function Cms() {
    * that hold something say what they hold, so nothing here is written by hand
    * twice.
    */
+  const moduleRow = (m: Module): MapRow => moduleMapRow(modules, m, liveOf)
+
   const tree: { group: NavGroup; color: string; rows: MapRow[] }[] = (
     [
       { group: 'Public', color: ink.green },
@@ -798,12 +835,12 @@ export function Cms() {
     for (const item of NAV.filter((n) => n.group === g.group && !n.hiddenFromSidebar)) {
       // Reading modules sit under Trang chủ, the gallery that shows them.
       if (g.group === 'Public' && item.key === 'notes') {
-        for (const m of modules.filter((x) => !spokenFor.has(x.id))) {
-          rows.push({
-            label: m.title,
-            desc: m.concept ? `module · ${m.concept}` : 'module',
-            kids: liveOf(m.id).map((p, i) => `${displayNumber(i)} · ${p.en}`),
-          })
+        // Only the modules nothing else holds. Everything filed inside one is
+        // reached by recursing into it, so a module is drawn exactly once
+        // however deep it sits — the flat loop that used to be here listed a
+        // sub-module beside its own parent.
+        for (const m of rootsOf(modules).filter((x) => !spokenFor.has(x.id))) {
+          rows.push(moduleRow(m))
         }
       }
 
@@ -813,10 +850,7 @@ export function Cms() {
         // fallback for a module that has not loaded or does not exist yet.
         label: m?.title ?? item.label,
         desc: m?.concept ? `module · ${m.concept}` : item.desc,
-        // A site map shows the site: a post nobody can read is not on it.
-        kids: m
-          ? liveOf(m.id).map((p, i) => `${displayNumber(i)} · ${p.en}`)
-          : childrenOf(item.key),
+        kids: m ? moduleRow(m).kids : childrenOf(item.key),
       })
     }
     return { ...g, rows }
@@ -963,25 +997,7 @@ export function Cms() {
                       {r.desc}
                     </div>
                   </div>
-                  {r.kids.map((k, ki) => (
-                    <div
-                      key={ki}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        gap: 12,
-                        padding: '4px 0 4px 26px',
-                        borderLeft: `1px solid ${paper.rule}`,
-                        margin: '4px 0 0 6px',
-                        fontFamily: sans,
-                        fontWeight: 300,
-                        fontSize: 12.5,
-                        color: ink.soft,
-                      }}
-                    >
-                      {k}
-                    </div>
-                  ))}
+                  <MapKids rows={r.kids} />
                 </div>
               ))}
             </div>
