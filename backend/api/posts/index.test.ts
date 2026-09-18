@@ -203,6 +203,72 @@ describe('POST /api/posts', () => {
   })
 })
 
+describe('POST /api/posts — a tag written along with the post', () => {
+  /*
+   * "Bài mới" từng là hai lượt gọi từ trình duyệt: xin id của tag, rồi mới tạo
+   * bài. Hai lượt là hai preflight và hai lần đánh thức function trước khi màn
+   * soạn kịp mở. Nay nhãn đi kèm bài.
+   */
+  it('derives the tag id from the label and writes both', async () => {
+    const tags = queryBuilder({ data: null, error: null })
+    const insert = queryBuilder({ data: { id: 'new-post' }, error: null })
+    fromMock.mockReturnValueOnce(tags).mockReturnValueOnce(insert)
+
+    const res = mockRes()
+    await handler(
+      mockReq({
+        method: 'POST',
+        headers: authHeaders(signToken()),
+        body: { module_id: 'sensory', kindLabel: 'Ghi chép', en: 'Title', vi: '' },
+      }),
+      res,
+    )
+
+    expect(res.statusCode).toBe(201)
+    expect(tags.upsert).toHaveBeenCalledWith(
+      { id: 'ghi-chep', label: 'Ghi chép' },
+      { onConflict: 'id' },
+    )
+    // Bài đeo chính cái id vừa tính ra, không phải nhãn.
+    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ghi-chep' }))
+  })
+
+  it('still accepts a plain tag id, and then writes no tag', async () => {
+    const insert = queryBuilder({ data: { id: 'new-post' }, error: null })
+    fromMock.mockReturnValue(insert)
+
+    const res = mockRes()
+    await handler(
+      mockReq({
+        method: 'POST',
+        headers: authHeaders(signToken()),
+        body: { module_id: 'sensory', kind: 'essay', en: 'Title', vi: '' },
+      }),
+      res,
+    )
+
+    expect(res.statusCode).toBe(201)
+    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({ kind: 'essay' }))
+    expect(fromMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('400s on a label with no letter or number in it', async () => {
+    const res = mockRes()
+    await handler(
+      mockReq({
+        method: 'POST',
+        headers: authHeaders(signToken()),
+        body: { module_id: 'sensory', kindLabel: '!!!', en: 'Title', vi: '' },
+      }),
+      res,
+    )
+
+    expect(res.statusCode).toBe(400)
+    expect(res.body.error).toMatch(/kindLabel/)
+    expect(fromMock).not.toHaveBeenCalled()
+  })
+})
+
 describe('PUT /api/posts', () => {
   it('requires a module_id', async () => {
     const res = mockRes()

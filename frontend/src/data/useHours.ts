@@ -288,9 +288,9 @@ export function useHours(): UseHoursResult {
       const setter = system === 'task' ? setKinds : setProjects
       setter((xs) => xs.concat([trimmed]))
       try {
-        const saved = await apiAddKind(trimmed, system)
-        setKinds(saved.kinds)
-        setProjects(saved.projects)
+        // Máy chủ không trả về cả hai danh sách nữa — danh sách lạc quan ở trên
+        // đã đúng, và ghi đè nó bằng một lượt đọc y hệt là lượt đi thừa.
+        await apiAddKind(trimmed, system)
         setError(null)
       } catch (e) {
         failed(e)
@@ -306,9 +306,7 @@ export function useHours(): UseHoursResult {
       setter((xs) => xs.map((x) => (x === from ? to : x)))
       setLogs((ls) => ls.map((l) => (l[column] === from ? { ...l, [column]: to } : l)))
       try {
-        const saved = await renameKind(from, to, system)
-        setKinds(saved.kinds)
-        setProjects(saved.projects)
+        await renameKind(from, to, system)
         setError(null)
       } catch (e) {
         failed(e)
@@ -341,8 +339,6 @@ export function useHours(): UseHoursResult {
       setter((xs) => xs.filter((x) => x !== name))
       try {
         const saved = await deleteKind(name, system, plan)
-        setKinds(saved.kinds)
-        setProjects(saved.projects)
         setError(null)
         // The reassignments touched rows this hook holds; refetch rather than
         // replay the server's arithmetic locally and hope the two agree.

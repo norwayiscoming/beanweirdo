@@ -7,8 +7,12 @@
  * authenticated call.
  */
 import type { SectionData } from 'post-renderer'
+import { supabase } from '../../lib/supabaseClient'
 import type { SiteOverrides } from '../../content/site'
 import type { LogEntry } from '../../content/hours'
+
+/** Kho ảnh của bài — cùng tên với migration 0004, và bucket ấy là public. */
+const IMAGE_BUCKET = 'post-images'
 
 /** The 3 real post templates (the old `templates` table is gone). */
 export const TEMPLATES = ['article', 'cards', 'report', 'longform', 'memo', 'bitesize'] as const
@@ -174,8 +178,16 @@ export async function listPosts(status: PostStatus | 'all' = 'all'): Promise<Pos
 /** POST /api/posts — create a draft. Server derives n and date_label; status defaults to 'draft'. */
 export async function createPost(input: {
   module_id: string
-  /** The tag, free text since migration 0020 — see backend/api/tags.ts. */
-  kind: string
+  /** An existing tag's id. Bỏ qua khi có `kindLabel`. */
+  kind?: string
+  /**
+   * Tag đúng như chủ site vừa gõ; máy chủ tự ghi nó xuống và tự tính `id`.
+   *
+   * Trước đây màn "bài mới" phải gọi `createTag` trước để lấy `id` rồi mới gọi
+   * `createPost` — hai lượt nối tiếp, mỗi lượt một preflight, trước khi màn
+   * soạn kịp mở.
+   */
+  kindLabel?: string
   en: string
   vi: string
   /** The stored template to start from; its body is copied into the new post. */
@@ -264,26 +276,48 @@ export async function updatePost(
 }
 
 /**
- * POST /api/posts/:id/status — applies one lifecycle transition. Returns the
- * full updated detail, except for 'permanently-delete' which hard-deletes
- * the row and returns `{ deleted: true }` instead.
+ * POST /api/posts/:id/status — applies one lifecycle transition.
+ *
+ * Trả về đúng những cột lần đổi này ghi, cộng `id` — không phải cả bài. Ba chỗ
+ * gọi (`PostsPanel`, `Editor`, `Cms.removeEntry`) đều bỏ qua giá trị trả về.
+ * 'permanently-delete' xoá cứng và trả `{ deleted: true }`.
  */
 export async function transitionStatus(
   id: string,
   action: StatusAction,
-): Promise<PostDetail | { deleted: true }> {
-  const result = await request<{ post: PostDetail } | { deleted: true }>(`/api/posts/${id}/status`, {
-    method: 'POST',
-    body: JSON.stringify({ action }),
-  })
+): Promise<(Partial<PostDetail> & { id: string }) | { deleted: true }> {
+  const result = await request<{ post: Partial<PostDetail> & { id: string } } | { deleted: true }>(
+    `/api/posts/${id}/status`,
+    { method: 'POST', body: JSON.stringify({ action }) },
+  )
   return 'deleted' in result ? result : result.post
 }
 
-/** POST /api/upload — multipart upload, field name 'file'. */
+/**
+ * Tải một ảnh lên, bằng một lượt chứ không phải hai.
+ *
+ * Trước đây tệp đi qua serverless function: trình duyệt → Vercel → Supabase.
+ * Người dùng chờ hết lượt đầu rồi mới bắt đầu lượt sau. Nay máy chủ chỉ ký một
+ * vé — `POST /api/upload` không nhận byte nào — và tệp đi thẳng từ trình duyệt
+ * lên Storage.
+ *
+ * Chữ ký của hàm này không đổi, nên bảy chỗ đang gọi nó không phải sửa gì.
+ */
 export async function uploadImage(file: File): Promise<{ url: string }> {
-  const form = new FormData()
-  form.set('file', file)
-  return request<{ url: string }>('/api/upload', { method: 'POST', body: form })
+  const ticket = await request<{ path: string; token: string; url: string }>('/api/upload', {
+    method: 'POST',
+    body: JSON.stringify({ filename: file.name, contentType: file.type }),
+  })
+
+  const { error } = await supabase.storage
+    .from(IMAGE_BUCKET)
+    .uploadToSignedUrl(ticket.path, ticket.token, file)
+
+  // Vé ký được nhưng tệp không lên được là một lỗi khác hẳn, nên nó nói tên
+  // mình ra chứ không đội lốt lỗi của `/api/upload`.
+  if (error) throw new ApiError(`Không tải được ảnh lên kho: ${error.message}`, 502, error)
+
+  return { url: ticket.url }
 }
 
 /** GET /api/modules — for the admin's module-select dropdown. */
@@ -384,12 +418,18 @@ export async function deleteLog(id: string): Promise<void> {
   await request<Record<string, never>>(`/api/hours?id=${id}`, { method: 'DELETE' })
 }
 
-/** POST /api/hours?resource=kinds — add a tag to one system; both lists come back. */
+/**
+ * POST /api/hours?resource=kinds — add a tag to one system.
+ *
+ * Trả về đúng tag vừa thêm, không phải cả hai danh sách. Máy chủ từng đọc lại
+ * cả bảng `activity_kinds` để trả lời, mà `useHours` thì đã tự thêm vào danh
+ * sách của nó trước khi gọi — nên lượt đọc ấy chỉ để ghi đè một giá trị y hệt.
+ */
 export async function addKind(
   name: string,
   system: 'task' | 'project' = 'task',
-): Promise<{ kinds: string[]; projects: string[] }> {
-  return request<{ kinds: string[]; projects: string[] }>('/api/hours?resource=kinds', {
+): Promise<{ name: string; system: 'task' | 'project' }> {
+  return request<{ name: string; system: 'task' | 'project' }>('/api/hours?resource=kinds', {
     method: 'POST',
     body: JSON.stringify({ name, system }),
   })
@@ -398,13 +438,17 @@ export async function addKind(
 /** Which activities a tag is being taken off, and what they get instead. */
 export type TagMove = { to: string | null; ids: string[] }
 
-/** PATCH /api/hours?resource=kinds — rename a tag and everything filed under it. */
+/**
+ * PATCH /api/hours?resource=kinds — rename a tag and everything filed under it.
+ *
+ * Trả về tên mới, không phải cả hai danh sách — cùng lý do với `addKind`.
+ */
 export async function renameKind(
   name: string,
   next: string,
   system: 'task' | 'project' = 'task',
-): Promise<{ kinds: string[]; projects: string[] }> {
-  return request<{ kinds: string[]; projects: string[] }>(
+): Promise<{ name: string; system: 'task' | 'project' }> {
+  return request<{ name: string; system: 'task' | 'project' }>(
     `/api/hours?resource=kinds&name=${encodeURIComponent(name)}&system=${system}`,
     { method: 'PATCH', body: JSON.stringify({ name: next }) },
   )
@@ -416,14 +460,15 @@ export async function renameKind(
  * `moves` are the reassignments chosen for the activities wearing it; `rest`
  * catches whatever those did not cover. Leaving `rest` undefined files the
  * remainder as unclassified. `affected` comes back holding every activity that
- * wore the tag — undo needs the ones older than the span on screen too.
+ * wore the tag — undo needs the ones older than the span on screen too, so it
+ * is the one thing this route still reads the database to answer.
  */
 export async function deleteKind(
   name: string,
   system: 'task' | 'project' = 'task',
   body: { moves?: TagMove[]; rest?: string | null } = {},
-): Promise<{ kinds: string[]; projects: string[]; affected: string[] }> {
-  return request<{ kinds: string[]; projects: string[]; affected: string[] }>(
+): Promise<{ affected: string[] }> {
+  return request<{ affected: string[] }>(
     `/api/hours?resource=kinds&name=${encodeURIComponent(name)}&system=${system}`,
     { method: 'DELETE', body: JSON.stringify(body) },
   )

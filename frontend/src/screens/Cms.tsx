@@ -7,7 +7,6 @@ import { resolveSite, SITE_DEFAULTS, type NavGroup, type SiteCopy, type SiteOver
 import {
   createModule,
   deleteModule,
-  listModules,
   listPosts,
   reorderModules,
   reorderPosts,
@@ -21,12 +20,17 @@ import {
 import {
   transitionStatus,
   getSite,
-  listTags,
   createTag,
   renameTag,
   deleteTag,
   type Tag,
 } from '../admin/lib/apiClient'
+import {
+  forgetModules,
+  forgetTags,
+  listModulesCached,
+  listTagsCached,
+} from '../admin/lib/lists'
 import { tagColor } from '../lib/notesFilter'
 import { PostsPanel } from '../admin/components/PostsPanel'
 import { RoutesPanel } from '../admin/components/RoutesPanel'
@@ -440,7 +444,7 @@ function TagsPanel() {
   const [adding, setAdding] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const load = () => void listTags().then(setTags)
+  const load = () => void listTagsCached().then(setTags)
   useEffect(load, [])
 
   const run = async (id: string, fn: () => Promise<unknown>) => {
@@ -448,6 +452,9 @@ function TagsPanel() {
     try {
       await fn()
       setErr(null)
+      // Bỏ bản đang giữ trước khi đọc lại, nếu không `load()` trả về đúng cái
+      // danh sách mà lượt ghi vừa rồi đã làm cho cũ.
+      forgetTags()
       load()
     } catch (e) {
       setErr((e as Error).message)
@@ -558,7 +565,7 @@ export function Cms() {
 
   const load = useCallback(async () => {
     try {
-      const [s, m, p] = await Promise.all([getSite(), listModules(), listPosts('all')])
+      const [s, m, p] = await Promise.all([getSite(), listModulesCached(), listPosts('all')])
       setSite(s)
       setModules(m)
       setPosts(p)
@@ -669,6 +676,7 @@ export function Cms() {
 
   async function patchModule(id: string, patch: Partial<Module>) {
     setModules((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+    forgetModules()
     try {
       await updateModule(id, patch)
     } catch (e) {
@@ -687,6 +695,7 @@ export function Cms() {
     if (i < 0 || j < 0) return
     order.splice(j, 0, order.splice(i, 1)[0])
     setModules(order.map((id) => modules.find((m) => m.id === id)!))
+    forgetModules()
     try {
       setModules(await reorderModules(order))
     } catch (e) {
@@ -1174,6 +1183,7 @@ export function Cms() {
               onClick={async () => {
                 try {
                   const m = await createModule()
+                  forgetModules()
                   setModules((ms) => ms.concat([m]))
                   setOpenModule(m.id)
                   toast.ok(`Đã tạo module “${m.title}”`)
@@ -1280,6 +1290,7 @@ export function Cms() {
                     onClick={async () => {
                       try {
                         await deleteModule(m.id)
+                        forgetModules()
                         setModules((ms) => ms.filter((x) => x.id !== m.id))
                         setPosts((ps) => ps.filter((p) => p.module_id !== m.id))
                         setOpenModule(null)
