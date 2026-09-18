@@ -12,6 +12,7 @@ import { garden, ink, paper, prose, sans, serif, wrapTitle } from '../design/tok
 import { Hover } from '../lib/Hover'
 import { rowPad, useNav, useSettings } from '../lib/nav'
 import { openPost } from '../lib/openPost'
+import { groupByModule } from '../lib/postGroups'
 import { openModule } from '../lib/moduleTarget'
 import { useIsMobile } from '../lib/useIsMobile'
 
@@ -51,17 +52,6 @@ function usePlates() {
     caption: captions[i],
     fill: photos[i] ? coverStyle(photos[i]) : { background: p.bg },
   }))
-}
-
-/** Groups posts by `module_id`, preserving each module's `sort_order`. */
-function groupByModule(posts: PostRow[]): Map<string, PostRow[]> {
-  const map = new Map<string, PostRow[]>()
-  for (const p of posts) {
-    const list = map.get(p.module_id)
-    if (list) list.push(p)
-    else map.set(p.module_id, [p])
-  }
-  return map
 }
 
 type ModulesProps = { modules: ModuleRow[]; postsByModule: Map<string, PostRow[]> }

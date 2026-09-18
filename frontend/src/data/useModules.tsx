@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { rootsOf } from '../lib/contentTree'
 import { supabase } from '../lib/supabaseClient'
 
 export type ModuleLayout = 'band' | 'specimen' | 'sequence'
@@ -39,6 +40,16 @@ export type ModuleRow = {
   page_shot3: string
   page_shot4: string
   sort_order: number
+  /**
+   * The module this one sits inside; null at the top level — see migration
+   * 0025 and `lib/contentTree.ts`.
+   *
+   * Optional rather than `string | null` because a database that has not run
+   * 0025 yet answers without the column at all, and every screen still has to
+   * draw. Nothing reads this field directly: ask `contentTree` instead, so the
+   * rules about missing parents and cycles live in one place.
+   */
+  parent_id?: string | null
   /**
    * 'normal' — a reading module, one of the gallery on the homepage.
    * 'special' — extended content that already has a page of its own (Ghi 01,
@@ -152,9 +163,14 @@ const byBandThenOrder = (a: ModuleRow, b: ModuleRow) => {
  * Trang chủ — the gallery of reading modules, one full-bleed colour block
  * each. Special modules are left out because they are not reading modules,
  * not because they are hidden.
+ *
+ * Only the top level of the tree: a module filed inside another one is
+ * introduced by its parent's page, and showing it here as well would put the
+ * same thing on the front page twice under two different headings. While every
+ * `parent_id` is null this is the whole list, which is what it was before.
  */
 export const landingModules = (modules: ModuleRow[]) =>
-  modules.filter((m) => m.kind !== 'special' && isPublic(m)).sort(byBandThenOrder)
+  rootsOf(modules.filter((m) => m.kind !== 'special' && isPublic(m))).sort(byBandThenOrder)
 
 /** Mục lục — everything public, the journals included, in sidebar order. */
 export const indexModules = (modules: ModuleRow[]) =>
