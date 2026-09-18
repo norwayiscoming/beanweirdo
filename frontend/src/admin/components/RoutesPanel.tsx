@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ink, paper, sans, serif, space } from '../../design/tokens'
+import { Button } from '../../design/Button'
+import { IconChevron } from '../../design/icons'
 import { buildSlug } from '../../lib/postSlug'
 import { toPath } from '../../lib/routes'
 import {
@@ -143,47 +145,42 @@ export function RoutesPanel({
   return (
     <div style={{ marginTop: space.section, borderTop: `2px solid ${ink.base}`, paddingTop: space.inner }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: space.inner }}>
-        <h2
-          onClick={toggle}
-          style={{
-            fontFamily: serif,
-            fontWeight: 400,
-            fontSize: 30,
-            letterSpacing: '-.02em',
-            margin: 0,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: 10,
-          }}
-        >
-          <span
-            aria-label={open ? 'Co lại' : 'Mở ra'}
-            role="button"
-            style={{ fontFamily: sans, fontSize: 13, color: ink.muted, width: 12 }}
-          >
-            {open ? '−' : '+'}
-          </span>
-          Đường dẫn
-          {!open && (
-            <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: ink.muted }}>
-              {toPath({ area: 'admin', screen: 'cms' }, live)} · {`/${live.post}/…`}
-            </code>
-          )}
+        {/*
+          This was an `<h2 onClick>` holding a `<span role="button">` that
+          carried no handler: announced as a button, reachable by neither Tab
+          nor Enter, and the only way to open the section was to click the
+          heading itself. The heading is the button now, and `aria-expanded`
+          says what pressing it will do.
+        */}
+        <h2 style={{ margin: 0 }}>
+          <button type="button" className="ab-disclose" onClick={toggle} aria-expanded={open}>
+            <IconChevron size={16} open={open} style={{ color: ink.muted }} />
+            <span
+              style={{
+                fontFamily: serif,
+                fontWeight: 400,
+                fontSize: 30,
+                letterSpacing: '-.02em',
+                color: ink.base,
+              }}
+            >
+              Đường dẫn
+            </span>
+            {!open && (
+              <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: ink.muted }}>
+                {toPath({ area: 'admin', screen: 'cms' }, live)} · {`/${live.post}/…`}
+              </code>
+            )}
+          </button>
         </h2>
         {open && (
           <div style={{ display: 'flex', alignItems: 'center', gap: space.gap }}>
             {saved && !changed && (
               <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.muted }}>đã lưu</span>
             )}
-            <button
-              className="admin-btn-ghost"
-              disabled={!changed || bad}
-              onClick={save}
-              style={{ opacity: !changed || bad ? 0.4 : 1 }}
-            >
+            <Button level="primary" disabled={!changed || bad} onClick={save}>
               Lưu đường dẫn
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -229,17 +226,13 @@ export function RoutesPanel({
                   style={field(Boolean(errors[k]))}
                 />
                 {draft[k] !== DEFAULT_WORDS[k] && (
-                  <button
-                    className="admin-btn-ghost"
-                    onClick={() => set(k, DEFAULT_WORDS[k])}
-                    style={{ fontSize: 11 }}
-                  >
+                  <Button size="sm" onClick={() => set(k, DEFAULT_WORDS[k])} title={`Trả về “${DEFAULT_WORDS[k]}”`}>
                     {DEFAULT_WORDS[k]}
-                  </button>
+                  </Button>
                 )}
               </div>
               {errors[k] && (
-                <div style={{ fontFamily: sans, fontSize: 11.5, color: '#8E1E42', marginTop: 4, marginLeft: 168 + space.gap }}>
+                <div style={{ fontFamily: sans, fontSize: 11.5, color: ink.danger, marginTop: 4, marginLeft: 168 + space.gap }}>
                   {errors[k]}
                 </div>
               )}
@@ -291,7 +284,7 @@ export function RoutesPanel({
             Tên module trong địa chỉ
           </div>
           {errors.modules && (
-            <span style={{ fontFamily: sans, fontSize: 11.5, color: '#8E1E42' }}>{errors.modules}</span>
+            <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.danger }}>{errors.modules}</span>
           )}
         </div>
         {modules.map((m) => (

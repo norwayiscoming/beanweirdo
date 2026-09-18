@@ -38,6 +38,9 @@ import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
 import type { FeatureOverride } from '../content/notes'
 import { ink, paper, sans, serif } from '../design/tokens'
+import { Button, IconButton } from '../design/Button'
+import { IconChevron, IconClose, IconDrag, IconPlus, IconTrash, IconUpload } from '../design/icons'
+import { useToast } from '../design/Toaster'
 import { Hover } from '../lib/Hover'
 import { useNav } from '../lib/nav'
 
@@ -193,6 +196,7 @@ function ImageSlot({
 }) {
   const [placing, setPlacing] = useState<string | null>(null)
   const [linking, setLinking] = useState(false)
+  const file = useRef<HTMLInputElement>(null)
   const { marked, handle, ...dragProps } = drag ?? { marked: false, handle: undefined }
   return (
     <div {...dragProps} style={{ outline: marked ? `2px solid ${ink.base}` : undefined, outlineOffset: 4 }}>
@@ -202,16 +206,9 @@ function ImageSlot({
             {...handle}
             title="Kéo sang khung khác để đổi chỗ hai ảnh"
             aria-label={`kéo ${label} sang khung khác`}
-            style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 13,
-              lineHeight: 1,
-              color: ink.faint,
-              cursor: 'grab',
-              userSelect: 'none',
-            }}
+            style={{ lineHeight: 0, color: ink.faint, cursor: 'grab', userSelect: 'none' }}
           >
-            ⠿
+            <IconDrag size={15} />
           </div>
         )}
         <div style={fieldLabel}>{label}</div>
@@ -250,85 +247,44 @@ function ImageSlot({
           <div style={{ fontFamily: sans, fontSize: 11, color: ink.faint }}>chưa có ảnh</div>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7 }}>
-        <Hover
-          as="label"
-          style={{
-            flex: 1,
-            minWidth: 0,
-            display: 'block',
-            fontFamily: sans,
-            fontSize: 10,
-            letterSpacing: '.14em',
-            textTransform: 'uppercase',
-            color: ink.soft,
-            border: '1px dashed #DAD7C7',
-            padding: '7px 10px',
-            cursor: 'pointer',
-            textAlign: 'center',
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 7, flexWrap: 'wrap' }}>
+        {/*
+          A `<label>` wrapping a hidden file input is what this was: it could be
+          clicked but not tabbed to, and it was drawn with a dashed 1px rule
+          that read as a drop zone rather than a control. A real button that
+          forwards the click keeps the keyboard in play.
+        */}
+        <input
+          ref={file}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) onUpload(f)
+            e.target.value = ''
           }}
-          hoverStyle={{ borderColor: ink.base, color: ink.base }}
+          style={{ display: 'none' }}
+        />
+        <Button
+          size="sm"
+          level="secondary"
+          onClick={() => file.current?.click()}
+          icon={<IconUpload size={14} />}
         >
-          {url ? 'đổi ảnh' : 'tải ảnh lên'}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) onUpload(f)
-              e.target.value = ''
-            }}
-            style={{ display: 'none' }}
-          />
-        </Hover>
+          {url ? 'Đổi ảnh' : 'Tải ảnh lên'}
+        </Button>
         {url && (
-          <Hover
-            as="button"
-            onClick={() => setPlacing(url)}
-            style={{
-              fontFamily: sans,
-              fontSize: 10,
-              letterSpacing: '.14em',
-              textTransform: 'uppercase',
-              color: ink.soft,
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              flex: 'none',
-            }}
-            hoverStyle={{ color: ink.base }}
-          >
-            đặt vào khung
-          </Hover>
+          <Button size="sm" onClick={() => setPlacing(url)}>
+            Đặt vào khung
+          </Button>
         )}
-        <Hover
-          as="button"
-          onClick={() => setLinking(!linking)}
-          style={{
-            fontFamily: sans,
-            fontSize: 10,
-            letterSpacing: '.14em',
-            textTransform: 'uppercase',
-            color: ink.soft,
-            background: 'none',
-            border: 'none',
-            padding: 0,
-            cursor: 'pointer',
-            flex: 'none',
-          }}
-          hoverStyle={{ color: ink.base }}
-        >
-          dán link
-        </Hover>
+        <Button size="sm" onClick={() => setLinking(!linking)} aria-expanded={linking}>
+          Dán link
+        </Button>
         {url && (
-          <Hover
-            onClick={onClear}
-            style={{ fontFamily: sans, fontSize: 11, color: ink.faint, cursor: 'pointer', flex: 'none' }}
-            hoverStyle={{ color: '#C25C7C' }}
-          >
-            ✕
-          </Hover>
+          <IconButton size="sm" level="danger" label="Bỏ ảnh này" onClick={onClear}>
+            <IconClose size={15} />
+          </IconButton>
         )}
       </div>
 
@@ -434,8 +390,10 @@ function TagsPanel() {
             }}
             style={{ ...boxed, maxWidth: 260, padding: '5px 9px', fontSize: 13 }}
           />
-          <button
-            type="button"
+          <IconButton
+            size="sm"
+            level="danger"
+            label={`Xoá tag ${t.label}`}
             disabled={busy === t.id}
             onClick={() =>
               void run(t.id, async () => {
@@ -449,10 +407,9 @@ function TagsPanel() {
                 }
               })
             }
-            style={{ fontFamily: sans, fontSize: 11, color: ink.muted, background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            xoá
-          </button>
+            <IconTrash size={14} />
+          </IconButton>
           {asking?.id === t.id && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: ink.mid }}>
               {asking.wearing.posts.length + asking.wearing.notes.length} thứ đang đeo — chuyển sang
@@ -490,13 +447,11 @@ function TagsPanel() {
           style={{ ...boxed, maxWidth: 260, padding: '5px 9px', fontSize: 13 }}
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          style={{ alignSelf: 'flex-start', fontFamily: sans, fontSize: 11, color: ink.green, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-        >
-          + tag mới
-        </button>
+        <div style={{ alignSelf: 'flex-start' }}>
+          <Button size="sm" onClick={() => setAdding(true)} icon={<IconPlus size={14} />}>
+            Tag mới
+          </Button>
+        </div>
       )}
     </div>
   )
@@ -504,6 +459,7 @@ function TagsPanel() {
 
 export function Cms() {
   const nav = useNav()
+  const toast = useToast()
   // Tab nằm trong địa chỉ, không nằm trong state: ba tab là ba chỗ khác nhau
   // để đứng, nên một đường link tới sơ đồ trang không được mở ra danh sách bài.
   const tab = nav.cmsTab
@@ -515,7 +471,8 @@ export function Cms() {
   const [dragModule, setDragModule] = useState<string | null>(null)
   const [overModule, setOverModule] = useState<string | null>(null)
   const [dragEntry, setDragEntry] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  /** Đang hỏi lại trước khi xoá sạch nội dung đã sửa của cả trang. */
+  const [resetting, setResetting] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -523,11 +480,10 @@ export function Cms() {
       setSite(s)
       setModules(m)
       setPosts(p)
-      setError(null)
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     void load()
@@ -544,7 +500,7 @@ export function Cms() {
     try {
       setSite(await updateSite(patch))
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
     }
   }
 
@@ -624,7 +580,7 @@ export function Cms() {
       await saveSite({ [`plateImg${slot}`]: url } as SiteOverrides)
       return url
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
       return null
     }
   }
@@ -634,7 +590,7 @@ export function Cms() {
     try {
       await updateModule(id, patch)
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
     }
   }
 
@@ -652,7 +608,7 @@ export function Cms() {
     try {
       setModules(await reorderModules(order))
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
     }
   }
 
@@ -686,7 +642,7 @@ export function Cms() {
     try {
       await updatePost(id, patch)
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
     }
   }
 
@@ -706,7 +662,7 @@ export function Cms() {
       const updated = await reorderPosts(module_id, order)
       setPosts((ps) => ps.filter((p) => p.module_id !== module_id).concat(updated))
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
     }
   }
 
@@ -716,7 +672,7 @@ export function Cms() {
       await transitionStatus(id, 'delete')
       setPosts((ps) => ps.filter((p) => p.id !== id))
     } catch (e) {
-      setError((e as Error).message)
+      toast.fromError(e)
     }
   }
 
@@ -841,42 +797,26 @@ export function Cms() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 4, marginTop: 26 }}>
+        {/*
+          Three places to stand, so three real buttons. They were `<div onClick>`,
+          which meant the only way into the other two tabs was the mouse — and
+          `aria-pressed` now says which one you are on rather than leaving it to
+          the fill colour alone.
+        */}
+        <div style={{ display: 'flex', gap: 6, marginTop: 26, flexWrap: 'wrap' }}>
           {TABS.map((x) => (
-            <div
+            <button
               key={x.k}
+              type="button"
+              className="ab-tab"
+              aria-pressed={tab === x.k}
               onClick={() => nav.goCms(x.k)}
-              style={{
-                fontFamily: sans,
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: '.16em',
-                textTransform: 'uppercase',
-                padding: '10px 18px',
-                cursor: 'pointer',
-                background: tab === x.k ? ink.base : 'transparent',
-                color: tab === x.k ? paper.cream : ink.soft,
-              }}
             >
               {x.t}
-            </div>
+            </button>
           ))}
         </div>
       </div>
-
-      {error && (
-        <div
-          style={{
-            background: '#FBE7E5',
-            color: '#8E1E42',
-            fontFamily: sans,
-            fontSize: 12.5,
-            padding: '10px 56px',
-          }}
-        >
-          {error}
-        </div>
-      )}
 
       {tab === 'posts' && (
         <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
@@ -1143,29 +1083,22 @@ export function Cms() {
             >
               Module — kéo thẻ để đổi thứ tự
             </div>
-            <div
+            <Button
+              level="primary"
+              icon={<IconPlus size={16} />}
               onClick={async () => {
                 try {
                   const m = await createModule()
                   setModules((ms) => ms.concat([m]))
                   setOpenModule(m.id)
+                  toast.ok(`Đã tạo module “${m.title}”`)
                 } catch (e) {
-                  setError((e as Error).message)
+                  toast.fromError(e)
                 }
               }}
-              style={{
-                fontFamily: sans,
-                fontSize: 11,
-                letterSpacing: '.14em',
-                textTransform: 'uppercase',
-                background: ink.base,
-                color: paper.cream,
-                padding: '8px 14px',
-                cursor: 'pointer',
-              }}
             >
-              + module mới
-            </div>
+              Module mới
+            </Button>
           </div>
 
           {modules.map((m, mi) => {
@@ -1207,63 +1140,72 @@ export function Cms() {
                     title="Kéo để đổi thứ tự"
                     style={{
                       fontFamily: sans,
-                      fontSize: 13,
-                      lineHeight: 1,
-                      color: '#C9C2AC',
+                      lineHeight: 0,
+                      color: ink.faint,
                       cursor: 'grab',
-                      width: 12,
                       flex: 'none',
-                      letterSpacing: '.05em',
                     }}
                     hoverStyle={{ color: ink.base }}
                   >
-                    ⠿
+                    <IconDrag size={16} />
                   </Hover>
-                  <div
+                  {/*
+                    The arrow and the module name were two separate `<div onClick>`
+                    doing the same thing, so a keyboard could reach neither. One
+                    button carrying both is also one tab stop instead of two.
+                  */}
+                  <IconButton
+                    size="sm"
+                    label={open ? `Đóng ${m.title}` : `Mở ${m.title}`}
+                    aria-expanded={open}
                     onClick={() => setOpenModule(open ? null : m.id)}
-                    style={{ fontFamily: sans, fontSize: 12, color: ink.muted, cursor: 'pointer', width: 14, flex: 'none' }}
                   >
-                    {open ? '▾' : '▸'}
-                  </div>
+                    <IconChevron size={14} open={open} />
+                  </IconButton>
                   <div style={{ width: 9, height: 9, borderRadius: '50%', background: m.accent, flex: 'none' }} />
                   <div
                     style={{ fontFamily: sans, fontSize: 10.5, letterSpacing: '.16em', color: ink.faint, width: 26, flex: 'none' }}
                   >
                     {String(mi + 1).padStart(2, '0')}
                   </div>
-                  <div
+                  <button
+                    type="button"
+                    className="ab-disclose"
+                    aria-expanded={open}
                     onClick={() => setOpenModule(open ? null : m.id)}
                     style={{
                       fontFamily: serif,
                       fontSize: 24,
                       lineHeight: 1.1,
                       letterSpacing: '-.025em',
+                      color: ink.base,
                       flex: 1,
                       minWidth: 0,
-                      cursor: 'pointer',
                     }}
                   >
                     {m.title}
-                  </div>
+                  </button>
                   <div style={{ fontFamily: sans, fontWeight: 300, fontSize: 12, color: ink.muted, flex: 'none' }}>
                     {countLabel(m.id, entries.length)}
                   </div>
-                  <Hover
+                  <IconButton
+                    size="sm"
+                    level="danger"
+                    label={`Xoá module ${m.title}`}
                     onClick={async () => {
                       try {
                         await deleteModule(m.id)
                         setModules((ms) => ms.filter((x) => x.id !== m.id))
                         setPosts((ps) => ps.filter((p) => p.module_id !== m.id))
                         setOpenModule(null)
+                        toast.ok(`Đã xoá module “${m.title}”`)
                       } catch (e) {
-                        setError((e as Error).message)
+                        toast.fromError(e)
                       }
                     }}
-                    style={{ fontFamily: sans, fontSize: 12, color: ink.faint, cursor: 'pointer', flex: 'none' }}
-                    hoverStyle={{ color: '#C25C7C' }}
                   >
-                    ✕
-                  </Hover>
+                    <IconTrash size={14} />
+                  </IconButton>
                 </div>
 
                 {open && (
@@ -1383,7 +1325,7 @@ export function Cms() {
                             })
                             return url
                           } catch (e) {
-                            setError((e as Error).message)
+                            toast.fromError(e)
                             return null
                           }
                         }}
@@ -1404,7 +1346,7 @@ export function Cms() {
                             await patchModule(m.id, { [imageColumn(group, slot)]: url })
                             return url
                           } catch (e) {
-                            setError((e as Error).message)
+                            toast.fromError(e)
                             return null
                           }
                         }}
@@ -1459,22 +1401,13 @@ export function Cms() {
                         over to the wizard rather than dropping a blank draft
                         in from the side.
                       */}
-                      <Hover
+                      <Button
+                        size="sm"
                         onClick={() => nav.newPost()}
-                        style={{
-                          fontFamily: sans,
-                          fontSize: 10.5,
-                          letterSpacing: '.14em',
-                          textTransform: 'uppercase',
-                          border: '1px solid #DAD7C7',
-                          padding: '6px 12px',
-                          cursor: 'pointer',
-                          color: ink.soft,
-                        }}
-                        hoverStyle={{ borderColor: ink.base, color: ink.base }}
+                        icon={<IconPlus size={14} />}
                       >
-                        + bài
-                      </Hover>
+                        Bài mới
+                      </Button>
                     </div>
 
                     {entries.map((e, i) => (
@@ -1502,10 +1435,10 @@ export function Cms() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                           <Hover
                             title="Kéo để đổi thứ tự"
-                            style={{ fontFamily: sans, fontSize: 12, lineHeight: 1, color: '#D5CEB8', cursor: 'grab' }}
+                            style={{ lineHeight: 0, color: ink.faint, cursor: 'grab' }}
                             hoverStyle={{ color: ink.base }}
                           >
-                            ⠿
+                            <IconDrag size={14} />
                           </Hover>
                           <div style={{ fontFamily: sans, fontSize: 10.5, letterSpacing: '.12em', color: ink.faint }}>
                             {displayNumber(i)}
@@ -1557,13 +1490,14 @@ export function Cms() {
                             outline: 'none',
                           }}
                         />
-                        <Hover
+                        <IconButton
+                          size="sm"
+                          level="danger"
+                          label={`Bỏ “${e.en}” khỏi module`}
                           onClick={() => void removeEntry(e.id)}
-                          style={{ fontFamily: sans, fontSize: 12, color: ink.faint, cursor: 'pointer' }}
-                          hoverStyle={{ color: '#C25C7C' }}
                         >
-                          ✕
-                        </Hover>
+                          <IconClose size={14} />
+                        </IconButton>
                       </div>
                     ))}
 
@@ -1624,36 +1558,47 @@ export function Cms() {
             </Field>
           </div>
 
-          <Hover
-            onClick={async () => {
-              // Every field back to its shipped default: clear the whole blob.
-              try {
-                setSite(await updateSite(Object.fromEntries(
-                  Object.keys(SITE_DEFAULTS)
-                    .filter((k) => k !== 'sections')
-                    .map((k) => [k, '']),
-                ) as SiteOverrides))
-                await load()
-              } catch (e) {
-                setError((e as Error).message)
-              }
-            }}
-            style={{
-              display: 'inline-block',
-              marginTop: 30,
-              fontFamily: sans,
-              fontSize: 10.5,
-              letterSpacing: '.16em',
-              textTransform: 'uppercase',
-              color: ink.faint,
-              borderBottom: `1px solid ${paper.rule}`,
-              paddingBottom: 4,
-              cursor: 'pointer',
-            }}
-            hoverStyle={{ color: '#C25C7C', borderColor: '#C25C7C' }}
-          >
-            Trả về nội dung gốc
-          </Hover>
+          {/*
+            The most destructive control on the screen was the faintest thing
+            on it — 10.5px in `ink.faint`, styled as a footnote, and it wiped
+            every copy field on the site with no way back. It asks first now,
+            and the question is a second press rather than a `confirm()` the
+            browser can suppress.
+          */}
+          <div style={{ marginTop: 34, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            {resetting ? (
+              <>
+                <span style={{ fontFamily: sans, fontSize: 12.5, color: ink.danger }}>
+                  Xoá mọi chữ đã sửa trên toàn bộ trang, không hoàn tác được. Chắc chưa?
+                </span>
+                <Button
+                  level="danger"
+                  onClick={async () => {
+                    setResetting(false)
+                    // Every field back to its shipped default: clear the whole blob.
+                    try {
+                      setSite(await updateSite(Object.fromEntries(
+                        Object.keys(SITE_DEFAULTS)
+                          .filter((k) => k !== 'sections')
+                          .map((k) => [k, '']),
+                      ) as SiteOverrides))
+                      await load()
+                      toast.ok('Đã trả toàn bộ nội dung về bản gốc')
+                    } catch (e) {
+                      toast.fromError(e)
+                    }
+                  }}
+                >
+                  Xoá hết, trả về gốc
+                </Button>
+                <Button onClick={() => setResetting(false)}>Thôi</Button>
+              </>
+            ) : (
+              <Button level="danger" onClick={() => setResetting(true)}>
+                Trả về nội dung gốc…
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>
