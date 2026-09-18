@@ -173,15 +173,8 @@ export function RoutesPanel({
             )}
           </button>
         </h2>
-        {open && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: space.gap }}>
-            {saved && !changed && (
-              <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.muted }}>đã lưu</span>
-            )}
-            <Button level="primary" disabled={!changed || bad} onClick={save}>
-              Lưu đường dẫn
-            </Button>
-          </div>
+        {open && saved && !changed && (
+          <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.muted }}>đã lưu</span>
         )}
       </div>
 
@@ -307,6 +300,55 @@ export function RoutesPanel({
         ))}
       </div>
       )}
+
+      {/*
+        The save button used to sit at the top of the panel, which is the one
+        place it is never needed: by the time a word has been changed the list
+        has scrolled it off. It follows the bottom of the window instead, and
+        only appears once there is something to save, so it is also the answer
+        to "did that take?".
+      */}
+      {open && changed && (
+        <div
+          style={{
+            position: 'sticky',
+            bottom: 0,
+            zIndex: 20,
+            display: 'flex',
+            alignItems: 'center',
+            gap: space.gap,
+            flexWrap: 'wrap',
+            marginTop: space.inner,
+            padding: '12px 0',
+            background: paper.cream,
+            borderTop: `1px solid ${paper.rule}`,
+          }}
+        >
+          <span style={{ fontFamily: sans, fontSize: 12.5, color: bad ? ink.danger : ink.soft }}>
+            {bad
+              ? 'Còn chỗ viết sai, chưa lưu được.'
+              : `${countChanges(draft, live)} thay đổi chưa lưu.`}
+          </span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: space.gap }}>
+            <Button onClick={() => setDraft(live)}>Huỷ</Button>
+            <Button level="primary" disabled={bad} onClick={save}>
+              Lưu đường dẫn
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+/** Bao nhiêu từ đang khác bản đang chạy — để thanh lưu nói được con số, không chỉ "có thay đổi". */
+function countChanges(draft: RouteWords, live: RouteWords): number {
+  let n = 0
+  for (const k of Object.keys(draft) as (keyof RouteWords)[]) {
+    if (k === 'modules') continue
+    if (draft[k] !== live[k]) n++
+  }
+  const names = new Set([...Object.keys(draft.modules), ...Object.keys(live.modules)])
+  for (const id of names) if (draft.modules[id] !== live.modules[id]) n++
+  return n
 }

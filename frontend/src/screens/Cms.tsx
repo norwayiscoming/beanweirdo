@@ -129,6 +129,88 @@ const TABS = [
   { k: 'content', t: 'Sửa nội dung' },
 ] as const
 
+/**
+ * The seven things Sửa nội dung holds, in the order they appear.
+ *
+ * They were one uninterrupted scroll: landing copy, tags, two page blurbs, the
+ * index, every module with its image editors nested inside, then the admin
+ * blurb. Changing one word in the last block meant scrolling past all six.
+ */
+const CONTENT_SECTIONS = [
+  { id: 'landing', t: 'Trang chủ' },
+  { id: 'tag', t: 'Tag' },
+  { id: 'notes', t: 'Ghi chép' },
+  { id: 'archive', t: 'Lưu trữ' },
+  { id: 'index', t: 'Mục lục' },
+  { id: 'modules', t: 'Module' },
+  { id: 'admin', t: 'Quản trị' },
+] as const
+
+/**
+ * The bar that jumps between them.
+ *
+ * It sits along the top rather than down the left: the forms below run to two
+ * and three columns inside 1080px, and a rail would take that back out of the
+ * widest rows.
+ */
+function ContentIndex() {
+  const [at, setAt] = useState<string>(CONTENT_SECTIONS[0].id)
+
+  useEffect(() => {
+    // jsdom has no IntersectionObserver; the bar still jumps, it just does not
+    // light up, which is not worth a polyfill in tests.
+    if (typeof IntersectionObserver === 'undefined') return
+    const seen = new Map<string, number>()
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) seen.set(e.target.id, e.intersectionRatio)
+        // Whichever heading is showing most of itself is the one you are at.
+        let best: string | null = null
+        let ratio = 0
+        for (const [id, r] of seen) if (r > ratio) [best, ratio] = [id, r]
+        if (best) setAt(best)
+      },
+      { rootMargin: '-64px 0px -70% 0px', threshold: [0, 0.5, 1] },
+    )
+    for (const s of CONTENT_SECTIONS) {
+      const el = document.getElementById(s.id)
+      if (el) io.observe(el)
+    }
+    return () => io.disconnect()
+  }, [])
+
+  return (
+    <nav
+      aria-label="Mục trên trang"
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 20,
+        display: 'flex',
+        gap: 6,
+        flexWrap: 'wrap',
+        padding: '12px 0 13px',
+        marginBottom: 8,
+        background: paper.cream,
+        borderBottom: `1px solid ${paper.rule}`,
+      }}
+    >
+      {CONTENT_SECTIONS.map((x) => (
+        <button
+          key={x.id}
+          type="button"
+          className="ab ab-ghost ab-sm"
+          aria-current={at === x.id ? 'true' : undefined}
+          style={at === x.id ? { background: ink.base, borderColor: ink.base, color: paper.cream } : undefined}
+          onClick={() => document.getElementById(x.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
+        >
+          {x.t}
+        </button>
+      ))}
+    </nav>
+  )
+}
+
 /** One page on the site map, and what it holds. */
 type MapRow = { label: string; desc: string; kids: string[] }
 
@@ -914,8 +996,9 @@ export function Cms() {
       )}
 
       {tab === 'content' && (
-        <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
-          <div style={sectionHead}>Trang chủ — landing</div>
+        <div style={{ padding: '0 56px 130px', maxWidth: 1080 }}>
+          <ContentIndex />
+          <div id="landing" style={{ ...sectionHead, scrollMarginTop: 64 }}>Trang chủ — landing</div>
           <div style={grid(two)}>
             <Field label="Nhãn trên cùng">
               <input
@@ -972,10 +1055,10 @@ export function Cms() {
             * chỗ. Trước đây bốn dạng ghi viết cứng trong code, muốn đổi một chữ
             * là phải sửa code.
             */}
-          <div style={{ ...sectionHead, margin: '34px 0 18px' }}>Tag</div>
+          <div id="tag" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Tag</div>
           <TagsPanel />
 
-          <div style={{ ...sectionHead, margin: '34px 0 18px' }}>Trang Ghi chép</div>
+          <div id="notes" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Ghi chép</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề trang">
               <input {...field('notesTitle')} style={serifInput} />
@@ -1001,7 +1084,7 @@ export function Cms() {
             </Field>
           </div>
 
-          <div style={{ ...sectionHead, margin: '34px 0 18px' }}>Trang Lưu trữ</div>
+          <div id="archive" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Lưu trữ</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề trang">
               <input {...field('archiveTitle')} style={serifInput} />
@@ -1011,7 +1094,7 @@ export function Cms() {
             </Field>
           </div>
 
-          <div style={{ ...sectionHead, margin: '34px 0 18px' }}>Mục lục</div>
+          <div id="index" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Mục lục</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề — dòng 1">
               <input {...field('t1')} style={serifInput} />
@@ -1069,7 +1152,9 @@ export function Cms() {
               borderBottom: `2px solid ${ink.base}`,
               paddingBottom: 9,
               marginBottom: 6,
+              scrollMarginTop: 64,
             }}
+            id="modules"
           >
             <div
               style={{
@@ -1507,7 +1592,7 @@ export function Cms() {
             )
           })}
 
-          <div style={{ ...sectionHead, margin: '44px 0 18px' }}>{copy.sections.Admin}</div>
+          <div id="admin" style={{ ...sectionHead, margin: '44px 0 18px', scrollMarginTop: 64 }}>{copy.sections.Admin}</div>
           <div style={grid(two, 20)}>
             <Field label="Design system — tiêu đề dòng 1">
               <input
