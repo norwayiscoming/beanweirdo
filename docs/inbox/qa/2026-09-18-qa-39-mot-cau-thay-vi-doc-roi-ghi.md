@@ -1,6 +1,6 @@
 # QA-39: một câu thay vì đọc rồi ghi
 
-PR: (chưa mở — sẽ điền)    nhánh: `claude/project-thread-rsb5j4`
+PR: #6    nhánh: `claude/project-thread-rsb5j4`
 Cắt từ: `origin/main` @ `3f15954`
 
 Nối tiếp QA-38. QA-38 đi tìm những chỗ chậm cụ thể và vá từng chỗ. Ghi chú này
