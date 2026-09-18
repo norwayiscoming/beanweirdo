@@ -241,7 +241,7 @@ export const STATUS_ACTIONS: StatusAction[] = [
 ]
 
 /** The single statuses each action is valid from, per the spec's transition table. */
-const ALLOWED_FROM: Record<StatusAction, PostStatus[]> = {
+export const ALLOWED_FROM: Record<StatusAction, PostStatus[]> = {
   publish: ['draft'],
   unpublish: ['published'],
   archive: ['published'],
@@ -249,6 +249,36 @@ const ALLOWED_FROM: Record<StatusAction, PostStatus[]> = {
   delete: ['draft', 'published', 'archived'],
   'restore-trash': ['deleted'],
   'permanently-delete': ['deleted'],
+}
+
+/**
+ * The columns an action writes, when they don't depend on the post's current
+ * status — or null when they do.
+ *
+ * Four of the seven transitions write fixed values. The only thing that needed
+ * the current row was the guard "is this action legal from where it is now",
+ * and that rides in the UPDATE's own WHERE clause: no row came back means the
+ * guard rejected it. `permanently-delete` writes nothing at all (it is a hard
+ * delete) and is likewise one statement.
+ *
+ * `delete` and `restore-trash` are the two that genuinely have to read first.
+ * Each copies one column into another — `previous_status` from `status` on the
+ * way out, and back again on the way in — and PostgREST has no way to say
+ * `set previous_status = status` without a stored function.
+ */
+export function fixedStatusPatch(action: StatusAction, nowIso: string): Partial<PostRow> | null {
+  switch (action) {
+    case 'publish':
+      return { status: 'published', published_at: nowIso, updated_at: nowIso }
+    case 'unpublish':
+      return { status: 'draft', updated_at: nowIso }
+    case 'archive':
+      return { status: 'archived', updated_at: nowIso }
+    case 'restore':
+      return { status: 'published', updated_at: nowIso }
+    default:
+      return null
+  }
 }
 
 export interface StatusTransitionResult {

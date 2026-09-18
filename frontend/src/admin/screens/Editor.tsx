@@ -29,7 +29,6 @@ import type {
 } from 'post-renderer'
 import {
   getPost,
-  listModules,
   transitionStatus,
   updatePost,
   uploadImage,
@@ -37,6 +36,7 @@ import {
   type PostDetail,
   type PostTemplate,
 } from '../lib/apiClient'
+import { listModulesCached } from '../lib/lists'
 import { useNav } from '../../lib/nav'
 import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
@@ -181,7 +181,7 @@ function EditorContent({ postId }: { postId: string }) {
   const history = useRef<History>(emptyHistory)
 
   useEffect(() => {
-    Promise.all([getPost(postId), listModules()]).then(([p, mods]) => {
+    Promise.all([getPost(postId), listModulesCached()]).then(([p, mods]) => {
       setPost(p)
       setModules(mods)
     })
