@@ -48,7 +48,7 @@ describe('dải ảnh module trên điện thoại', () => {
 
   it('hở dưới phần chữ hẹp lại ở màn nhỏ, giữ nguyên ở màn rộng', () => {
     // 64px viết cho mọi bề ngang là một mảng trống bằng một phần năm màn 375.
-    expect(css).toMatch(/\.bw-modhead \{\n  margin-bottom: 28px;\n\}/)
+    expect(css).toMatch(/\.bw-modhead \{\n {2}margin-bottom: 28px;\n\}/)
     // Ngưỡng của `global.css` là 900, khớp `mobileMax` — lane design đã gộp
     // hai ngưỡng lại; đừng viết 1240 ở đây nữa.
     expect(css).toMatch(/min-width: 900px[\s\S]*?margin-bottom: 64px;/)
