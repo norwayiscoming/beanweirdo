@@ -217,16 +217,19 @@ async function applyMoves(
   moves: Array<{ to: string | null; ids: string[] }>,
 ): Promise<string | null> {
   const supabase = getSupabase()
-  for (const move of moves) {
-    // `kind` is NOT NULL — "no tag" for a task is the unclassified bucket.
-    const value = move.to === null && column === 'kind' ? UNCLASSIFIED : move.to
-    const { error } = await supabase
-      .from('hour_logs')
-      .update({ [column]: value })
-      .in('id', move.ids)
-    if (error) return error.message
-  }
-  return null
+  // One statement per move, but all of them in flight at once: the moves name
+  // disjoint sets of ids, so nothing here depends on the order they land in.
+  const writes = await Promise.all(
+    moves.map((move) => {
+      // `kind` is NOT NULL — "no tag" for a task is the unclassified bucket.
+      const value = move.to === null && column === 'kind' ? UNCLASSIFIED : move.to
+      return supabase
+        .from('hour_logs')
+        .update({ [column]: value })
+        .in('id', move.ids)
+    }),
+  )
+  return writes.find((w) => w.error)?.error?.message ?? null
 }
 
 /**
