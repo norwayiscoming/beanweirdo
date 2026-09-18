@@ -3,7 +3,7 @@ import { splitAesc } from '../content/site'
 import { landingModules, useModules } from '../data/useModules'
 import type { ModuleImageFields } from '../admin/moduleForm'
 import { coverStyle } from '../lib/imageFocus'
-import type { PostRow } from '../data/usePublishedPosts'
+import { groupByModule } from '../lib/postGroups'
 import { usePublishedPosts } from '../data/usePublishedPosts'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { garden, ink, layout, paper, prose, sans, serif, wrapTitle } from '../design/tokens'
@@ -72,17 +72,6 @@ const bandGrid = (columns: string, rows: string, mob: boolean): CSSProperties =>
    */
   ...(mob ? { marginLeft: -layout.padMobile, marginRight: -layout.padMobile } : null),
 })
-
-/** Groups posts by `module_id`, preserving each module's `sort_order`. */
-function groupByModule(posts: PostRow[]): Map<string, PostRow[]> {
-  const map = new Map<string, PostRow[]>()
-  for (const p of posts) {
-    const list = map.get(p.module_id)
-    if (list) list.push(p)
-    else map.set(p.module_id, [p])
-  }
-  return map
-}
 
 /**
  * Each module gets its own image arrangement, and every tile breaks its grid
