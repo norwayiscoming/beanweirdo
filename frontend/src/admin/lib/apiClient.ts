@@ -232,7 +232,13 @@ export async function getPost(id: string): Promise<PostDetail> {
   return result.post
 }
 
-/** PATCH /api/posts/:id — partial update of editable fields; returns the full updated detail. */
+/**
+ * PATCH /api/posts/:id — partial update of editable fields.
+ *
+ * Trả về đúng những cột vừa vá, trừ `body`, chứ không phải cả bài — xem chú
+ * thích trong backend/api/posts/[id]/index.ts. Mọi chỗ gọi hàm này đều đã cập
+ * nhật state lạc quan trước rồi, không chỗ nào đọc giá trị trả về.
+ */
 export async function updatePost(
   id: string,
   patch: Partial<{
@@ -249,8 +255,8 @@ export async function updatePost(
       sort_order: number | null
       pinned: boolean
   }>,
-): Promise<PostDetail> {
-  const result = await request<{ post: PostDetail }>(`/api/posts/${id}`, {
+): Promise<Partial<PostDetail> & { id: string }> {
+  const result = await request<{ post: Partial<PostDetail> & { id: string } }>(`/api/posts/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
   })

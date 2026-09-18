@@ -247,16 +247,25 @@ async function handleReorder(req: VercelRequest, res: VercelResponse): Promise<v
   const supabase = getSupabase()
   const nowIso = new Date().toISOString()
 
-  for (const [i, id] of (order as string[]).entries()) {
-    const { error } = await supabase
-      .from('posts')
-      .update({ sort_order: i + 1, updated_at: nowIso })
-      .eq('id', id)
-      .eq('module_id', module_id)
-    if (error) {
-      res.status(500).json({ error: error.message })
-      return
-    }
+  /*
+   * The `await` used to sit inside the loop, so reordering ten posts was ten
+   * round trips waiting on each other before the select below could even start.
+   * They do not depend on one another — each writes its own row — so they go
+   * together. Still N statements, but N in flight instead of N in a queue.
+   */
+  const writes = await Promise.all(
+    (order as string[]).map((id, i) =>
+      supabase
+        .from('posts')
+        .update({ sort_order: i + 1, updated_at: nowIso })
+        .eq('id', id)
+        .eq('module_id', module_id),
+    ),
+  )
+  const failed = writes.find((w) => w.error)
+  if (failed?.error) {
+    res.status(500).json({ error: failed.error.message })
+    return
   }
 
   const { data, error } = await supabase

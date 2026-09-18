@@ -80,12 +80,27 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
 
   patch.updated_at = new Date().toISOString()
 
+  /*
+   * Answer with the columns this PATCH wrote, and never with `body`.
+   *
+   * This used to select POST_DETAIL_COLUMNS, which is `*`. The editor autosaves
+   * on every blur, so renaming one heading in a longform piece sent the whole
+   * body up and then pulled the whole body back down — to tell the caller a
+   * value it had just supplied.
+   *
+   * Nothing reads the response. Every caller of `updatePost` sets its own state
+   * first and ignores what comes back: Editor's `applyPatch`, `writeBody` and
+   * `step`, `Cms.patchPost`, and the pin button in `PostsPanel`. `id` is here so
+   * the shape still names which post answered.
+   */
+  const returned = ['id', ...Object.keys(patch).filter((column) => column !== 'body')].join(', ')
+
   const supabase = getSupabase()
   const { data, error } = await supabase
     .from('posts')
     .update(patch)
     .eq('id', id)
-    .select(POST_DETAIL_COLUMNS)
+    .select(returned)
     .maybeSingle()
 
   if (error) {
@@ -97,7 +112,7 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
     return
   }
 
-  res.status(200).json({ post: toPostDetail(data as PostRow) })
+  res.status(200).json({ post: data })
 }
 
 async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {

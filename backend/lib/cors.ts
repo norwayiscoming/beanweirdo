@@ -13,6 +13,21 @@ export function applyCorsHeaders(req: VercelRequest, res: VercelResponse): void 
   res.setHeader('Vary', 'Origin')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
+  /*
+   * Without this, every single admin request costs two round trips.
+   *
+   * The admin app and this API are separate deployments, so every call is
+   * cross-origin, and `request` in apiClient sends `Authorization` on all of
+   * them. That header is not CORS-safelisted, so the browser preflights even
+   * GETs. With no Max-Age, Chrome remembers a preflight for five seconds: any
+   * two clicks further apart than that pay for the OPTIONS again. And OPTIONS
+   * is answered by this function, not at the edge (see `withCors` below), so
+   * the wasted trip can cold-start a lambda of its own.
+   *
+   * A day is what Chrome caps this at; Firefox caps at 24h too. The headers
+   * and methods above never change at runtime, so there is nothing to go stale.
+   */
+  res.setHeader('Access-Control-Max-Age', '86400')
 }
 
 export function withCors(handler: Handler): Handler {

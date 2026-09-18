@@ -42,6 +42,18 @@ describe('applyCorsHeaders', () => {
     expect(headers['Access-Control-Allow-Headers']).toContain('Authorization')
     expect(headers['Access-Control-Allow-Methods']).toContain('GET')
   })
+
+  /*
+   * Without a Max-Age the browser preflights again every five seconds, and
+   * because every admin call carries `Authorization` — which is not
+   * CORS-safelisted — that is every call, GETs included. Two round trips per
+   * click instead of one, which is what made the admin feel slow.
+   */
+  it('lets the browser cache the preflight, so one click is one round trip', () => {
+    const { req, res, headers } = mockReqRes('GET')
+    applyCorsHeaders(req, res)
+    expect(headers['Access-Control-Max-Age']).toBe('86400')
+  })
 })
 
 describe('withCors', () => {
