@@ -117,9 +117,22 @@ export function useHours(): UseHoursResult {
 
   const rawAdd = useCallback(
     async (entry: Omit<LogEntry, 'id'>) => {
+      /*
+       * Dòng mới hiện ra ngay, không chờ máy chủ trả lời.
+       *
+       * `rawPatch` và `rawRemove` ngay dưới đây đều vẽ trước rồi mới gửi. Chỉ
+       * riêng chỗ này `await` trước rồi mới vẽ, nên sửa và xoá thì tức thì còn
+       * thêm thì đứng một nhịp — và cảm giác "lúc nhanh lúc chậm" đến từ đó.
+       *
+       * Id tạm không bao giờ đi tới máy chủ: nó chỉ để React có khoá mà vẽ, và
+       * bị thay bằng id thật ngay khi phản hồi về. Nếu hỏng thì `failed` tải
+       * lại cả danh sách, nên dòng tạm biến mất đúng lúc lời báo lỗi hiện ra.
+       */
+      const tempId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      setLogs((ls) => ls.concat([{ ...entry, id: tempId }]))
       try {
         const saved = await createLog(entry)
-        setLogs((ls) => ls.concat([saved]))
+        setLogs((ls) => ls.map((l) => (l.id === tempId ? saved : l)))
         setError(null)
         return saved
       } catch (e) {
