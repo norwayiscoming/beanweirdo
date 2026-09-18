@@ -101,6 +101,24 @@ describe('Article', () => {
     expect(screen.getByLabelText('edit pull')).toHaveValue(post.pull)
   })
 
+  it('draws a store element sitting in the body beside ordinary sections', () => {
+    // Article's `{h, p, fig}` has no shape for a table, so one arrives as the
+    // stored element it already is — the same way long-form carries them.
+    render(
+      <Article
+        post={{
+          ...post,
+          sections: [
+            ...post.sections,
+            { type: 'table', table: { columns: ['Mốc'], rows: [{ cells: ['Sấy'] }] } } as never,
+          ],
+        }}
+      />,
+    )
+    expect(screen.getByText('Mốc')).toBeInTheDocument()
+    expect(screen.getByText('Sấy')).toBeInTheDocument()
+  })
+
   it('uses renderFigure override instead of the default figure block', () => {
     render(<Article post={post} renderFigure={(fig) => <div data-testid="fig-override">{fig.caption}</div>} />)
     expect(screen.getByTestId('fig-override')).toHaveTextContent('A chlorogenic acid molecule diagram')

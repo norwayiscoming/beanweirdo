@@ -13,7 +13,21 @@
  */
 import type { SectionData } from 'post-renderer'
 
-export const flowsSection = (s: SectionData | undefined) => s !== undefined && !s.fig
+/**
+ * A body entry taken from the shared element store, not article's own
+ * `{h, p, fig}` vocabulary. Recognised by `type` — the one key every stored
+ * element carries and no section has.
+ */
+export const isStoredElement = (s: SectionData | undefined): boolean =>
+  typeof (s as { type?: unknown } | undefined)?.type === 'string'
+
+/*
+ * A table, a chart or an image cannot be written out as markdown and read back
+ * unchanged, so a stored element stands on its own the way `fig` does — fold
+ * it into the run of prose and it disappears from the editing surface.
+ */
+export const flowsSection = (s: SectionData | undefined) =>
+  s !== undefined && !s.fig && !isStoredElement(s)
 
 export type SectionRun =
   | { kind: 'text'; at: [number, number]; text: string }

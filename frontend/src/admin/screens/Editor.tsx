@@ -84,7 +84,7 @@ import { toRuns, writeRun } from '../lib/flow'
 import { emptyHistory, historyKey, inverseOf, record, redo, undo, type History } from '../lib/editHistory'
 import { blockKey, neighbour, type BlockFocus } from '../lib/blockKeys'
 import { runAtIndex, toLongformRuns, writeLongformRun } from '../lib/longformFlow'
-import { runAtSection, toSectionRuns, writeSectionRun } from '../lib/articleFlow'
+import { isStoredElement, runAtSection, toSectionRuns, writeSectionRun } from '../lib/articleFlow'
 import { LiveText } from '../components/LiveText'
 import type { LiveEdges } from '../components/liveKeys'
 import { applyMark, markFor } from '../lib/marks'
@@ -1271,6 +1271,26 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
   }
   const drag = useRowDrag((from, to) => setSections(move(sections, from, to)))
   const sectionRuns = toSectionRuns(sections)
+  /** Which row has its insert menu open; `-1` is the trough at the foot. */
+  const [menuAt, setMenuAt] = useState<number | null>(null)
+
+  /*
+   * One `+` trough, the same one every other template uses.
+   *
+   * Article used to have a lone "+ PHẦN" button under the last section, which
+   * could only append and could only append a section — so the store's blocks
+   * were out of reach here while the other five templates had them.
+   */
+  const insertPlus = (at: number, insertAtIndex: number) => (
+    <InsertPlus
+      open={menuAt === at}
+      onToggle={() => setMenuAt(menuAt === at ? null : at)}
+      onInsert={(t) => {
+        setSections(insertAt(sections, insertAtIndex, blankReportBlock(t) as never))
+        setMenuAt(null)
+      }}
+    />
+  )
 
   function updateSection(index: number, patch: Partial<SectionData>) {
     onChange({ body: sections.map((s, i) => (i === index ? { ...s, ...patch } : s)) })
@@ -1323,6 +1343,7 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
           if (i !== run.at[0]) return null
           return (
             <div key={i} className="awc-rep-block">
+              <div className="awc-gutter">{insertPlus(i, run.at[1] + 1)}</div>
               <LiveText
                 text={run.text}
                 onCommit={(md) => setSections(writeSectionRun(sections, run.at, md))}
@@ -1332,19 +1353,24 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
         }
         return (
           <RowShell
-            noun="phần"
+            noun={isStoredElement(sections[i]) ? 'khối' : 'phần'}
             index={i}
             drag={drag}
             onMove={(dir) => setSections(move(sections, i, i + dir))}
             onRemove={() => setSections(removeAt(sections, i, true))}
             onDuplicate={() => setSections(duplicateAt(sections, i))}
+            plus={insertPlus(i, i + 1)}
           >
             {section}
           </RowShell>
         )
       }}
       renderAfterSections={() => (
-        <AddRow label="phần" onAdd={() => setSections(insertAt(sections, sections.length, { h: '', p: '' }))} />
+        <div className="awc-rep-block">
+          <div className="awc-gutter" style={{ opacity: 1 }}>
+            {insertPlus(-1, sections.length)}
+          </div>
+        </div>
       )}
     />
   )

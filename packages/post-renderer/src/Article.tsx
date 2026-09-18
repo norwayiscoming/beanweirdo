@@ -1,6 +1,20 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react'
+import { ElementList } from './elements'
+import { paletteFrom } from './palette'
 import { garden, ink, layout, paper, sans, serif, wrapTitle } from './tokens'
 import type { ArticlePlateData, ArticlePostData, FigureData } from './types'
+
+/**
+ * A body entry that came from the shared element store rather than from
+ * article's own `{h, p, fig}` vocabulary.
+ *
+ * Told apart by `type` because that is the one key every stored element
+ * carries and no section ever has — the alternative, "has neither h nor p",
+ * would also swallow a section the writer has simply not filled in yet.
+ */
+function isStoredElement(s: unknown): boolean {
+  return typeof (s as { type?: unknown } | null)?.type === 'string'
+}
 
 const label: CSSProperties = {
   fontFamily: sans,
@@ -62,6 +76,9 @@ export type ArticleProps = ArticleOverrides & {
  * over `post` instead of the static article/articleMeta content modules.
  */
 export function Article({ post, breadcrumb, mobile = false, ...overrides }: ArticleProps) {
+  // Store elements paint themselves from the module's colours, the same way
+  // they do on every other template; the band's fallback is repeated below.
+  const palette = paletteFrom(post.band?.bg ?? garden.leaf, post.band?.fg)
   return (
     <div>
       <div
@@ -213,7 +230,19 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
             </div>
 
             {post.sections.map((s, i) => {
-              const section = (
+              /*
+               * An entry taken from the shared store.
+               *
+               * Article keeps `{h, p, fig}` for its own sections, so a table
+               * or a chart has no shape to live in here — it travels as the
+               * stored element it already is, and both shapes ride in one
+               * `body`. Same arrangement long-form arrived at.
+               */
+              const section = isStoredElement(s) ? (
+                <div style={{ marginBottom: 34 }}>
+                  <ElementList elements={[s]} palette={palette} mobile={mobile} />
+                </div>
+              ) : (
                 <div style={{ marginBottom: 34 }}>
                 <h3
                   style={{
