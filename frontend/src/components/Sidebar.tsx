@@ -2,6 +2,8 @@ import { useState, type CSSProperties, type ReactNode } from 'react'
 import { NAV, type Glyph, type NavItem } from '../content/navItems'
 import type { NavGroup } from '../content/site'
 import { sidebarModules, useModules, type ModuleRow } from '../data/useModules'
+import { buildTree, flattenTree } from '../lib/contentTree'
+import { countUnder } from '../lib/postGroups'
 import { usePublishedPosts, type PostRow } from '../data/usePublishedPosts'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { layout, paper, sans, serif } from '../design/tokens'
@@ -107,6 +109,7 @@ function Row({
   label,
   count,
   sub,
+  depth = 0,
   muted,
   hoverBg,
   onClick,
@@ -116,12 +119,25 @@ function Row({
   count?: ReactNode
   /** Template pages sit one level in, marked by a short dash instead of a glyph. */
   sub?: boolean
+  /**
+   * How far inside the table of contents this row sits. 0 is a top-level entry.
+   *
+   * A number rather than the `sub` flag beside it: `sub` says "one level in"
+   * and cannot say "two", which is the same thing that stopped the rest of the
+   * site holding a third level. The indent is per step, so a branch four deep
+   * needs nothing added here.
+   */
+  depth?: number
   muted: string
   hoverBg: string
   onClick: () => void
 }) {
   return (
-    <Hover style={{ ...row, color: muted }} hoverStyle={{ background: hoverBg }} onClick={onClick}>
+    <Hover
+      style={{ ...row, color: muted, paddingLeft: 22 + depth * 15 }}
+      hoverStyle={{ background: hoverBg }}
+      onClick={onClick}
+    >
       <div style={glyphSlot}>{sub ? null : glyph}</div>
       <div
         style={{
@@ -225,7 +241,13 @@ export function Sidebar() {
   const t = theme(dark)
   const groups = visibleGroups(nav.area, authed)
 
-  const countFor = (m: ModuleRow) => posts.filter((p: PostRow) => p.module_id === m.id).length
+  /*
+   * The count beside a name covers the whole branch, not just what is filed
+   * directly under it. A heading holding two sub-sections of six posts each
+   * reads as empty otherwise — and "chưa có bài" is a different statement from
+   * "everything here is one level down".
+   */
+  const countFor = (m: ModuleRow) => countUnder(posts as PostRow[], modules, m.id)
 
   const section = (group: NavGroup) => {
     const items = NAV.filter((n) => n.group === group && !n.hiddenFromSidebar)
@@ -238,13 +260,21 @@ export function Sidebar() {
         // Every module is listed, published or not: the sidebar is the map of
         // what the journal covers, and a module with nothing in it yet is still
         // part of that map. The count beside it tells the truth.
-        for (const m of modules) {
+        /*
+         * Parents before their own children, each carrying how deep it sits.
+         * This used to be a flat loop, which is why the sidebar could show a
+         * list of modules and never a table of contents. Nothing here names a
+         * number of levels, so a branch four deep draws itself.
+         */
+        for (const node of flattenTree(buildTree(modules))) {
+          const m = node.row
           rows.push(
             <Row
               key={`mod-${m.id}`}
               onClick={() => openModule(nav, m)}
               label={m.title}
               count={countFor(m)}
+              depth={node.depth}
               muted={t.muted}
               hoverBg={t.hover}
               glyph={<ModuleMark m={m} />}

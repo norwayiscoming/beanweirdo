@@ -1,5 +1,6 @@
 import type { ModuleRow } from '../data/useModules'
 import { navLabel } from '../content/navItems'
+import { ancestorsOf } from './contentTree'
 import type { NavGroup } from '../content/site'
 import { goToArea } from './area'
 import type { Nav } from './nav'
@@ -64,24 +65,44 @@ export function buildCrumbs(
   const atCms = nav.screen === 'cms'
   const admin: Crumb = atCms ? { label: sections.Admin } : { label: sections.Admin, go: nav.goCms }
   const backend: Crumb = atCms ? { label: 'Backend' } : { label: 'Backend', go: nav.goCms }
+  const titleOf = (id: string) => modules.find((m) => m.id === id)?.title ?? id
   const mod = (id: string): Crumb => ({
-    label: modules.find((m) => m.id === id)?.title ?? id,
+    label: titleOf(id),
     go: toPublic('landing', () => nav.openModule(id)),
   })
+
+  /**
+   * The branches a module hangs from, outermost first.
+   *
+   * This is the whole reason the trail can grow: the depth is not written here
+   * but read from the data, so `Trang chủ › Mục lục › bean weirdo › Roasting ›
+   * Heat Transfer` and a trail two levels deeper are the same line of code.
+   * While every module sits at the top this is empty, and the trail reads
+   * exactly as it did before the tree existed.
+   */
+  const branches = (id: string): Crumb[] => ancestorsOf(modules, id).map((m) => mod(m.id))
 
   switch (nav.screen) {
     case 'home':
       return [landing, { label: navLabel('home') }]
     case 'module':
-      return [landing, index, { label: modules.find((m) => m.id === nav.moduleId)?.title ?? nav.moduleId }]
+      return [landing, index, ...branches(nav.moduleId), { label: titleOf(nav.moduleId) }]
     case 'article':
       // The trail ends on the post's own name. 'Bài viết' told the reader
       // nothing they could not already see.
       // Three doors, three trails. Opened from Archive it used to read
       // `Admin › Templates › …` — a route through a screen the reader never
       // touched, on the way from one they did.
-      if (nav.articleFrom === 'module')
-        return [landing, index, mod(ctx.moduleId ?? nav.moduleId), { label: ctx.trailing ?? 'Bài viết' }]
+      if (nav.articleFrom === 'module') {
+        const filedUnder = ctx.moduleId ?? nav.moduleId
+        return [
+          landing,
+          index,
+          ...branches(filedUnder),
+          mod(filedUnder),
+          { label: ctx.trailing ?? 'Bài viết' },
+        ]
+      }
       if (nav.articleFrom === 'archive')
         return [admin, { label: navLabel('archive'), go: nav.goArchive }, { label: ctx.trailing ?? 'Bài viết' }]
       // Cửa thứ ba từng là màn Templates; màn ấy đã bỏ, nên đường về chỉ còn
@@ -108,7 +129,20 @@ export function buildCrumbs(
  * From a private area the step back leads out to the public journal, which is
  * a different entry point rather than a different screen.
  */
-export function crumbBack(nav: Nav, moduleId?: string, parentGo?: () => void): () => void {
+export function crumbBack(
+  nav: Nav,
+  moduleId?: string,
+  parentGo?: () => void,
+  /**
+   * The table of contents, when the caller has it.
+   *
+   * Only the module screen needs it, and only to find the branch one level up.
+   * Optional because the answer without it — the index — is exactly what the
+   * arrow did before modules could hold modules, and is still right for a
+   * module at the top.
+   */
+  modules: ModuleRow[] = [],
+): () => void {
   /*
    * A screen holding a layer of its own owns the first step back: from an open
    * template, one step is the list, and only the step after that leaves for
@@ -127,8 +161,13 @@ export function crumbBack(nav: Nav, moduleId?: string, parentGo?: () => void): (
      */
     case 'logic':
       return nav.goCms
-    case 'module':
-      return nav.goHome
+    case 'module': {
+      // One step back out of Roasting is bean weirdo, not the index. The arrow
+      // used to skip every branch in between, because it only knew about a
+      // world two levels deep.
+      const branch = ancestorsOf(modules, nav.moduleId).at(-1)
+      return branch ? () => nav.openModule(branch.id) : nav.goHome
+    }
     case 'article':
       // Back goes to the module this post is actually filed under. It used to
       // go to 'biochem' whatever you were reading.
