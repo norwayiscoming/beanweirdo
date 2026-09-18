@@ -1,6 +1,6 @@
 # QA-40: danh sách bài thôi kéo cả thân bài về
 
-PR: (chưa mở — sẽ điền)    nhánh: `claude/project-thread-rsb5j4`
+PR: #8    nhánh: `claude/project-thread-rsb5j4`
 Cắt từ: `origin/main` @ `d42aa72`
 
 Phần còn lại của QA-39, chỗ duy nhất t đã hoãn có chủ ý vì nó cần DDL. Chủ site
