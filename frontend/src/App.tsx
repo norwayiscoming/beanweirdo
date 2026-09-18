@@ -4,6 +4,7 @@ import { ModulesProvider } from './data/useModules'
 import { PostAddressProvider, usePostAddresses } from './data/usePostAddresses'
 import { SiteCopyProvider, useSiteCopy } from './data/useSiteCopy'
 import { ink, layout, paper, sans } from './design/tokens'
+import { ToastProvider } from './design/Toaster'
 import { AuthGate, AuthProvider } from './lib/auth'
 import { useIsMobile } from './lib/useIsMobile'
 import { AREA_HOME, isPrivate, screenAllowed } from './lib/area'
@@ -62,6 +63,13 @@ export function App() {
 
   return (
     <SettingsContext.Provider value={settings}>
+      {/*
+        One place the whole app reports from. Every screen used to hold its own
+        error in state and draw it its own way, and a save that worked said
+        nothing at all — which matters most on Sửa nội dung, where the fields
+        write themselves on blur.
+      */}
+      <ToastProvider>
       <AuthProvider>
         <SiteCopyProvider>
           <RouteWordsSync onAdopt={onWords} />
@@ -72,6 +80,7 @@ export function App() {
           </ModulesProvider>
         </SiteCopyProvider>
       </AuthProvider>
+      </ToastProvider>
     </SettingsContext.Provider>
   )
 }

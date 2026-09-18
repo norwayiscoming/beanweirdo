@@ -1,0 +1,200 @@
+# Bộ nút cho ba màn quản trị
+
+- **Nhánh:** `claude/project-thread-r3z436`
+- **PR:** chưa mở — chờ chủ site duyệt.
+- **Phạm vi:** `frontend/src/screens/Cms.tsx`, `frontend/src/admin/`, `frontend/src/design/`.
+  Không đụng trang công khai, không đụng `packages/post-renderer`.
+
+Chủ site báo: ở `/ad-post`, `/ad-page-content`, `/ad-sitemap` nhiều nút "không hiển
+thị là button mà lại là chữ, click vào chữ thì mới được".
+
+---
+
+## Đo trước khi sửa
+
+Đếm bằng cách duyệt mọi thẻ mang `onClick` trong `Cms.tsx` và 8 component ở
+`admin/components/`. Ba màn kia đều là cùng một màn `Cms` (xem `routes.ts:cmsTabs`),
+chỉ khác tab, nên số đếm là chung.
+
+| | Số |
+|---|---|
+| Tổng số nút | 36 |
+| Không có `background` lẫn `border` | 29 |
+| `padding: 0` | 26 |
+| Không phải thẻ `<button>` | 11 |
+| Quy tắc `:focus-visible` trong toàn bộ CSS | 0 |
+
+`padding: 0` là thứ gây ra "phải click đúng chữ": vùng nhận cú nhấn đúng bằng hộp
+chữ, ở cỡ 10–12px là cao khoảng 12–14px.
+
+---
+
+## Đã đổi những gì
+
+### [SỬA LỖI] 11 thẻ không phải nút, nay là `<button>`
+
+Trước: `<div onClick>`, hoặc `<Hover onClick>` — `Hover` mặc định render ra `div`
+(`lib/Hover.tsx`, `createElement(as ?? 'div', …)`). Không tab tới được, không bấm
+Enter được.
+
+Sau: `<button>` thật, có `aria-pressed` hoặc `aria-expanded` nơi cần.
+
+- `Cms.tsx` — thanh ba tab đầu trang (`TABS.map`), nay dùng class `.ab-tab` với `aria-pressed`
+- `Cms.tsx:Cms` — nút tạo module, mũi co/mở module, tên module, nút xoá module
+- `Cms.tsx:ImageSlot` — bỏ ảnh
+- `Cms.tsx:Cms` — bỏ một bài khỏi module, trả nội dung về gốc
+- `PostCard.tsx:PostCard` — nút ghim
+- `RoutesPanel.tsx:RoutesPanel` — tiêu đề "Đường dẫn": trước là `<h2 onClick>` bọc một
+  `<span role="button">` **không mang handler** — khai là nút nhưng không phải nút
+
+### [SỬA LỖI] `ImageSlot` — nút tải ảnh tab tới được
+
+Trước: `<Hover as="label">` bọc `<input type="file">` ẩn — bấm được, tab không tới.
+Sau: `<button>` gọi `file.current?.click()`, input giữ nguyên `display: none`.
+Anchor: `Cms.tsx:ImageSlot`.
+
+### [ĐỔI HÀNH VI] Năm cấp nút, cấp nào cũng có viền lúc nghỉ
+
+Mới: `design/controls.ts`, `design/Button.tsx`, và khối `.ab-*` ở cuối
+`admin/admin.css`.
+
+| Cấp | Nền | Viền | Chữ |
+|---|---|---|---|
+| primary | `#23211A` | `#23211A` | `#FDFBF2` |
+| secondary | `#FFFFFF` | `#8C8674` | `#23211A` |
+| ghost | `#FFFFFF` | `#B5AE99` | `#3B3729` |
+| danger | `#FFFFFF` | `#C25C7C` | `#8E1E42` |
+
+Cỡ: lg 40px · md 34px · sm 28px · icon 34×34 (sm 28×28). Padding ngang 20/16/12.
+Tất cả cao hơn ngưỡng 24px.
+
+Không thêm màu mới. `#8E1E42` và `#C25C7C` vốn đã nằm rải trong `admin/` (6 và 9
+lần, viết cứng), nay đặt tên thành `ink.danger` và `ink.dangerLine` trong
+`design/tokens.ts`.
+
+### [ĐỔI HÀNH VI] `PostCard` — hành động ra cột riêng, "Xoá" thành cấp danger
+
+Trước: năm nút `Sửa · Nhân bản · Đăng · Lưu trữ · Xoá` dùng chung class
+`.admin-link-action` (chữ xanh 11.5px, `padding: 0`), nằm lẫn trong ô tiêu đề.
+
+Sau: cột riêng bên phải, nút cỡ sm. `danger: true` gắn vào các mục xoá trong
+`ACTIONS_BY_STATUS`, nên "Xoá" và "Xoá vĩnh viễn" vẽ đỏ, còn lại vẽ ghost.
+
+`.admin-link-action` đã xoá khỏi `admin.css` — `PostCard` là nơi duy nhất dùng.
+
+### [ĐỔI HÀNH VI] Nút ghim luôn nhìn thấy
+
+Trước: emoji `📌` trong `<div role="button">`, `opacity: 0.18` khi chưa ghim và chưa
+rê chuột. Tên đọc được của nó là chính ký tự emoji.
+
+Sau: `IconButton` với `aria-pressed`, nhãn "Ghim lên đầu module" / "Bỏ ghim",
+cấp `primary` khi đang ghim và `ghost` khi chưa. Bỏ hẳn `opacity`.
+
+Đã sửa `PostCard.pin.test.tsx` theo: nút tìm bằng `name: /ghim/i` thay vì emoji, và
+phép thử "nhìn là biết bài nào đang ghim" nay đọc class thay vì `style.opacity`.
+
+### [ĐỔI HÀNH VI] Toast thay cho lỗi cục bộ
+
+Mới: `design/Toaster.tsx`, gắn ở `App.tsx` bọc cả `AuthProvider`.
+
+Đã thay 12 chỗ `setError((e as Error).message)` trong `Cms.tsx` và 4 chỗ trong
+`PostsPanel.tsx` bằng `toast.fromError(e)`. Bỏ dải lỗi hồng chạy ngang đầu
+`Cms` — nó đẩy cả trang tụt xuống.
+
+`PostsPanel` giữ lại một cờ `failed` (không giữ nội dung lỗi) vì chỗ trống của
+danh sách phải phân biệt "chưa có bài nào" với "không tải được".
+
+Toast xanh và trắng tự tắt sau 4 giây; toast đỏ ở lại tới khi bấm đóng.
+
+### [ĐỔI HÀNH VI] 9 icon SVG thay ký tự Unicode
+
+Mới: `design/icons.tsx`. Nét 2.2, đầu nét vuông, ăn theo `currentColor`.
+
+Trước đó `✕` dùng 13 lần và `×` dùng 11 lần — **hai ký tự khác nhau cho cùng một
+nghĩa**. Còn `⠿` (7), `▾`/`▸`, `✎`. Nay `IconChevron` nhận `open` nên một hình
+thay cho bốn ký tự `▾ ▸ + −`.
+
+### [ĐỔI HÀNH VI] Một bán kính cho cả khu quản trị
+
+`admin.css` trước có 4px, 6px và 10px. Nay chỉ còn 4px. Việc này chạm cả
+`.admin-btn`, `.admin-btn-ghost`, `.admin-field`, `.admin-tpl-card` — tức là
+`Editor`, `Login`, `MetadataStep` cũng đổi theo, dù ba màn ấy ngoài phạm vi báo lỗi.
+Lý do gộp vào: ba màn đang sửa và `Editor` dùng chung một file CSS, để lệch nhau
+thì trong cùng một khung nhìn có ba bán kính.
+
+Đã xoá `.admin-tab` khỏi `admin.css` — định nghĩa từ lâu, chưa từng có nơi dùng.
+
+### [ĐỔI HÀNH VI] Nhãn nút viết hoa chữ đầu
+
+`tải ảnh lên` → `Tải ảnh lên`, `+ tag mới` → `Tag mới`, `+ module mới` →
+`Module mới`, `+ bài` → `Bài mới`, `+ Bài mới` → `Bài mới`. Dấu `+` nay là icon.
+
+Nhãn của các hành động trên `PostCard` (`Đăng`, `Lưu trữ`, `Bỏ đăng`, `Khôi phục`,
+`Xoá`, `Xoá vĩnh viễn`) **giữ nguyên từng chữ** — `PostsPanel.test.tsx` tìm nút
+bằng đúng các chuỗi ấy.
+
+---
+
+## Mâu thuẫn với bộ luật — cần chủ site quyết
+
+**Nhóm 08, luật 5** viết: *"Ở mọi thao tác xoá: xoá thẳng, không hỏi lại — hoàn tác
+thay cho hộp xác nhận."*
+
+Tôi đã cho nút **"Trả về nội dung gốc…"** ở tab Sửa nội dung một bước hỏi lại
+(bấm lần hai để xác nhận, không dùng `confirm()`). Đây là **mâu thuẫn trực tiếp**
+với luật trên.
+
+Lý do tôi vẫn làm vậy, để chủ site cân nhắc chứ không phải để tự quyết:
+
+- Nút này gọi `updateSite` với **mọi khoá của `SITE_DEFAULTS` đặt về chuỗi rỗng** —
+  không phải xoá một dòng mà xoá toàn bộ chữ đã sửa của cả trang.
+- Không có hoàn tác cho nó. `lib/useUndoStack.ts` chỉ phục vụ bộ soạn thảo bài;
+  `Cms.tsx` không gọi tới. Nên vế "hoàn tác thay cho hộp xác nhận" của luật 08 hiện
+  không có thật ở chỗ này.
+
+Hai đường đi tiếp, chọn một:
+1. Giữ bước hỏi lại, và sửa luật 08 để nêu ngoại lệ cho thao tác xoá hàng loạt
+   không hoàn tác được.
+2. Bỏ bước hỏi lại cho đúng luật 08, và làm hoàn tác cho thao tác này trước.
+
+Các nút xoá còn lại (xoá tag, xoá module, bỏ bài khỏi module, bỏ ảnh) **không**
+hỏi lại — đúng luật 08.
+
+Ngoài ra bản sửa không đụng luật nào khác. Nhóm 01 (màu) giữ nguyên bảng màu;
+nhóm 02 (chữ) giữ hai họ chữ và nét 500 cho nhãn; nhóm 15 (ảnh) không đổi hành vi,
+chỉ đổi hình dạng nút quanh ô ảnh.
+
+---
+
+## Bảng, cột, endpoint đã đụng
+
+**Không cái nào.** Toàn bộ thay đổi nằm ở lớp hiển thị. Các lời gọi
+`updateSite`, `patchModule`, `deleteModule`, `deleteTag`, `transitionStatus`,
+`updatePost`, `createModule`, `createPost`, `uploadImage` giữ nguyên tham số và
+nguyên thứ tự; chỉ nơi báo kết quả đổi từ state cục bộ sang toast.
+
+---
+
+## Kiểm
+
+- `npm test` — 125 file, 1249 phép thử xanh (thêm 9 phép thử mới ở
+  `design/Button.test.tsx`).
+- `npx vite build` — xanh, 243 module.
+- **Chưa mở trình duyệt xem.** Ba màn nằm sau cổng đăng nhập và tôi không tự gõ mật
+  khẩu. Mọi con số ở trên đọc từ mã nguồn. Cần chủ site đăng nhập một lần rồi soi
+  lại trên màn thật trước khi merge.
+
+`design/Button.test.tsx` đọc thẳng `admin.css` và bắt lỗi nếu có cấp nút nào thiếu
+`border-color` hoặc `background` — chính là lỗi đã xảy ra ở bản đề xuất đầu tiên,
+nơi cấp ghost và danger để viền trong suốt.
+
+---
+
+## Đề xuất luật
+
+Chưa làm, để chủ site quyết:
+
+1. Thêm vào nhóm 01 hoặc một nhóm mới: mọi nút trong khu quản trị phải có viền thấy
+   được ở trạng thái nghỉ, và vùng bấm cao tối thiểu 24px.
+2. Nêu rõ trong nhóm 08 rằng luật "xoá thẳng, không hỏi lại" áp cho thao tác trên
+   **một** dòng dữ liệu, chứ không cho thao tác xoá hàng loạt không hoàn tác được.

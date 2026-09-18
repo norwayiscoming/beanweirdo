@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { PostStatus, PostSummary, PostTemplate, StatusAction } from '../lib/apiClient'
 import { garden, ink, paper, sans, serif } from '../../design/tokens'
+import { Button, IconButton } from '../../design/Button'
+import { IconCopy, IconEdit, IconPin } from '../../design/icons'
 import { StatusBadge } from './StatusBadge'
 
 // Real template names — the old band/specimen/sequence naming is gone along
@@ -14,24 +16,31 @@ const TEMPLATE_LABEL: Record<PostTemplate, string> = {
   bitesize: 'Bitesize note',
 }
 
-const ACTIONS_BY_STATUS: Record<PostStatus, { label: string; action: StatusAction }[]> = {
+/**
+ * What each action does to the post, which decides how loud its button is.
+ *
+ * All five used to be the same green text link, so "Xoá" and "Sửa" were
+ * indistinguishable until you read them. Only the ones that destroy something
+ * are marked; everything else is an ordinary row action.
+ */
+const ACTIONS_BY_STATUS: Record<PostStatus, { label: string; action: StatusAction; danger?: true }[]> = {
   draft: [
     { label: 'Đăng', action: 'publish' },
     { label: 'Lưu trữ', action: 'archive' },
-    { label: 'Xoá', action: 'delete' },
+    { label: 'Xoá', action: 'delete', danger: true },
   ],
   published: [
     { label: 'Bỏ đăng', action: 'unpublish' },
     { label: 'Lưu trữ', action: 'archive' },
-    { label: 'Xoá', action: 'delete' },
+    { label: 'Xoá', action: 'delete', danger: true },
   ],
   archived: [
     { label: 'Khôi phục', action: 'restore' },
-    { label: 'Xoá', action: 'delete' },
+    { label: 'Xoá', action: 'delete', danger: true },
   ],
   deleted: [
     { label: 'Khôi phục', action: 'restore-trash' },
-    { label: 'Xoá vĩnh viễn', action: 'permanently-delete' },
+    { label: 'Xoá vĩnh viễn', action: 'permanently-delete', danger: true },
   ],
 }
 
@@ -69,7 +78,7 @@ export function PostCard({
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '52px minmax(0,1fr) 84px 96px auto',
+        gridTemplateColumns: '52px minmax(0,1fr) auto',
         alignItems: 'center',
         gap: 16,
         padding: '14px 40px',
@@ -82,10 +91,10 @@ export function PostCard({
         <img
           src={post.thumbnail_url}
           alt=""
-          style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 6, flex: 'none' }}
+          style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 4, flex: 'none' }}
         />
       ) : (
-        <div style={{ width: 44, height: 44, background: thumbColor(post.id), borderRadius: 6, flex: 'none' }} />
+        <div style={{ width: 44, height: 44, background: thumbColor(post.id), borderRadius: 4, flex: 'none' }} />
       )}
 
       <div style={{ minWidth: 0 }}>
@@ -94,60 +103,60 @@ export function PostCard({
           {post.module_id} · {post.kind} · {post.date_label}
         </div>
         <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.soft, marginTop: 5, lineHeight: 1.5 }}>{post.vi}</div>
-        <div style={{ fontSize: 11, marginTop: 8 }}>
-          <button
-            onClick={() => onEdit(post.id)}
-            className="admin-link-action"
-            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit' }}
+      </div>
+
+      {/*
+        Actions get their own column instead of sitting inside the title cell.
+        Mixed in with the text they read as part of the description, which is
+        most of why they did not read as controls at all.
+      */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flex: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              fontFamily: sans,
+              fontSize: 10,
+              color: ink.muted,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+            }}
           >
+            {post.template ? TEMPLATE_LABEL[post.template] : '—'}
+          </span>
+          {/* Ghim là việc của mọi module, không riêng Ghi 01: bài ghim dẫn đầu
+              module của nó dù phần còn lại xếp theo gì. */}
+          <IconButton
+            level={post.pinned ? 'primary' : 'ghost'}
+            aria-pressed={post.pinned}
+            label={post.pinned ? 'Bỏ ghim' : 'Ghim lên đầu module'}
+            onClick={(e) => {
+              e.stopPropagation()
+              onPin(post.id, !post.pinned)
+            }}
+          >
+            <IconPin size={16} />
+          </IconButton>
+          <StatusBadge status={post.status} />
+        </div>
+
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Button size="sm" onClick={() => onEdit(post.id)} icon={<IconEdit size={14} />}>
             Sửa
-          </button>
-          <button
-            onClick={() => onCopy(post.id)}
-            className="admin-link-action"
-            style={{ background: 'none', border: 'none', padding: 0, font: 'inherit' }}
-          >
+          </Button>
+          <Button size="sm" onClick={() => onCopy(post.id)} icon={<IconCopy size={14} />}>
             Nhân bản
-          </button>
+          </Button>
           {actions.map((a) => (
-            <button
+            <Button
               key={a.action}
+              size="sm"
+              level={a.danger ? 'danger' : 'ghost'}
               onClick={() => onAction(post.id, a.action)}
-              className="admin-link-action"
-              style={{ background: 'none', border: 'none', padding: 0, font: 'inherit' }}
             >
               {a.label}
-            </button>
+            </Button>
           ))}
         </div>
-      </div>
-
-      <div style={{ fontFamily: sans, fontSize: 10, color: ink.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        {post.template ? TEMPLATE_LABEL[post.template] : '—'}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        {/* Ghim là việc của mọi module, không riêng Ghi 01: bài ghim dẫn đầu
-            module của nó dù phần còn lại xếp theo gì. */}
-        <div
-          role="button"
-          aria-pressed={post.pinned}
-          onClick={(e) => {
-            e.stopPropagation()
-            onPin(post.id, !post.pinned)
-          }}
-          title={post.pinned ? 'Bỏ ghim' : 'Ghim lên đầu module'}
-          style={{
-            fontSize: 13,
-            cursor: 'pointer',
-            lineHeight: 1,
-            opacity: post.pinned ? 1 : hover ? 0.5 : 0.18,
-            transition: 'opacity .2s ease',
-          }}
-        >
-          📌
-        </div>
-        <StatusBadge status={post.status} />
       </div>
     </div>
   )

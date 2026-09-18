@@ -21,7 +21,7 @@
   font-weight: 500;
   font-size: 12.5px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 9px 16px;
   cursor: pointer;
   background: #23211a;
@@ -40,7 +40,7 @@
   font-weight: 500;
   font-size: 12.5px;
   border: 1px solid #ebe5d3;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 9px 16px;
   cursor: pointer;
   background: transparent;
@@ -50,36 +50,9 @@
   background: #f6f2e2;
 }
 
-.admin-tab {
-  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
-  font-size: 12px;
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: 1px solid #ebe5d3;
-  color: #8c8674;
-  cursor: pointer;
-  background: transparent;
-}
-.admin-tab[aria-pressed='true'] {
-  background: #23211a;
-  color: #fdfbf2;
-  border-color: #23211a;
-}
-
-.admin-link-action {
-  color: #3e7a4e;
-  text-decoration: none;
-  margin-right: 12px;
-  cursor: pointer;
-  font-size: 11.5px;
-}
-.admin-link-action:hover {
-  text-decoration: underline;
-}
-
 .admin-tpl-card {
   border: 1px solid #ebe5d3;
-  border-radius: 10px;
+  border-radius: 4px;
   overflow: hidden;
   cursor: pointer;
   background: #ffffff;
@@ -98,7 +71,7 @@
   font-size: 14px;
   color: #23211a;
   border: 1px solid #ebe5d3;
-  border-radius: 6px;
+  border-radius: 4px;
   padding: 9px 10px;
   width: 100%;
   background: #ffffff;
@@ -139,3 +112,127 @@
 .awc-live-bold { font-weight: 600; font-style: italic; }
 .awc-live-u { border-bottom: 1px solid #CFCFC4; }
 .awc-live-link { color: inherit; border-bottom: 1px solid currentColor; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   .ab — the back office's one button. See design/Button.tsx for why, and
+   design/controls.ts for the numbers these rules repeat.
+
+   Two rules hold across every level and state:
+
+   1. A visible 1px border at rest. 29 of the 36 controls on the CMS screens
+      had neither background nor border, which is why the owner reported that
+      the buttons look like text and that you have to hit the letters.
+   2. That border is present in every state, so hovering never shifts the box
+      by a pixel and a row of buttons never re-flows under the pointer.
+
+   Colours are `design/tokens.ts` verbatim; nothing new was added to the
+   palette except naming the two reds that were already being written by hand.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.ab {
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color .13s ease, border-color .13s ease, color .13s ease;
+}
+
+/* The one focus ring in the app. There were none, and `.admin-field:focus`
+   removed the browser's own without putting anything back. */
+.ab:focus-visible {
+  outline: 2px solid #3e7a4e;
+  outline-offset: 2px;
+}
+
+.ab-lg { height: 40px; padding: 0 20px; font-size: 12.5px; }
+.ab-md { height: 34px; padding: 0 16px; font-size: 12px; }
+.ab-sm { height: 28px; padding: 0 12px; font-size: 11.5px; }
+.ab-icon { width: 34px; height: 34px; padding: 0; }
+.ab-icon-sm { width: 28px; height: 28px; }
+
+.ab-primary { background: #23211a; border-color: #23211a; color: #fdfbf2; }
+.ab-primary:hover:not(:disabled) { background: #3b3729; border-color: #3b3729; }
+
+.ab-secondary { background: #ffffff; border-color: #8c8674; color: #23211a; }
+.ab-secondary:hover:not(:disabled) { background: #f6f2e2; border-color: #5c5745; }
+
+.ab-ghost { background: #ffffff; border-color: #b5ae99; color: #3b3729; }
+.ab-ghost:hover:not(:disabled) { background: #f6f2e2; border-color: #8c8674; }
+
+.ab-danger { background: #ffffff; border-color: #c25c7c; color: #8e1e42; }
+.ab-danger:hover:not(:disabled) { background: #fbe7e5; border-color: #8e1e42; }
+
+.ab:disabled {
+  background: #fdfbf2;
+  border-color: #ebe5d3;
+  color: #b5ae99;
+  cursor: not-allowed;
+}
+
+/* Tabs. The CMS tab bar was three `<div onClick>` on the blue band, so the
+   three places a person can stand in the back office could not be reached
+   from the keyboard at all. `aria-pressed` carries which one is current. */
+.ab-tab {
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  height: 34px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  border: 1px solid #b5ae99;
+  background: transparent;
+  color: #5c5745;
+  cursor: pointer;
+  transition: background-color .13s ease, border-color .13s ease, color .13s ease;
+}
+.ab-tab:hover { border-color: #23211a; color: #23211a; }
+.ab-tab[aria-pressed='true'] {
+  background: #23211a;
+  border-color: #23211a;
+  color: #fdfbf2;
+}
+.ab-tab:focus-visible {
+  outline: 2px solid #3e7a4e;
+  outline-offset: 2px;
+}
+
+/* A section header that opens and closes. It was an `<h2 onClick>` carrying a
+   `<span role="button">` that held no handler — announced as a button, and
+   not one. */
+.ab-disclose {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.ab-disclose:focus-visible {
+  outline: 2px solid #3e7a4e;
+  outline-offset: 3px;
+}
+
+/* A filter inside a list, not a place to stand — underlined rather than
+   bordered, so the two rows of choices on Tạo bài đăng do not claim to be the
+   same kind of choice. It still needs the focus ring the rest of the app got. */
+.ab-filter:focus-visible {
+  outline: 2px solid #3e7a4e;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
