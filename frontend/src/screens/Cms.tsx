@@ -21,13 +21,11 @@ import {
 import {
   transitionStatus,
   getSite,
-  listTemplates,
   listTags,
   createTag,
   renameTag,
   deleteTag,
   type Tag,
-  type TemplateSummary,
 } from '../admin/lib/apiClient'
 import { tagColor } from '../lib/notesFilter'
 import { PostsPanel } from '../admin/components/PostsPanel'
@@ -512,7 +510,6 @@ export function Cms() {
   const [site, setSite] = useState<SiteOverrides>({})
   const [modules, setModules] = useState<Module[]>([])
   // The site map names what Templates holds, so it has to know.
-  const [templates, setTemplates] = useState<TemplateSummary[]>([])
   const [posts, setPosts] = useState<PostSummary[]>([])
   const [openModule, setOpenModule] = useState<string | null>(null)
   const [dragModule, setDragModule] = useState<string | null>(null)
@@ -522,10 +519,9 @@ export function Cms() {
 
   const load = useCallback(async () => {
     try {
-      const [s, m, p, t] = await Promise.all([getSite(), listModules(), listPosts('all'), listTemplates()])
+      const [s, m, p] = await Promise.all([getSite(), listModules(), listPosts('all')])
       setSite(s)
       setModules(m)
-      setTemplates(t)
       setPosts(p)
       setError(null)
     } catch (e) {
@@ -727,14 +723,11 @@ export function Cms() {
   /**
    * What an admin page holds, for the pages that hold something nameable.
    *
-   * Content management holds its own three tabs; Templates holds the templates
-   * stored in the database, so adding one shows up here without anyone editing
-   * this list. The rest hold rules and reference, which the page itself is
-   * better at showing than a map row would be.
+   * Content management holds its own three tabs. Phần còn lại giữ luật và
+   * tham chiếu, thứ chính trang ấy bày ra tốt hơn một dòng trong sơ đồ.
    */
   function childrenOf(key: string): string[] {
     if (key === 'cms') return TABS.map((t) => t.t)
-    if (key === 'templates') return templates.map((t) => `${t.name} · ${t.renderer}`)
     return []
   }
 

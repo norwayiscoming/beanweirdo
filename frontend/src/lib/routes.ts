@@ -46,9 +46,7 @@ const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adPost}`]: 'cms',
   [`${w.admin}-${w.adSitemap}`]: 'cms',
   [`${w.admin}-${w.adPageContent}`]: 'cms',
-  [`${w.admin}-${w.adDesignSystem}`]: 'art',
   [`${w.admin}-${w.adConvention}`]: 'logic',
-  [`${w.admin}-${w.adTemplate}`]: 'templates',
   [`${w.admin}-${w.adArchive}`]: 'archive',
 })
 
@@ -73,9 +71,7 @@ const pageOfTab = (w: RouteWords): Record<CmsTab, string> => ({
 })
 
 const screenPage = (w: RouteWords): Partial<Record<Screen, string>> => ({
-  art: `${w.admin}-${w.adDesignSystem}`,
   logic: `${w.admin}-${w.adConvention}`,
-  templates: `${w.admin}-${w.adTemplate}`,
   archive: `${w.admin}-${w.adArchive}`,
 })
 
@@ -135,9 +131,6 @@ function readPath(pathname: string, search: string, w: RouteWords): Where | null
       const screen = postActions(w)[verb]
       if (screen) return { area: 'admin', screen, slug: slug || undefined }
     }
-    if (head === `${w.admin}-${w.adTemplate}` && seg[1]) {
-      return { area: 'admin', screen: 'templates', templateId: seg[1] }
-    }
     const screen = adminPages(w)[head]
     if (screen) return { area: 'admin', screen, tab: cmsTabs(w)[head] }
     return { area: 'admin', screen: 'cms' }
@@ -168,10 +161,6 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
   if (where.area === 'admin') {
     const action = actionOfScreen(w)[where.screen]
     if (action) return where.slug ? `${adPost}/${action}=${where.slug}` : `${adPost}/${action}`
-    if (where.screen === 'templates') {
-      const list = `/${w.admin}-${w.adTemplate}`
-      return where.templateId ? `${list}/${where.templateId}` : list
-    }
     if (where.screen === 'article') return where.slug ? `/${w.post}/${where.slug}?from=admin` : adHome
     if (where.screen === 'cms') return where.tab ? `/${pageOfTab(w)[where.tab]}` : adHome
     const page = screenPage(w)[where.screen]

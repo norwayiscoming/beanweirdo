@@ -108,28 +108,12 @@ export const NAV: NavItem[] = [
     shape: glyph({ w: '9px', h: '11px', bbw: '4px' }),
   },
   {
-    key: 'art',
-    group: 'Admin',
-    label: 'Design system',
-    desc: 'màu, chữ, khoảng cách',
-    screen: 'art',
-    shape: glyph({ r: '50%', bd: '3px solid currentColor', brw: '3px', bbw: '3px' }),
-  },
-  {
     key: 'logic',
     group: 'Admin',
     label: 'System conventions',
     desc: 'quy tắc FE / BE',
     screen: 'logic',
     shape: glyph({ w: '8px', h: '8px', tf: 'rotate(45deg)' }),
-  },
-  {
-    key: 'templates',
-    group: 'Admin',
-    label: 'Templates',
-    desc: 'khung để bắt đầu một bài',
-    screen: 'templates',
-    shape: glyph({ w: '11px', h: '8px', r: '0 2px 2px 0', brw: '4px' }),
   },
   {
     key: 'archive',

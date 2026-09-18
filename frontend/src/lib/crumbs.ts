@@ -64,7 +64,6 @@ export function buildCrumbs(
   const atCms = nav.screen === 'cms'
   const admin: Crumb = atCms ? { label: sections.Admin } : { label: sections.Admin, go: nav.goCms }
   const backend: Crumb = atCms ? { label: 'Backend' } : { label: 'Backend', go: nav.goCms }
-  const templates: Crumb = { label: navLabel('templates'), go: nav.goTemplates }
   const mod = (id: string): Crumb => ({
     label: modules.find((m) => m.id === id)?.title ?? id,
     go: toPublic('landing', () => nav.openModule(id)),
@@ -85,21 +84,15 @@ export function buildCrumbs(
         return [landing, index, mod(ctx.moduleId ?? nav.moduleId), { label: ctx.trailing ?? 'Bài viết' }]
       if (nav.articleFrom === 'archive')
         return [admin, { label: navLabel('archive'), go: nav.goArchive }, { label: ctx.trailing ?? 'Bài viết' }]
-      return [admin, templates, { label: ctx.trailing ?? 'Bài viết' }]
-    case 'templates':
-      // With a template open the list becomes a place to return to, so the
-      // trail grows a stop and `Templates` stops being the current page.
-      return ctx.trailing
-        ? [admin, { label: navLabel('templates'), go: ctx.parentGo ?? nav.goTemplates }, { label: ctx.trailing }]
-        : [admin, { label: navLabel('templates') }]
+      // Cửa thứ ba từng là màn Templates; màn ấy đã bỏ, nên đường về chỉ còn
+      // tới khu quản trị.
+      return [admin, { label: ctx.trailing ?? 'Bài viết' }]
     case 'notes':
       return [landing, { label: `beӕn weirdo — ${navLabel('notes')}` }]
     case 'hours':
       return [landing, { label: `beӕn weirdo — ${navLabel('hours')}` }]
     case 'archive':
       return [admin, { label: 'Notes', go: nav.goCms }, { label: navLabel('archive') }]
-    case 'art':
-      return [admin, backend, { label: navLabel('art') }]
     case 'logic':
       return [admin, backend, { label: navLabel('logic') }]
     case 'cms':
@@ -132,8 +125,6 @@ export function crumbBack(nav: Nav, moduleId?: string, parentGo?: () => void): (
      * the area entirely, so `←` from Templates landed on the public journal —
      * a long way from one step back.
      */
-    case 'templates':
-    case 'art':
     case 'logic':
       return nav.goCms
     case 'module':

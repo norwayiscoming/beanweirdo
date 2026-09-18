@@ -17,7 +17,7 @@ import { prose } from '../design/tokens'
  * Đọc thẳng mã nguồn vì dựng đủ bốn màn hình trong test cần cả context điều
  * hướng lẫn dữ liệu module, mà thứ dễ rơi chỉ là một dòng trong `style`.
  */
-const SCREENS = ['ModuleScreen', 'Landing', 'IndexScreen', 'DesignSystem'] as const
+const SCREENS = ['ModuleScreen', 'Landing', 'IndexScreen'] as const
 
 /**
  * Chữ dài do chủ site gõ — không tính tiêu đề, tiêu đề là ô một dòng.

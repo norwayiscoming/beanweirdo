@@ -22,9 +22,7 @@ export type RouteWords = {
   adPost: string
   adSitemap: string
   adPageContent: string
-  adDesignSystem: string
   adConvention: string
-  adTemplate: string
   adArchive: string
   /** Ba động từ soạn bài: `/ad-post/edit=<slug>`. */
   create: string
@@ -49,9 +47,7 @@ export const DEFAULT_WORDS: RouteWords = {
   adPost: 'post',
   adSitemap: 'sitemap',
   adPageContent: 'page-content',
-  adDesignSystem: 'design-system',
   adConvention: 'convention',
-  adTemplate: 'template',
   adArchive: 'archive',
   create: 'create',
   edit: 'edit',
@@ -75,9 +71,7 @@ export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'module
   adPost: 'Tạo bài đăng',
   adSitemap: 'Sơ đồ trang',
   adPageContent: 'Sửa nội dung',
-  adDesignSystem: 'Design system',
   adConvention: 'System conventions',
-  adTemplate: 'Templates',
   adArchive: 'Archive',
   create: 'Tạo bài',
   edit: 'Sửa bài',
@@ -108,7 +102,7 @@ const MUST_DIFFER: (keyof RouteWords)[][] = [
   // Đoạn đầu địa chỉ: mọi trang công khai và khu quản trị nằm cùng một chỗ.
   ['admin', 'post', 'module', 'index', 'notes', 'practice'],
   // Bảy trang con đứng cùng một chỗ, ngay sau `ad-`.
-  ['adPost', 'adSitemap', 'adPageContent', 'adDesignSystem', 'adConvention', 'adTemplate', 'adArchive'],
+  ['adPost', 'adSitemap', 'adPageContent', 'adConvention', 'adArchive'],
   // Ba động từ đứng cùng một chỗ, ngay sau `/ad-post/`.
   ['create', 'edit', 'view'],
 ]

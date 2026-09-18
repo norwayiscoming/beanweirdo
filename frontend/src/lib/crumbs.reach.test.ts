@@ -24,7 +24,6 @@ function navFor(screen: string, area = 'admin'): Nav {
     goCms: vi.fn(),
     goArt: vi.fn(),
     goLogic: vi.fn(),
-    goTemplates: vi.fn(),
     goArchive: vi.fn(),
     goHours: vi.fn(),
     goNotes: vi.fn(),
@@ -35,7 +34,7 @@ function navFor(screen: string, area = 'admin'): Nav {
   } as unknown as Nav
 }
 
-const ADMIN = ['cms', 'art', 'logic', 'templates', 'archive']
+const ADMIN = ['cms', 'logic', 'archive']
 const PUBLIC = ['home', 'module', 'notes', 'hours']
 
 describe('every crumb but the last one leads somewhere', () => {
@@ -65,7 +64,7 @@ describe('every crumb but the last one leads somewhere', () => {
 
 describe('the back arrow', () => {
   it('stays inside admin instead of leaving for the public journal', () => {
-    for (const screen of ['templates', 'art', 'logic']) {
+    for (const screen of ['logic']) {
       const nav = navFor(screen)
       crumbBack(nav)()
       expect(nav.goCms, `← trên màn ${screen} không về admin`).toHaveBeenCalled()
@@ -99,7 +98,7 @@ describe('crumbs — không mẩu nào trỏ về chỗ đang đứng', () => {
   it('still walks from the other admin screens', () => {
     // Chỉ Content management mới là chỗ đang đứng; ở Design system thì hai mẩu
     // đầu vẫn phải đưa về được.
-    for (const screen of ['art', 'logic', 'archive']) {
+    for (const screen of ['logic', 'archive']) {
       const trail = buildCrumbs(navFor(screen), MODULES, SECTIONS)
       expect(trail.slice(0, -1).every((c) => c.go), screen).toBe(true)
     }

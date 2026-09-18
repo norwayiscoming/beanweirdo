@@ -30,7 +30,6 @@ describe('screenAllowed', () => {
     expect(screenAllowed('public', 'cms')).toBe(false)
     expect(screenAllowed('public', 'hours')).toBe(false)
     expect(screenAllowed('public', 'archive')).toBe(false)
-    expect(screenAllowed('public', 'art')).toBe(false)
     expect(screenAllowed('public', 'logic')).toBe(false)
     expect(screenAllowed('public', 'postEdit')).toBe(false)
   })
@@ -46,13 +45,6 @@ describe('screenAllowed', () => {
     expect(screenAllowed('practice', 'hours')).toBe(true)
     expect(screenAllowed('admin', 'cms')).toBe(true)
     expect(screenAllowed('admin', 'postNew')).toBe(true)
-  })
-
-  it('lets Templates render in the admin area only', () => {
-    // One screen lists them all now; the five hardcoded template screens are
-    // gone along with the five nav entries.
-    expect(screenAllowed('admin', 'templates')).toBe(true)
-    expect(screenAllowed('public', 'templates')).toBe(false)
   })
 
   it('always allows the screen an area opens on', () => {

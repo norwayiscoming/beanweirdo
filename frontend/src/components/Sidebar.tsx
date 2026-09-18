@@ -191,13 +191,11 @@ function go(nav: Nav, item: NavItem): () => void {
     case 'hours':
       return nav.goHours
     case 'cms':
-      return nav.goCms
-    case 'art':
-      return nav.goArt
+      // Thẳng tới danh sách bài. `/ad` chỉ gọi tên màn mà không gọi tên tab,
+      // nên bấm vào đây từng dừng ở một địa chỉ không phải chỗ nào cả.
+      return () => nav.goCms('posts')
     case 'logic':
       return nav.goLogic
-    case 'templates':
-      return nav.goTemplates
     case 'archive':
       return nav.goArchive
     default:

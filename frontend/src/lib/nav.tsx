@@ -3,7 +3,6 @@ import type { Area } from './area'
 import type { CmsTab } from './routes'
 
 export type Screen =
-  | 'art'
   | 'landing'
   | 'home'
   | 'module'
@@ -20,7 +19,6 @@ export type Screen =
   | 'postEdit'
   | 'postPreview'
   /** Admin › Templates — the stored blueprints. */
-  | 'templates'
   /** A template with sample content in it, under Admin › Templates. */
   | 'template'
 
@@ -53,10 +51,8 @@ export type Nav = {
   postId: string | null
   articleFrom: Origin
   /** The template open under Admin › Templates — null on the list itself. */
-  templateId: string | null
   /** Which tab of Content management is open. */
   cmsTab: CmsTab
-  goArt(): void
   goLanding(): void
   goHome(): void
   goArchive(): void
@@ -64,7 +60,6 @@ export type Nav = {
   goNotes(): void
   goCms(tab?: CmsTab): void
   goLogic(): void
-  goTemplates(): void
   /**
    * Open one template, or `null` for the list.
    *
@@ -72,7 +67,6 @@ export type Nav = {
    * button returns from it. That only works if the address says which one is
    * open, so the screen asks to be moved rather than moving itself.
    */
-  openTemplate(id: string | null): void
   openModule(id: string): void
   /**
    * Optional id: some call sites (the sidebar's Templates links) don't have a

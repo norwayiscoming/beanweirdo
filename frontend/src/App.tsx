@@ -25,14 +25,12 @@ import { Preview } from './admin/screens/Preview'
 import { Archive } from './screens/Archive'
 import { Article } from './screens/Article'
 import { Cms } from './screens/Cms'
-import { DesignSystem } from './screens/DesignSystem'
 import { Hours } from './screens/Hours'
 import { IndexScreen } from './screens/IndexScreen'
 import { Landing } from './screens/Landing'
 import { Logic } from './screens/Logic'
 import { ModuleScreen } from './screens/ModuleScreen'
 import { Notes } from './screens/Notes'
-import { Templates } from './screens/Templates'
 
 const settings: Settings = { density: 'roomy', showPlates: true }
 
@@ -121,11 +119,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
 
   const editPost = useCallback((id: string) => at({ screen: 'postEdit', slug: posts.slugOf(id) }), [at, posts])
   const previewPost = useCallback((id: string) => at({ screen: 'postPreview', slug: posts.slugOf(id) }), [at, posts])
-  const openTemplate = useCallback(
-    (id: string | null) => at({ screen: 'templates', templateId: id ?? undefined }),
-    [at],
-  )
-
   const nav = useMemo<Nav>(
     () => ({
       screen: where.screen,
@@ -136,7 +129,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       articleFrom,
       templateId: where.templateId ?? null,
       cmsTab: where.tab ?? 'posts',
-      goArt: () => at({ screen: 'art' }),
       goLanding: () => at({ screen: 'landing' }),
       goHome: () => at({ screen: 'home' }),
       goArchive: () => at({ screen: 'archive' }),
@@ -149,14 +141,12 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       newPost: () => at({ screen: 'postNew' }),
       editPost,
       previewPost,
-      goTemplates: () => at({ screen: 'templates' }),
-      openTemplate,
       toggleVariant: () => {
         at({ screen: 'home' })
         setVariant((v) => (v === 'A' ? 'B' : 'A'))
       },
     }),
-    [where, area, variant, moduleId, postId, articleFrom, at, openModule, openArticle, editPost, previewPost, openTemplate],
+    [where, area, variant, moduleId, postId, articleFrom, at, openModule, openArticle, editPost, previewPost],
   )
 
   // Second line of defence: even if some path sets a screen that doesn't
@@ -173,7 +163,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
     <div style={mobile ? { marginLeft: 0, paddingBottom: layout.barMobile } : { marginLeft: layout.sidebarClosed }}>
       {shown === 'hours' && <Hours />}
       {shown === 'notes' && <Notes />}
-      {shown === 'art' && <DesignSystem />}
       {shown === 'landing' && <Landing />}
       {shown === 'home' && <IndexScreen />}
       {shown === 'module' && <ModuleScreen />}
@@ -184,7 +173,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       {shown === 'postNew' && <NewPostWizard />}
       {shown === 'postEdit' && postId && <Editor postId={postId} />}
       {shown === 'postPreview' && postId && <Preview postId={postId} />}
-      {shown === 'templates' && <Templates />}
     </div>
   )
 
