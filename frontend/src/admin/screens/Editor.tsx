@@ -1342,13 +1342,29 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
         if (run?.kind === 'text') {
           if (i !== run.at[0]) return null
           return (
-            <div key={i} className="awc-rep-block">
-              <div className="awc-gutter">{insertPlus(i, run.at[1] + 1)}</div>
-              <LiveText
-                text={run.text}
-                onCommit={(md) => setSections(writeSectionRun(sections, run.at, md))}
-              />
-            </div>
+            <LiveRun
+              key={i}
+              text={run.text}
+              menuOpen={menuAt === i}
+              onToggleMenu={() => setMenuAt(menuAt === i ? null : i)}
+              onCommit={(md) => setSections(writeSectionRun(sections, run.at, md))}
+              onInsertAfterLine={(lineIndex, t) => {
+                setSections(insertAt(sections, run.at[0] + lineIndex + 1, blankReportBlock(t) as never))
+                setMenuAt(null)
+              }}
+              onBackspaceAtStart={() => {
+                const before = run.at[0] - 1
+                if (before < 0) return false
+                setSections(removeAt(sections, before, true))
+                return true
+              }}
+              onDeleteAtEnd={() => {
+                const after = run.at[1] + 1
+                if (after >= sections.length) return false
+                setSections(removeAt(sections, after, true))
+                return true
+              }}
+            />
           )
         }
         return (
@@ -1361,7 +1377,17 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
             onDuplicate={() => setSections(duplicateAt(sections, i))}
             plus={insertPlus(i, i + 1)}
           >
-            {section}
+            {isStoredElement(sections[i]) ? (
+              <StoredBlockFields
+                block={sections[i] as unknown as ReportBlock}
+                palette={paletteFrom(post.theme_color ?? module?.accent ?? REPORT_BLUE)}
+                onChange={(next) =>
+                  setSections(sections.map((x, k) => (k === i ? (next as never) : x)))
+                }
+              />
+            ) : (
+              section
+            )}
           </RowShell>
         )
       }}
@@ -1519,7 +1545,15 @@ function LongformEditor({
               />
             }
           >
-            {drawn}
+            {(blocks[i] as { k?: string }).k === undefined ? (
+              <StoredBlockFields
+                block={blocks[i] as unknown as ReportBlock}
+                palette={paletteFrom(post.theme_color ?? module?.accent ?? REPORT_BLUE)}
+                onChange={(next) => write(blocks.map((b, k) => (k === i ? (next as never) : b)))}
+              />
+            ) : (
+              drawn
+            )}
           </RowShell>
         )
       }}
@@ -1646,6 +1680,41 @@ function InlineField({
  * trên. Chúng nằm trong `body` jsonb chứ không thành cột mới — đúng cách bốn
  * template kia mang phần riêng của chúng.
  */
+/**
+ * Ô nhập cho một khối lấy từ kho, ở những khuôn bài giữ từ vựng riêng.
+ *
+ * Long-form và article lưu thân bài bằng từ vựng của chính chúng
+ * (`LongformBlock`, `SectionData`) nhưng nay chèn được khối của kho vào giữa.
+ * Lúc mới nối, `RowShell` bọc **bản vẽ** của khối — nên thêm một cái bảng thì
+ * thấy bảng mà không gõ vào ô nào được. Chỗ này bọc đúng ô nhập.
+ *
+ * Bốn móc bàn phím để trơ, có chủ ý và nói rõ ra đây thay vì im lặng: chúng
+ * nói về vị trí của một khối **trong dải chữ**, mà một khối của kho ở hai
+ * khuôn này lại nằm *giữa* các dải chứ không ở trong dải nào. Việc xoá nó bằng
+ * bàn phím đã có `onBackspaceAtStart` / `onDeleteAtEnd` của dải bên cạnh lo.
+ */
+function StoredBlockFields({
+  block,
+  palette,
+  onChange,
+}: {
+  block: ReportBlock
+  palette: Palette
+  onChange: (next: ReportBlock) => void
+}) {
+  return (
+    <ReportBlockFields
+      block={block}
+      palette={palette}
+      onChange={onChange}
+      onPasteBlocks={() => false}
+      onTextKey={() => {}}
+      onSlash={() => {}}
+      onArrowOut={() => false}
+    />
+  )
+}
+
 /**
  * Một dải chữ, kèm cái máng `+` **bám theo dòng con trỏ đang ở**.
  *
