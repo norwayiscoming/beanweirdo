@@ -135,30 +135,35 @@ bằng đúng các chuỗi ấy.
 
 ---
 
-## Mâu thuẫn với bộ luật — cần chủ site quyết
+## Đối chiếu với bộ luật
 
-**Nhóm 08, luật 5** viết: *"Ở mọi thao tác xoá: xoá thẳng, không hỏi lại — hoàn tác
-thay cho hộp xác nhận."*
+**Không mâu thuẫn với luật nào.**
 
-Tôi đã cho nút **"Trả về nội dung gốc…"** ở tab Sửa nội dung một bước hỏi lại
-(bấm lần hai để xác nhận, không dùng `confirm()`). Đây là **mâu thuẫn trực tiếp**
-với luật trên.
+Bản ghi chú đầu tiên của tôi nói ngược lại, và sai. Tôi đọc **nhóm 08, luật 5**
+(*"Ở mọi thao tác xoá: xoá thẳng, không hỏi lại — hoàn tác thay cho hộp xác nhận"*)
+là áp cho mọi nút có chữ "Xoá" ở khắp hệ thống, rồi kết luận rằng bước hỏi lại tôi
+thêm cho **"Trả về nội dung gốc…"** là vi phạm.
 
-Lý do tôi vẫn làm vậy, để chủ site cân nhắc chứ không phải để tự quyết:
+Chủ site đã xác định lại phạm vi của luật: **nhóm 08 nói về xoá chữ trong khi soạn
+thảo**, không nói về nút xoá một bài đăng hay một module. Đọc như vậy thì khớp với
+chính bộ luật: nhóm 08 tên là *"Ghi — sửa và lưu"*, luật 6 và 7 của nó nói về
+Ctrl+Z và bộ nhớ đệm hoàn tác của trình soạn, và ví dụ của cả nhóm trích
+`[[hours]]` và `[[report]]` — các màn Practice, không phải CMS. Thứ làm tôi đọc sai
+là nhãn phạm vi `'Toàn hệ thống'` gắn trên từng mục.
 
-- Nút này gọi `updateSite` với **mọi khoá của `SITE_DEFAULTS` đặt về chuỗi rỗng** —
-  không phải xoá một dòng mà xoá toàn bộ chữ đã sửa của cả trang.
-- Không có hoàn tác cho nó. `lib/useUndoStack.ts` chỉ phục vụ bộ soạn thảo bài;
-  `Cms.tsx` không gọi tới. Nên vế "hoàn tác thay cho hộp xác nhận" của luật 08 hiện
-  không có thật ở chỗ này.
+Hệ quả, tất cả đều là không phải làm gì:
 
-Hai đường đi tiếp, chọn một:
-1. Giữ bước hỏi lại, và sửa luật 08 để nêu ngoại lệ cho thao tác xoá hàng loạt
-   không hoàn tác được.
-2. Bỏ bước hỏi lại cho đúng luật 08, và làm hoàn tác cho thao tác này trước.
+- Bước hỏi lại ở **"Trả về nội dung gốc…"** giữ nguyên. Nút này gọi `updateSite`
+  với mọi khoá của `SITE_DEFAULTS` đặt về chuỗi rỗng, và `lib/useUndoStack.ts` chỉ
+  phục vụ bộ soạn thảo bài chứ `Cms.tsx` không gọi tới — nên không có hoàn tác cho
+  nó. Nhóm 08 không áp vào đây.
+- Các nút xoá còn lại (xoá tag, xoá module, bỏ bài khỏi module, bỏ ảnh) không hỏi
+  lại, giữ nguyên.
+- Không có gì trong mã nguồn phải sửa vì mục này, và PR không còn chờ quyết định
+  nào về luật.
 
-Các nút xoá còn lại (xoá tag, xoá module, bỏ bài khỏi module, bỏ ảnh) **không**
-hỏi lại — đúng luật 08.
+Commit `e93d152` đã đẩy lên với thông điệp nêu "mâu thuẫn" theo cách đọc cũ. Không
+sửa lại được vì đã nằm trong PR; mục này là bản đính chính.
 
 Ngoài ra bản sửa không đụng luật nào khác. Nhóm 01 (màu) giữ nguyên bảng màu;
 nhóm 02 (chữ) giữ hai họ chữ và nét 500 cho nhãn; nhóm 15 (ảnh) không đổi hành vi,
@@ -196,8 +201,10 @@ Chưa làm, để chủ site quyết:
 
 1. Thêm vào nhóm 01 hoặc một nhóm mới: mọi nút trong khu quản trị phải có viền thấy
    được ở trạng thái nghỉ, và vùng bấm cao tối thiểu 24px.
-2. Nêu rõ trong nhóm 08 rằng luật "xoá thẳng, không hỏi lại" áp cho thao tác trên
-   **một** dòng dữ liệu, chứ không cho thao tác xoá hàng loạt không hoàn tác được.
+2. Nhóm 08 đang gắn nhãn phạm vi `'Toàn hệ thống'` cho cả bảy mục, nhưng theo chủ
+   site thì nhóm này nói về soạn thảo chữ. Nhãn ấy làm tôi đọc sai một lần rồi —
+   lane Tài liệu cân nhắc đổi phạm vi cho đúng, hoặc nói rõ trong luật 5 rằng "xoá"
+   ở đây là xoá chữ trong trình soạn.
 
 ---
 
