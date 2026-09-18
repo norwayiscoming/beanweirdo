@@ -28,9 +28,9 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { BLUR_COMMAND, COMMAND_PRIORITY_LOW, TextNode } from 'lexical'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { SITE_TRANSFORMERS, unescapeSite } from '../lib/liveMarkdown'
-import { registerLiveKeys } from './liveKeys'
+import { registerLiveKeys, type LiveEdges } from './liveKeys'
 
 /**
  * Tên lớp cho từng loại, để CSS của trang vẽ chúng.
@@ -101,10 +101,24 @@ function OneEmphasis() {
   return null
 }
 
-/** `Tab` trong danh sách, `Cmd+K`, `Cmd+\` — xem `liveKeys.ts`. */
-function LiveKeys() {
+/**
+ * `Tab` trong danh sách, `Cmd+K`, `Cmd+\`, và hai mép — xem `liveKeys.ts`.
+ *
+ * Hai hàm ở mép đi qua một `ref` chứ không vào mảng phụ thuộc: chỗ gọi dựng
+ * chúng lại mỗi lần vẽ, và đăng ký lại lệnh sau mỗi phím thì con trỏ nhảy.
+ */
+function LiveKeys({ edges }: { edges: LiveEdges }) {
   const [editor] = useLexicalComposerContext()
-  useEffect(() => registerLiveKeys(editor), [editor])
+  const latest = useRef(edges)
+  latest.current = edges
+  useEffect(
+    () =>
+      registerLiveKeys(editor, {
+        onBackspaceAtStart: () => latest.current.onBackspaceAtStart?.() ?? false,
+        onDeleteAtEnd: () => latest.current.onDeleteAtEnd?.() ?? false,
+      }),
+    [editor],
+  )
   return null
 }
 
@@ -112,11 +126,13 @@ export function LiveText({
   text,
   placeholder = 'Viết ở đây, hoặc gõ / để chèn',
   onCommit,
+  onBackspaceAtStart,
+  onDeleteAtEnd,
 }: {
   text: string
   placeholder?: string
   onCommit: (markdown: string) => void
-}) {
+} & LiveEdges) {
   return (
     <LexicalComposer
       initialConfig={{
@@ -143,7 +159,7 @@ export function LiveText({
         <ListPlugin />
         <HistoryPlugin />
         <OneEmphasis />
-        <LiveKeys />
+        <LiveKeys edges={{ onBackspaceAtStart, onDeleteAtEnd }} />
         <CommitOnBlur onCommit={onCommit} />
       </div>
     </LexicalComposer>

@@ -135,7 +135,7 @@
 .awc-live-quote { border-left: 2px solid #EBE5D3; padding-left: 14px; margin: 20px 0; font-family: 'Playfair Display', Georgia, serif; font-size: 21px; line-height: 1.35; }
 .awc-live-ul, .awc-live-ol { margin: 0 0 20px; padding-left: 22px; }
 .awc-live-li { margin: 0 0 11px; }
-.awc-live-li-nested { margin-left: 8px; }
+.awc-live-li-nested { margin-left: 22px; }
 .awc-live-bold { font-weight: 600; font-style: italic; }
 .awc-live-u { border-bottom: 1px solid #CFCFC4; }
 .awc-live-link { color: inherit; border-bottom: 1px solid currentColor; }

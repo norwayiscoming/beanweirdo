@@ -13,16 +13,54 @@
 import { $isListItemNode } from '@lexical/list'
 import { $findMatchingParent, mergeRegister } from '@lexical/utils'
 import {
+  $getRoot,
   $getSelection,
   $isRangeSelection,
   $isTextNode,
   COMMAND_PRIORITY_LOW,
   INDENT_CONTENT_COMMAND,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DELETE_COMMAND,
   KEY_MODIFIER_COMMAND,
   KEY_TAB_COMMAND,
   OUTDENT_CONTENT_COMMAND,
   type LexicalEditor,
 } from 'lexical'
+
+/**
+ * Hai mép của một ô soạn, và thứ nằm ngay ngoài chúng.
+ *
+ * Chủ site: *"xoá xoá tới khối table hay ảnh này kia là không xoá bằng
+ * keyboard được. keyboard centered mà"*. Bảng và ảnh không phải chữ nên chúng
+ * đứng ngoài ô soạn; `Backspace` ở đầu ô vì thế chạm vào một bức tường thay vì
+ * nuốt cái đứng trước nó.
+ *
+ * Trả `true` nghĩa là đã nuốt xong — phím không đi tiếp. Trả `false` là không
+ * có gì để nuốt, và phím trả về cho trình duyệt.
+ */
+export type LiveEdges = {
+  onBackspaceAtStart?: () => boolean
+  onDeleteAtEnd?: () => boolean
+}
+
+/** Con trỏ đứng ở ngay đầu ô, không bôi đen gì. */
+function atStart(): boolean {
+  const selection = $getSelection()
+  if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false
+  if (selection.anchor.offset !== 0) return false
+  const first = $getRoot().getFirstDescendant()
+  return first === null || selection.anchor.getNode().is(first)
+}
+
+/** Con trỏ đứng ở ngay cuối ô, không bôi đen gì. */
+function atEnd(): boolean {
+  const selection = $getSelection()
+  if (!$isRangeSelection(selection) || !selection.isCollapsed()) return false
+  const last = $getRoot().getLastDescendant()
+  const node = selection.anchor.getNode()
+  if (last !== null && !node.is(last)) return false
+  return selection.anchor.offset === node.getTextContentSize()
+}
 
 /**
  * `Tab` chỉ đổi tầng khi con trỏ đứng ở **đầu** một mục danh sách.
@@ -112,10 +150,22 @@ function onModifier(event: KeyboardEvent): boolean {
   return false
 }
 
-/** Nối cả ba vào một editor; trả về hàm gỡ, như mọi `register*` của Lexical. */
-export function registerLiveKeys(editor: LexicalEditor): () => void {
+/** Nối tất cả vào một editor; trả về hàm gỡ, như mọi `register*` của Lexical. */
+export function registerLiveKeys(editor: LexicalEditor, edges: LiveEdges = {}): () => void {
+  const edge = (at: () => boolean, take?: () => boolean) => (event: KeyboardEvent | null) => {
+    if (!take || !at() || !take()) return false
+    event?.preventDefault()
+    return true
+  }
+
   return mergeRegister(
     editor.registerCommand(KEY_TAB_COMMAND, (event) => onTab(editor, event), COMMAND_PRIORITY_LOW),
     editor.registerCommand(KEY_MODIFIER_COMMAND, onModifier, COMMAND_PRIORITY_LOW),
+    editor.registerCommand(
+      KEY_BACKSPACE_COMMAND,
+      edge(atStart, edges.onBackspaceAtStart),
+      COMMAND_PRIORITY_LOW,
+    ),
+    editor.registerCommand(KEY_DELETE_COMMAND, edge(atEnd, edges.onDeleteAtEnd), COMMAND_PRIORITY_LOW),
   )
 }

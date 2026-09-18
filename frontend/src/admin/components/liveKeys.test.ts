@@ -16,6 +16,8 @@ import {
   $getRoot,
   $isElementNode,
   createEditor,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DELETE_COMMAND,
   KEY_MODIFIER_COMMAND,
   KEY_TAB_COMMAND,
   type LexicalEditor,
@@ -221,5 +223,83 @@ describe('Cmd+\\', () => {
       expect(node.hasFormat('bold')).toBe(false)
       expect(node.hasFormat('underline')).toBe(false)
     })
+  })
+})
+
+describe('hai mép của ô soạn', () => {
+  /** Editor riêng, vì hai móc ở mép phải nối lúc đăng ký. */
+  function withEdges(edges: Parameters<typeof registerLiveKeys>[1]) {
+    const editor = createEditor({
+      nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode],
+      onError: (e: Error) => {
+        throw e
+      },
+    })
+    // Cố ý **không** nối `rich-text` ở đây: khi móc ở mép trả `false`, phím rơi
+    // xuống bộ xử lý mặc định của nó, và bộ ấy cần một `window` mà jsdom không
+    // dựng cho editor rời. Cái cần đo là móc, không phải cái nằm sau nó.
+    registerLiveKeys(editor, edges)
+    editor.update(
+      () => {
+        const text = $createTextNode('chữ')
+        $getRoot().clear().append($createParagraphNode().append(text))
+        text.select(0, 0)
+      },
+      { discrete: true },
+    )
+    return editor
+  }
+
+  const press = (editor: LexicalEditor, command: typeof KEY_BACKSPACE_COMMAND, key: string) => {
+    const event = new KeyboardEvent('keydown', { key, cancelable: true })
+    editor.dispatchCommand(command, event)
+    editor.update(() => {}, { discrete: true })
+    return event
+  }
+
+  it('Backspace ở đầu ô nuốt khối đứng trước', () => {
+    // Bảng và ảnh nằm ngoài ô soạn; không có móc này thì xoá ngược tới chúng
+    // là cụt đường và phải với tay ra chuột.
+    let ate = 0
+    const editor = withEdges({ onBackspaceAtStart: () => (ate++, true) })
+
+    expect(press(editor, KEY_BACKSPACE_COMMAND, 'Backspace').defaultPrevented).toBe(true)
+    expect(ate).toBe(1)
+  })
+
+  it('không có gì đứng trước thì trả phím lại cho trình duyệt', () => {
+    const editor = withEdges({ onBackspaceAtStart: () => false })
+
+    expect(press(editor, KEY_BACKSPACE_COMMAND, 'Backspace').defaultPrevented).toBe(false)
+  })
+
+  it('Delete ở cuối ô nuốt khối đứng sau', () => {
+    let ate = 0
+    const editor = withEdges({ onDeleteAtEnd: () => (ate++, true) })
+    editor.update(
+      () => {
+        const node = $getRoot().getAllTextNodes()[0]
+        node.select(node.getTextContentSize(), node.getTextContentSize())
+      },
+      { discrete: true },
+    )
+
+    expect(press(editor, KEY_DELETE_COMMAND, 'Delete').defaultPrevented).toBe(true)
+    expect(ate).toBe(1)
+  })
+
+  it('giữa chữ thì không nuốt gì cả', () => {
+    let ate = 0
+    const editor = withEdges({ onBackspaceAtStart: () => (ate++, true) })
+    editor.update(
+      () => {
+        const node = $getRoot().getAllTextNodes()[0]
+        node.select(2, 2)
+      },
+      { discrete: true },
+    )
+
+    expect(press(editor, KEY_BACKSPACE_COMMAND, 'Backspace').defaultPrevented).toBe(false)
+    expect(ate).toBe(0)
   })
 })

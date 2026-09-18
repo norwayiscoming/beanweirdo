@@ -1462,6 +1462,18 @@ function LongformEditor({
               <LiveText
                 text={run.text}
                 onCommit={(md) => write(writeLongformRun(blocks, run.at, md))}
+                onBackspaceAtStart={() => {
+                  const before = run.at[0] - 1
+                  if (before < 0) return false
+                  write(removeAt(blocks, before, true))
+                  return true
+                }}
+                onDeleteAtEnd={() => {
+                  const after = run.at[1] + 1
+                  if (after >= blocks.length) return false
+                  write(removeAt(blocks, after, true))
+                  return true
+                }}
               />
             </div>
           )
@@ -1667,7 +1679,27 @@ function useElementBody({
       return (
         <div key={i} className="awc-rep-block">
           <div className="awc-gutter">{insertPlus(i, run.at[1] + 1)}</div>
-          <LiveText text={run.text} onCommit={(md) => write(writeRun(elements, run.at, md))} />
+          <LiveText
+            text={run.text}
+            onCommit={(md) => write(writeRun(elements, run.at, md))}
+            /*
+             * Bảng, ảnh, biểu đồ không phải chữ nên chúng đứng ngoài ô soạn.
+             * Không có hai móc này thì xoá ngược tới chúng là cụt đường, và
+             * cách duy nhất còn lại là với tay ra chuột.
+             */
+            onBackspaceAtStart={() => {
+              const before = run.at[0] - 1
+              if (before < 0) return false
+              write(removeAt(elements, before))
+              return true
+            }}
+            onDeleteAtEnd={() => {
+              const after = run.at[1] + 1
+              if (after >= elements.length) return false
+              write(removeAt(elements, after))
+              return true
+            }}
+          />
         </div>
       )
     }
