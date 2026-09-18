@@ -1,9 +1,7 @@
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { PostDetail, PostTemplate } from '../lib/apiClient'
 import { EditorCanvas } from './Editor'
-import { GRIP_LABEL } from '../components/RowShell'
 
 function post(template: PostTemplate, body: unknown): PostDetail {
   return {

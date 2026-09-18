@@ -1,0 +1,84 @@
+# Until this existed, a pull request was checked by two Vercel builds and
+# nothing else — and a build succeeding says only that the code compiles.
+# `POST /api/posts` wrote a column that migration 0016 had dropped, so creating
+# any post failed, and it stayed that way because nothing ran the tests.
+#
+# Three jobs, not one. `npm test` used to typecheck all three projects and only
+# then start vitest; run back to back that is 12s + 36s. Split, the wall clock
+# is the slowest job, not the sum.
+#
+# `schedule` looks redundant next to `push: branches: [main]`, and is not.
+# GitHub will not start a workflow for a push made with a GitHub App
+# installation token, and every merge here is performed by the `claude[bot]`
+# App: the merge commit 3f15954 lists `claude[bot]` (id 209825114) as its
+# committer and started nothing, while c5678d3 on PR #3, pushed from a sandbox
+# as the `claude` user (id 81847), started run 1 and passed. So the `push`
+# trigger above fires for a human and never for a merge, which left everything
+# on `main` unverified after the fact. A scheduled run is started by GitHub
+# itself rather than by any token, so it always fires.
+#
+# `workflow_dispatch` is the same story from the other side: until 16:35 UTC on
+# 2026-09-18 this repository had zero runs of anything, and finding that out
+# required opening a pull request. Now it is one button.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # 01:00 UTC, i.e. 08:00 in Hanoi — a red `main` is waiting in the morning
+  # rather than discovered days later.
+  schedule:
+    - cron: '0 1 * * *'
+
+# A new push makes the run in progress pointless, so let it go.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # `npm ci` and not `npm install`: the lockfile decides, and a run that
+      # quietly resolved different versions would not be testing what ships.
+      - run: npm ci
+      - run: npm run lint
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  # Two shards, not two directory lists. `--shard` splits by file, so a new
+  # test file lands in one of them by itself; a split written as paths would
+  # drop anything added outside those paths, and drop it silently.
+  #
+  # Measured on 128 files: one job 36.7s, two shards 17.8s and 20.5s.
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    name: test (${{ matrix.shard }}/2)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit -- --shard=${{ matrix.shard }}/2
