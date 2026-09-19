@@ -17,7 +17,14 @@ const backdrop: CSSProperties = {
 
 const card: CSSProperties = {
   background: paper.cream,
+  /*
+   * `paper.rule` là gạch chia trong một trang giấy — nhạt nhất trong bộ. Lane
+   * Thiết kế đang thêm token `ink.border` cho viền mọi control khu quản trị
+   * (PR #19, chưa merge); khi nó vào `main` thì ba chỗ viền trong tệp này đổi
+   * sang đó, vì một hộp thoại là một control chứ không phải một trang.
+   */
   border: `1px solid ${paper.rule}`,
+  outline: 'none',
   borderRadius: radius,
   padding: 22,
   maxWidth: 680,
@@ -182,6 +189,7 @@ export function FocusPicker({
   const [focus, setFocus] = useState<Focus>(() => readFocus(url))
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
   const stage = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
   const drag = useRef<{ x: number; y: number; from: Focus } | null>(null)
 
   useEffect(() => {
@@ -197,6 +205,24 @@ export function FocusPicker({
     window.addEventListener('keydown', esc)
     return () => window.removeEventListener('keydown', esc)
   }, [onCancel])
+
+  /*
+   * Khoá cuộn trang phía sau, và trả lại đúng giá trị cũ chứ không đặt về ''.
+   * Màn sửa có thể đang tự khoá cuộn vì việc khác; ghi đè bằng '' là cướp mất
+   * trạng thái của nó.
+   */
+  useEffect(() => {
+    const was = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = was
+    }
+  }, [])
+
+  // Bàn phím phải vào trong hộp, nếu không Esc và Tab vẫn nằm ở trang phía sau.
+  useEffect(() => {
+    box.current?.focus()
+  }, [])
 
   /*
    * Until the photo has loaded its own shape is unknown, so assume it matches
@@ -269,7 +295,20 @@ export function FocusPicker({
 
   return (
     <div style={backdrop} onPointerDown={(e) => e.target === e.currentTarget && onCancel()}>
-      <div style={card} onPointerDown={(e) => e.stopPropagation()}>
+      <div
+        ref={box}
+        role="dialog"
+        aria-modal="true"
+        aria-label={name}
+        tabIndex={-1}
+        style={card}
+        /*
+         * `pointerdown` chứ không phải `click`: bôi đen chữ trong hộp rồi thả
+         * chuột ra ngoài cũng đếm là một `click` trên nền, và như vậy là đóng
+         * mất hộp đang dùng.
+         */
+        onPointerDown={(e) => e.stopPropagation()}
+      >
         <div style={sub}>{name}</div>
         <div style={title}>Chọn phần ảnh giữ lại</div>
 

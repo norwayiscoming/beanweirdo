@@ -194,3 +194,26 @@ Nhóm 15 nên có một câu nói rằng **khuôn bài không được tự vẽ
 mọi ô phải đi qua `fillStyle`. Hai lỗi trên đều mọc ra từ chỗ ấy, và luật 15.3
 hiện nói về kết quả ("phủ kín ô, cắt phần thừa, căn giữa") chứ không nói về
 đường đi, nên một ô mới viết tay vẫn đọc như đang tuân thủ.
+
+## Đã trao đổi với lane Thiết kế
+
+Lane Thiết kế đang dựng `NewPostDialog` (PR #19) — cũng là một lớp phủ. Hai bên
+đã so và thống nhất:
+
+- **Vỏ nổi dùng chung để PR sau, không nhét vào #19.** Lý do họ đưa ra: hiện
+  mới có một chỗ dùng, tách component từ một chỗ dùng là đoán. Khi #19 vào
+  `main` họ tách vỏ ra tệp riêng rồi báo tên; `FocusPicker` đổi sang dùng nó ở
+  PR sau của lane này.
+- **Viền hộp sẽ đổi sang `ink.border`.** Token ấy đến cùng PR #19 và **chưa có
+  trong `main`**, nên tệp này vẫn dùng `paper.rule`; chú thích ở hằng `card`
+  ghi rõ ba chỗ phải đổi.
+- **Nghe `pointerdown` chứ không nghe `click`** để đóng ra nền: bôi đen chữ
+  trong hộp rồi thả chuột ra ngoài cũng đếm là một `click` trên nền, và như vậy
+  là đóng mất hộp đang dùng. Lane Thiết kế đã vấp chỗ này.
+- Đã thêm theo góp ý của họ: khoá `document.body.style.overflow` khi mở và trả
+  lại **đúng giá trị cũ** khi đóng (không đặt về `''` — màn sửa có thể đang tự
+  khoá cuộn vì việc khác), cộng `role="dialog"`, `aria-modal="true"`,
+  `aria-label` và `focus()` vào vỏ khi mở.
+- Esc chồng nhau khi hai lớp cùng mở: hiện không có đường nào mở hộp này từ
+  trong hộp kia, nên chưa cắn. Vỏ chung sẽ xử một lần bằng một ngăn xếp, chỉ
+  lớp trên cùng nghe Esc.
