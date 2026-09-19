@@ -14,7 +14,6 @@ export type Screen =
   | 'cards'
   | 'report'
   // The post-authoring flow, reached from Content management's first tab.
-  | 'postNew'
   | 'postEdit'
   | 'postPreview'
   /** Admin › Templates — the stored blueprints. */

@@ -20,7 +20,6 @@ const ROUNDTRIP: Where[] = [
   { area: 'admin', screen: 'cms', tab: 'posts' },
   { area: 'admin', screen: 'cms', tab: 'config' },
   { area: 'admin', screen: 'archive' },
-  { area: 'admin', screen: 'postNew' },
   { area: 'admin', screen: 'postEdit', slug: 'biochemistry-p260817' },
   { area: 'admin', screen: 'postPreview', slug: 'biochemistry-p260817' },
 ]
@@ -63,10 +62,14 @@ describe('routes — tên trong địa chỉ', () => {
     expect(parsePath('/ad-post/view=ghi-p260818')).toMatchObject({ screen: 'postPreview', slug: 'ghi-p260818' })
   })
 
-  it('lets a new post have no slug yet', () => {
-    // Lúc chọn khung và đặt tên thì bài chưa tồn tại, nên chưa có ngày tạo.
-    expect(toPath({ area: 'admin', screen: 'postNew' })).toBe('/ad-post/create')
-    expect(parsePath('/ad-post/create')).toMatchObject({ screen: 'postNew', slug: undefined })
+  it('đưa địa chỉ tạo bài cũ về danh sách bài', () => {
+    /*
+     * `/ad-post/create` từng là một trang riêng. Nay việc ấy là một hộp thoại
+     * mở ngay trên danh sách, nên địa chỉ đó không còn trỏ vào đâu — và một
+     * bookmark cũ phải rơi vào danh sách bài, chỗ gần nhất với thứ nó từng mở,
+     * chứ không rơi ra trang công khai.
+     */
+    expect(parsePath('/ad-post/create')).toMatchObject({ area: 'admin', screen: 'cms', tab: 'posts' })
   })
 
   it('opens each Content management tab at its own address', () => {

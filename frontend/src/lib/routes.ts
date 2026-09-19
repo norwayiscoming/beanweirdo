@@ -80,12 +80,10 @@ const screenPage = (w: RouteWords): Partial<Record<Screen, string>> => ({
 
 /** `/ad-post/edit=<slug>` and its two siblings. */
 const postActions = (w: RouteWords): Record<string, Screen> => ({
-  [w.create]: 'postNew',
   [w.edit]: 'postEdit',
   [w.view]: 'postPreview',
 })
 const actionOfScreen = (w: RouteWords): Partial<Record<Screen, string>> => ({
-  postNew: w.create,
   postEdit: w.edit,
   postPreview: w.view,
 })

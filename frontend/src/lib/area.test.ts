@@ -43,7 +43,7 @@ describe('screenAllowed', () => {
     expect(screenAllowed('public', 'module')).toBe(true)
     expect(screenAllowed('practice', 'hours')).toBe(true)
     expect(screenAllowed('admin', 'cms')).toBe(true)
-    expect(screenAllowed('admin', 'postNew')).toBe(true)
+    expect(screenAllowed('admin', 'postEdit')).toBe(true)
   })
 
   it('always allows the screen an area opens on', () => {
