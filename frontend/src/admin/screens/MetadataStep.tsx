@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { type Module, type Tag, type TemplateSummary } from '../lib/apiClient'
 import { listModulesCached, listTagsCached, listTemplatesCached } from '../lib/lists'
-import { ink, paper } from '../../design/tokens'
+import { ink } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
 
 /**
@@ -88,7 +88,14 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
   }
 
   return (
-    <div style={{ maxWidth: 560, background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: 10, padding: 24 }}>
+    /*
+     * Chỉ có các ô, không có khung.
+     *
+     * Trước đây khối này tự vẽ nền trắng, viền và bo góc, vì nó là thứ duy
+     * nhất trên một trang trống. Nay nó nằm trong hộp thoại, và một cái khung
+     * trong một cái khung là hai đường viền cách nhau hai chục pixel.
+     */
+    <div>
       <label htmlFor="module" style={{ ...fieldLabelStyle, marginTop: 0 }}>
         Module
       </label>

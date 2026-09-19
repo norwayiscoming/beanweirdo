@@ -39,7 +39,7 @@
   font-family: 'Be Vietnam Pro', system-ui, sans-serif;
   font-weight: 500;
   font-size: 12.5px;
-  border: 1px solid #ebe5d3;
+  border: 1px solid #5a4632;
   border-radius: 8px;
   padding: 9px 16px;
   cursor: pointer;
@@ -51,7 +51,7 @@
 }
 
 .admin-tpl-card {
-  border: 1px solid #ebe5d3;
+  border: 1px solid #5a4632;
   border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
@@ -59,7 +59,7 @@
   box-shadow: 0 1px 2px rgba(35, 33, 26, 0.04);
 }
 .admin-tpl-card:hover {
-  border-color: #b5ae99;
+  border-color: #5a4632;
 }
 .admin-tpl-card.sel {
   border: 2px solid #23211a;
@@ -70,7 +70,7 @@
   font-weight: 300;
   font-size: 14px;
   color: #23211a;
-  border: 1px solid #ebe5d3;
+  border: 1px solid #5a4632;
   border-radius: 8px;
   padding: 9px 10px;
   width: 100%;
@@ -78,7 +78,7 @@
 }
 .admin-field:focus {
   outline: none;
-  border-color: #8c8674;
+  border-color: #5a4632;
 }
 
 /*
@@ -161,11 +161,11 @@
 .ab-primary { background: #23211a; border-color: #23211a; color: #fdfbf2; }
 .ab-primary:hover:not(:disabled) { background: #3b3729; border-color: #3b3729; }
 
-.ab-secondary { background: #ffffff; border-color: #8c8674; color: #23211a; }
-.ab-secondary:hover:not(:disabled) { background: #f6f2e2; border-color: #5c5745; }
+.ab-secondary { background: #ffffff; border-color: #5a4632; color: #23211a; }
+.ab-secondary:hover:not(:disabled) { background: #f6f2e2; border-color: #3b2d1f; }
 
-.ab-ghost { background: #ffffff; border-color: #b5ae99; color: #3b3729; }
-.ab-ghost:hover:not(:disabled) { background: #f6f2e2; border-color: #8c8674; }
+.ab-ghost { background: #ffffff; border-color: #5a4632; color: #3b3729; }
+.ab-ghost:hover:not(:disabled) { background: #f6f2e2; border-color: #3b2d1f; }
 
 .ab-danger { background: #ffffff; border-color: #c25c7c; color: #8e1e42; }
 .ab-danger:hover:not(:disabled) { background: #fbe7e5; border-color: #8e1e42; }
@@ -191,13 +191,13 @@
   display: inline-flex;
   align-items: center;
   border-radius: 8px;
-  border: 1px solid #b5ae99;
+  border: 1px solid #5a4632;
   background: transparent;
   color: #5c5745;
   cursor: pointer;
   transition: background-color .13s ease, border-color .13s ease, color .13s ease;
 }
-.ab-tab:hover { border-color: #23211a; color: #23211a; }
+.ab-tab:hover { border-color: #3b2d1f; color: #23211a; }
 .ab-tab[aria-pressed='true'] {
   background: #23211a;
   border-color: #23211a;
@@ -276,7 +276,7 @@
   flex-direction: column;
   padding: 4px;
   border-radius: 8px;
-  border: 1px solid #b5ae99;
+  border: 1px solid #5a4632;
   background: #ffffff;
   box-shadow: 0 4px 14px rgba(35, 33, 26, 0.12);
 }
@@ -312,7 +312,7 @@
  * Cả thẻ là cái để bấm, nên nó cần trạng thái hover và một vòng focus như mọi
  * nút khác — hai thứ không viết inline được, nên chúng ở đây.
  */
-.ab-box:hover { border-color: #8c8674; background: #fffdf7; }
+.ab-box:hover { border-color: #5a4632; background: #fffdf7; }
 .ab-box:focus-visible {
   outline: 2px solid #3e7a4e;
   outline-offset: 2px;

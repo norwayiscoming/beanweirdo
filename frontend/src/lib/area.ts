@@ -49,7 +49,6 @@ const AREA_SCREENS: Record<Area, readonly string[]> = {
     'cms',
     'archive',
     'article',
-    'postNew',
     'postEdit',
     'postPreview',
   ],

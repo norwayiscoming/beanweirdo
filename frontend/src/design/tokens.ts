@@ -31,6 +31,16 @@ export const ink = {
   /** anchor colour: quote block, deep accents */
   moss: '#2B4B33',
   /**
+   * Viền của mọi control có viền: nút, ô nhập, tab, thẻ, menu.
+   *
+   * Trước đây mỗi cấp một màu — `#b5ae99` cho ghost, `#8c8674` cho secondary,
+   * `#ebe5d3` cho ô nhập — nên cái nhạt nhất gần như biến mất trên nền kem, và
+   * chủ site đọc cả bộ là "nhạt nhạt". Một màu, đủ đậm để thấy, và là nâu chứ
+   * không phải đen: đen là màu của nút primary, viền mà cũng đen thì nút đặc
+   * với nút rỗng trông như nhau.
+   */
+  border: '#5A4632',
+  /**
    * Destructive ink, and the line that goes with it.
    *
    * Both were already in the back office — `#8E1E42` in six places and
