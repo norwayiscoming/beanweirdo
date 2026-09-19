@@ -1,16 +1,16 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 /*
- * Thanh nhảy mục và các mục nó nhảy tới phải khớp nhau.
+ * Lưới ô của tab Cấu hình và những gì nó mở ra phải khớp nhau.
  *
- * `ContentIndex` đọc `CONTENT_SECTIONS` để vẽ ra các nút, rồi cuộn tới
- * `document.getElementById(id)`. Cái neo lại là một `div id=` viết tay ở tận
- * dưới. Hai chỗ ấy không có gì buộc phải khớp: đổi tên hay bỏ một mục mà quên
+ * `BoxGrid` đọc `CONFIG_BOXES` để vẽ ra các thẻ, rồi đặt `box` bằng `id` của
+ * thẻ vừa bấm. Cái nhận lấy `id` ấy là một `{box === '…' && …}` viết tay ở tận
+ * dưới. Hai chỗ ấy không có gì buộc phải khớp: đổi tên hay thêm một ô mà quên
  * sửa chỗ kia thì TypeScript không kêu, màn vẫn dựng, test cũ vẫn xanh — chỉ
- * có cái nút trỏ vào hư không. Hỏng im lặng, đúng kiểu khó tìm nhất.
+ * có cái thẻ mở ra một màn trống. Hỏng im lặng, đúng kiểu khó tìm nhất.
  *
- * Nên test này dựng màn thật rồi soi DOM, chứ không đọc mã.
+ * Nên test này dựng màn thật, bấm từng thẻ rồi soi DOM, chứ không đọc mã.
  */
 
 vi.mock('../admin/lib/apiClient', () => ({
@@ -36,45 +36,63 @@ vi.mock('../lib/nav', async () => {
   }
 })
 
-const { Cms, CONTENT_SECTIONS, TABS } = await import('./Cms')
+const { BACK_LABEL, Cms, CONFIG_BOXES, GRID_LABEL, TABS } = await import('./Cms')
 
 const tabLabel = (k: string) => TABS.find((t) => t.k === k)!.t
 
-describe('thanh nhảy mục của tab chữ', () => {
-  it('mọi mục nó liệt kê đều có neo thật trên trang', async () => {
-    render(<Cms />)
-    ;(await screen.findByText(tabLabel('content'))).click()
+/*
+ * Lưới, chứ không phải cả trang: "Trang chủ" cũng là một chặng trên đường dẫn
+ * ngay phía trên, nên tìm khắp màn thì trúng hai chỗ.
+ */
+const grid = async () => within(await screen.findByLabelText(GRID_LABEL))
 
-    for (const s of CONTENT_SECTIONS) {
+describe('lưới ô của tab Cấu hình', () => {
+  it('mỗi thẻ mở ra đúng phần của nó', async () => {
+    for (const b of CONFIG_BOXES) {
+      const view = render(<Cms />)
+      ;(await screen.findByText(tabLabel('config'))).click()
+      ;(await (await grid()).findByText(b.t)).click()
+
       await waitFor(() => {
-        expect(document.getElementById(s.id), `thiếu neo id="${s.id}"`).not.toBeNull()
+        expect(document.getElementById(b.id), `thẻ “${b.t}” mở ra màn trống`).not.toBeNull()
       })
+      view.unmount()
     }
   })
 
-  it('vẽ đúng một nút cho mỗi mục', async () => {
+  it('lưới là thứ hiện ra trước, không phải một ô nào', async () => {
     render(<Cms />)
-    ;(await screen.findByText(tabLabel('content'))).click()
+    ;(await screen.findByText(tabLabel('config'))).click()
 
-    for (const s of CONTENT_SECTIONS) {
-      await waitFor(() => expect(screen.queryAllByText(s.t).length).toBeGreaterThan(0))
+    // Mọi thẻ có mặt; chưa phần nào xổ ra.
+    for (const b of CONFIG_BOXES) {
+      expect((await grid()).queryAllByText(b.t).length, `thiếu thẻ “${b.t}”`).toBe(1)
+      expect(document.getElementById(b.id), `ô “${b.t}” xổ sẵn khi chưa bấm`).toBeNull()
     }
+  })
+
+  it('mở một ô rồi quay lại được lưới', async () => {
+    render(<Cms />)
+    ;(await screen.findByText(tabLabel('config'))).click()
+    ;(await (await grid()).findByText(CONFIG_BOXES[0].t)).click()
+    await waitFor(() => expect(document.getElementById(CONFIG_BOXES[0].id)).not.toBeNull())
+
+    ;(await screen.findByText(BACK_LABEL)).click()
+    await waitFor(() => expect(document.getElementById(CONFIG_BOXES[0].id)).toBeNull())
   })
 })
 
 describe('khối sửa module', () => {
   /*
-   * Nó từng nằm trong tab chữ, 484 dòng, và chủ site đi tìm ô "Nằm trong" ở
-   * tab Cấu trúc — tìm đúng chỗ, vì đó là màn vẽ cái cây. Nay nó ở đấy.
+   * Nó từng nằm giữa 484 dòng của một tab chữ dài, và chủ site đi tìm ô "Nằm
+   * trong" mãi không ra. Nay nó là một ô riêng, không dính gì tới chữ trên
+   * trang.
    */
-  it('nằm ở tab Cấu trúc, không ở tab chữ', async () => {
+  it('là một ô riêng, không nằm chung với ô chữ nào', async () => {
     render(<Cms />)
-
-    ;(await screen.findByText(tabLabel('content'))).click()
+    ;(await screen.findByText(tabLabel('config'))).click()
+    ;(await (await grid()).findByText(CONFIG_BOXES.find((b) => b.id === 'landing')!.t)).click()
     await waitFor(() => expect(document.getElementById('landing')).not.toBeNull())
     expect(document.getElementById('modules')).toBeNull()
-
-    ;(await screen.findByText(tabLabel('map'))).click()
-    await waitFor(() => expect(document.getElementById('modules')).not.toBeNull())
   })
 })
