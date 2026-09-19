@@ -53,13 +53,21 @@ export const plateHost: CSSProperties = { position: 'relative' }
  * captions are editable — a handle there would sit on top of the field.
  */
 export function PlateCorner({ action, slot }: { action?: PlateAction; slot: PlateSlot }) {
-  if (!action) return null
+  /*
+   * Nothing to draw is not the same as a box with nothing in it. The editor
+   * answers `null` for a cell it does not own — the cover, whose one place to
+   * live is a band above the canvas — and an empty positioned div left behind
+   * would still count as a handle to anything reading the page, tests first
+   * among them.
+   */
+  const drawn = action?.(slot)
+  if (drawn === null || drawn === undefined || drawn === false) return null
   return (
     <div
       data-plate-corner={slot.key}
       style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, lineHeight: 0 }}
     >
-      {action(slot)}
+      {drawn}
     </div>
   )
 }

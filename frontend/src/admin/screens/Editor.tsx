@@ -46,7 +46,7 @@ import { ink, paper, sans, serif } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
 import { CoverBand } from '../components/CoverBand'
 import { FramingProvider, useFraming } from '../components/framing'
-import { PlateImageUpload, PlateUpload } from '../components/PlateUpload'
+import { PlateImageUpload } from '../components/PlateUpload'
 import { blankReportBlock, getBody, ORDERED_LIST, resolveTemplate } from '../lib/postData'
 import {
   addColumn,
@@ -166,16 +166,6 @@ type CanvasProps = {
   onHeroDrop: (file: File, ratio?: number | null) => void
   hero?: HeroActions
 }
-
-/**
- * Khuôn nào tự vẽ một ô ảnh bìa trên trang.
- *
- * Bản kiểm kê đầy đủ nằm ở bảng `PLATE_CASES` trong
- * `packages/post-renderer/src/everyTemplate.test.tsx`; đây là đúng những khuôn
- * có một ô mang khoá `hero`. Thêm một khuôn có ô ảnh bìa mà quên thêm vào đây
- * thì ảnh bìa hiện hai lần trong màn sửa.
- */
-const DRAWS_HERO = new Set<PostTemplate>(['article', 'memo', 'bitesize'])
 
 const REPORT_BLUE = '#6FA8C0'
 
@@ -538,20 +528,22 @@ export function EditorCanvas({ template, post, module, onChange, onHeroDrop, her
       <EditorStyles />
 
       {/*
-        Ô trang bìa đứng trên đầu, và CHỈ ở những khuôn không tự vẽ ô ảnh bìa.
+        Ô trang bìa: một băng ngang trên đầu, GIỐNG NHAU ở cả sáu khuôn.
 
-        Một dải thả ảnh ở chỗ này từng bị bỏ đi vì ảnh hiện hai lần: một lần
-        trong một cái hộp không phải trang, một lần ở đúng chỗ trang đặt nó.
-        Chủ site nhắc lại đúng điều ấy khi thấy bản đầu của băng này: *"hiện 1
-        chỗ thôi chứ?"*. Nên khuôn nào đã có ô ảnh bìa trên trang thì ô ấy là
-        chỗ đặt, còn băng này chỉ có mặt khi không có ô nào để đặt vào.
+        Một dải thả ảnh ở chỗ này từng bị bỏ đi vì ảnh hiện hai lần — một lần
+        trong một cái hộp không phải trang, một lần ở đúng chỗ trang đặt nó —
+        và chủ site nhắc lại đúng điều ấy: *"hiện 1 chỗ thôi chứ?"*. Nên lần
+        này ô ảnh bìa mà template vẽ **không vẽ ảnh nữa trong màn sửa**: nó
+        đứng đó giữ chỗ, còn tấm ảnh chỉ nằm ở băng này.
 
-        Nó không phải một dải thả suông như dải cũ: nó mang đủ bốn nút như mọi
-        ô ảnh khác. Với `cards`, `report` và `longform` thì đây là đường DUY
-        NHẤT đặt ảnh bìa — ba khuôn ấy không vẽ ô ảnh bìa nào, nên khi thanh
-        chữ ở đầu khung sửa bỏ đi thì chúng không còn cách nào cả.
+        Nghĩa là khung sửa cố ý không còn giống hệt trang thật ở đúng một chỗ.
+        Chủ site chốt như vậy: *"trong màn sửa thì nó hiển thị thế để có chỗ
+        đẩy ảnh lên và quy chuẩn thôi, còn nó như nào thì phải click xem
+        trước"*. Đổi lại, sáu khuôn có cùng một chỗ đặt ảnh bìa, và `cards`,
+        `report`, `longform` — ba khuôn không vẽ ô ảnh bìa nào — lần đầu có
+        đường đặt ảnh bìa ngay trên trang sửa.
       */}
-      {hero && !DRAWS_HERO.has(template) && (
+      {hero && (
         <CoverBand
           imageUrl={post.hero_image_url}
           onPick={onHeroDrop}
@@ -574,13 +566,13 @@ export function EditorCanvas({ template, post, module, onChange, onHeroDrop, her
         ) : template === 'report' ? (
           <ReportEditor post={post} module={module} onChange={onChange} />
         ) : template === 'bitesize' ? (
-          <BitesizeEditor post={post} module={module} onChange={onChange} onHeroDrop={onHeroDrop} hero={hero} />
+          <BitesizeEditor post={post} module={module} onChange={onChange} />
         ) : template === 'memo' ? (
-          <MemoEditor post={post} module={module} onChange={onChange} onHeroDrop={onHeroDrop} hero={hero} />
+          <MemoEditor post={post} module={module} onChange={onChange} />
         ) : template === 'longform' ? (
           <LongformEditor post={post} module={module} onChange={onChange} />
         ) : (
-          <ArticleEditor post={post} module={module} onChange={onChange} onHeroDrop={onHeroDrop} hero={hero} />
+          <ArticleEditor post={post} module={module} onChange={onChange} />
         )}
       </div>
     </div>
@@ -1178,6 +1170,22 @@ const ARTICLE_PLATE_NAME: Record<string, string> = {
   detail: 'Chi tiết · ô vuông ở cột phải',
 }
 
+/**
+ * Bài như khung sửa vẽ nó: không có ảnh bìa.
+ *
+ * Ảnh bìa đặt ở băng "trang bìa" trên đầu khung sửa, nên ô ảnh bìa mà template
+ * vẽ đứng đó giữ chỗ chứ không vẽ lại tấm ảnh ấy — chủ site: *"hiện 1 chỗ thôi
+ * chứ?"*. Đây là chỗ DUY NHẤT khung sửa cố ý khác trang thật, và cách biết nó
+ * thật sự trông ra sao là bấm "xem trước".
+ *
+ * Bỏ địa chỉ chứ không bỏ hình dạng: dàn trang của bitesize ăn theo `body.media`
+ * với `body.portrait` (xem `frameOf`), không ăn theo `hero_image_url`, nên ô ảnh
+ * giữ đúng khổ nó sẽ có.
+ */
+function withoutHero(post: PostDetail): PostDetail {
+  return { ...post, hero_image_url: null }
+}
+
 function platePatch(post: PostDetail, key: string, url: string | null): EditPatch {
   return { plate_images: { ...(post.plate_images ?? {}), [key]: url } }
 }
@@ -1191,18 +1199,14 @@ function ArticleEditor({
   post,
   module,
   onChange,
-  onHeroDrop,
-  hero,
 }: {
   post: PostDetail
   module?: Module
   onChange: (patch: EditPatch) => void
-  onHeroDrop: (file: File, ratio?: number | null) => void
-  hero?: HeroActions
 }) {
   // Same adapter as the public journal, so the canvas is edited against what
   // will actually ship.
-  const data = toArticleData(post, module?.title ?? post.module_id, [], -1, module)
+  const data = toArticleData(withoutHero(post), module?.title ?? post.module_id, [], -1, module)
   const sections = getBody<SectionData>(post)
   const further_reading = post.further_reading ?? []
   /*
@@ -1282,20 +1286,13 @@ function ArticleEditor({
        * Article có nhiều ô ảnh cố định nhất trong sáu khuôn — hero, cặp ô mở
        * đầu, ô vuông ở cột phải, cộng một ô cho mỗi phần có hình — và ba ô ở
        * giữa xưa nay không có chỗ nào đặt ảnh vào cả.
+       *
+       * Trừ `hero`: ảnh bìa nay đặt ở băng "trang bìa" trên đầu khung sửa, một
+       * chỗ đặt cho cả sáu khuôn, nên ô hero ở đây không có nút và không vẽ
+       * ảnh.
        */
       renderPlateAction={(slot) => {
-        if (slot.key === 'hero') {
-          return (
-            <PlateUpload
-              imageUrl={slot.imageUrl}
-              accept="image/*,video/*"
-              onPick={onHeroDrop}
-              onLink={hero && hero.link}
-              onReframe={hero?.reframe}
-              onClear={hero ? hero.clear : () => onChange({ hero_image_url: '' })}
-            />
-          )
-        }
+        if (slot.key === 'hero') return null
         // `fig-3` là ô ảnh của phần thứ ba; ảnh của nó nằm trong `body`, cạnh
         // chú thích và ghi chú bên lề của chính phần ấy.
         const at = slot.key.startsWith('fig-') ? Number(slot.key.slice(4)) : NaN
@@ -1995,14 +1992,10 @@ function BitesizeEditor({
   post,
   module,
   onChange,
-  onHeroDrop,
-  hero,
 }: {
   post: PostDetail
   module?: Module
   onChange: (patch: EditPatch) => void
-  onHeroDrop: (file: File, ratio?: number | null) => void
-  hero?: HeroActions
 }) {
   const body = (post.body ?? {}) as BitesizeBody
   const write = (patch: Partial<BitesizeBody>) =>
@@ -2061,7 +2054,7 @@ function BitesizeEditor({
       </div>
       <PostRenderer
         template="bitesize"
-        post={toBitesizeData(post, { mod: module })}
+        post={toBitesizeData(withoutHero(post), { mod: module })}
         renderTitle={(title) => (
           <InlineField value={title} placeholder="Tiêu đề" onCommit={(v) => onChange({ en: v })} />
         )}
@@ -2075,9 +2068,8 @@ function BitesizeEditor({
           <InlineField value={sub} placeholder="Chữ trong ô ảnh phụ" onCommit={(v) => write({ sub: v })} />
         )}
         /*
-         * Hai ô ảnh, hai chỗ cất khác nhau: ô phương tiện là `hero_image_url`
-         * (và nhận cả clip — đính clip vào thì dàn trang tự đổi theo), ô ảnh
-         * phụ nằm trong `body` cạnh dòng chữ của chính nó.
+         * Chỉ ô ảnh phụ có nút. Ô phương tiện là ảnh bìa, mà ảnh bìa nay đặt ở
+         * băng "trang bìa" trên đầu khung sửa — một chỗ đặt cho cả sáu khuôn.
          */
         renderPlateAction={(slot) =>
           slot.key === 'sub' ? (
@@ -2087,16 +2079,7 @@ function BitesizeEditor({
               onUrl={(url) => write({ subImage: url })}
               onClear={() => write({ subImage: null })}
             />
-          ) : (
-            <PlateUpload
-              imageUrl={slot.imageUrl}
-              accept="image/*,video/*"
-              onPick={onHeroDrop}
-              onLink={hero && hero.link}
-              onReframe={hero?.reframe}
-              onClear={hero ? hero.clear : () => onChange({ hero_image_url: '' })}
-            />
-          )
+          ) : null
         }
         wrapElement={wrapElement}
         renderAfterElements={renderAfterElements}
@@ -2109,17 +2092,13 @@ function MemoEditor({
   post,
   module,
   onChange,
-  onHeroDrop,
-  hero,
 }: {
   post: PostDetail
   module?: Module
   onChange: (patch: EditPatch) => void
-  onHeroDrop: (file: File, ratio?: number | null) => void
-  hero?: HeroActions
 }) {
   const palette = paletteFrom(post.theme_color ?? module?.accent ?? REPORT_BLUE, post.theme_color ? undefined : module?.on_color)
-  const data = toMemoData(post, module)
+  const data = toMemoData(withoutHero(post), module)
   const elements = flatElements(post.body as { sections?: never[]; elements?: unknown[] }) as ReportBlock[]
 
   /** Một dòng thông số, sửa tại chỗ; phần còn lại của thân bài giữ nguyên. */
@@ -2168,21 +2147,6 @@ function MemoEditor({
       )}
       renderSpecValue={(value, i) => (
         <EditableField value={value} placeholder="giá trị" onCommit={(v) => setSpec(i, { v })} />
-      )}
-      /*
-       * Memo chỉ có một ô ảnh, và nó là ảnh bìa. Trên trang thật ô ấy **vắng
-       * mặt** khi bài chưa có ảnh; trong màn sửa nó vẫn dựng, nếu không thì
-       * không có góc nào để bấm — xem `renderPlateAction` trong `Memo.tsx`.
-       */
-      renderPlateAction={(slot) => (
-        <PlateUpload
-          imageUrl={slot.imageUrl}
-          accept="image/*,video/*"
-          onPick={onHeroDrop}
-          onLink={hero && hero.link}
-          onReframe={hero?.reframe}
-          onClear={hero ? hero.clear : () => onChange({ hero_image_url: '' })}
-        />
       )}
       wrapElement={wrapElement}
       renderAfterElements={renderAfterElements}
