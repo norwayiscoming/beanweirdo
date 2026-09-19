@@ -1,5 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { rootsOf } from '../lib/contentTree'
+import { watchModules } from './modulesChanged'
+import { byBandThenOrder } from '../lib/moduleOrder'
+export { byBandThenOrder } from '../lib/moduleOrder'
 import type { ModuleLayout } from '../content/layouts'
 export type { ModuleLayout }
 import { supabase } from '../lib/supabaseClient'
@@ -78,11 +81,23 @@ function useModulesQuery(enabled: boolean): UseModulesResult {
   const [data, setData] = useState<ModuleRow[]>([])
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
+  const [epoch, setEpoch] = useState(0)
+
+  // Khu quản trị ghi module qua một API khác hẳn đường đọc này, nên không có
+  // gì báo cho nó biết thứ tự vừa đổi. Nghe `modulesChanged` là chỗ duy nhất
+  // nối hai đường lại.
+  useEffect(() => {
+    if (!enabled) return
+    return watchModules(() => setEpoch((n) => n + 1))
+  }, [enabled])
 
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
-    setLoading(true)
+    // Chỉ lần đầu mới bật `loading`. Lượt hỏi lại chạy ngay trước mắt người
+    // đang nhìn thanh bên, mà xoá trắng danh sách một nhịp thì trông như hỏng
+    // chứ không như vừa cập nhật.
+    if (epoch === 0) setLoading(true)
 
     supabase
       .from('modules')
@@ -103,7 +118,7 @@ function useModulesQuery(enabled: boolean): UseModulesResult {
     return () => {
       cancelled = true
     }
-  }, [enabled])
+  }, [enabled, epoch])
 
   return { data, loading, error }
 }
@@ -150,15 +165,6 @@ export function useModules(): UseModulesResult {
 /** Anything a signed-out reader may see listed. */
 const isPublic = (m: ModuleRow) => m.visibility !== 'private'
 
-/**
- * Normal modules always sort above special ones; inside each band the order is
- * whatever the CMS set. Sorting on `sort_order` alone would let a renumbered
- * reading module fall below the journals.
- */
-const byBandThenOrder = (a: ModuleRow, b: ModuleRow) => {
-  const band = Number(a.kind === 'special') - Number(b.kind === 'special')
-  return band !== 0 ? band : a.sort_order - b.sort_order
-}
 
 /**
  * Trang chủ — the gallery of reading modules, one full-bleed colour block

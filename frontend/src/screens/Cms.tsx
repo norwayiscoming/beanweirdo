@@ -1,7 +1,8 @@
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { displayNumber } from '../lib/postText'
 import { onlyLive, orderPosts } from '../lib/postOrder'
+import { byBandThenOrder } from '../lib/moduleOrder'
 import { resolveSite, SITE_DEFAULTS, type SiteCopy, type SiteOverrides } from '../content/site'
 import {
   createModule,
@@ -862,12 +863,43 @@ export function Cms() {
     }
   }
 
+  /*
+   * Modules in the order the site reads them.
+   *
+   * This list used to come straight off `sort_order`, while the sidebar and Mục
+   * lục put every journal below every reading module — so `Ghi 01` sat fourth
+   * here and fifth there, and dragging it one place up moved a number nobody
+   * could see. Same class of bug as the post numbering below: a handle that
+   * rearranges a list which is not the list on the page.
+   *
+   * Writing 1..N back over this order also heals the stored numbers, since the
+   * bands come out already contiguous and `byBandThenOrder` then changes
+   * nothing.
+   */
+  const shownModules = useMemo(() => [...modules].sort(byBandThenOrder), [modules])
+
+  const kindOf = (id: string) => modules.find((m) => m.id === id)?.kind
+
+  /*
+   * A journal cannot be dragged in among the reading modules. The site sorts
+   * every `special` module below every `normal` one, so such a drop would write
+   * a number the page ignores and the thẻ would spring back on the next load —
+   * better to refuse the drop than to fake it.
+   */
+  const sameBand = (a: string, b: string) => {
+    const ka = kindOf(a)
+    return ka !== undefined && ka === kindOf(b)
+  }
+
   async function dropModule(targetId: string) {
     const src = dragModule
     setDragModule(null)
     setOverModule(null)
     if (!src || src === targetId) return
-    const order = modules.map((m) => m.id)
+    if (!sameBand(src, targetId)) return
+    // `shownModules`, not `modules`: the numbers written here become the site's
+    // order, so they have to be written over the list the owner just dragged.
+    const order = shownModules.map((m) => m.id)
     const i = order.indexOf(src)
     const j = order.indexOf(targetId)
     if (i < 0 || j < 0) return
@@ -1101,7 +1133,7 @@ export function Cms() {
             </Button>
           </div>
 
-          {modules.map((m, mi) => {
+          {shownModules.map((m, mi) => {
             // Only what a reader sees. Order is a fact about the page, so a
             // post that is not on the page has no place in this list — the
             // drafts and the archive are managed on Tạo bài đăng.
@@ -1109,13 +1141,34 @@ export function Cms() {
             const open = openModule === m.id
             // Which fields this module actually uses — see admin/moduleForm.ts.
             const shape = formShapeOf(m)
+            // The site keeps the journals below the reading modules, so the
+            // editor says where that line falls instead of letting a drag find
+            // it by springing back.
+            const bandStarts = mi > 0 && m.kind === 'special' && shownModules[mi - 1].kind !== 'special'
             return (
+              <Fragment key={m.id}>
+              {bandStarts && (
+                <div
+                  style={{
+                    fontFamily: sans,
+                    fontSize: 10.5,
+                    fontWeight: 500,
+                    letterSpacing: '.2em',
+                    textTransform: 'uppercase',
+                    color: ink.faint,
+                    borderBottom: `1px solid ${paper.rule}`,
+                    padding: '16px 0 7px',
+                  }}
+                >
+                  Nhật ký — luôn xếp sau các module đọc
+                </div>
+              )}
               <div
-                key={m.id}
                 draggable
                 onDragStart={() => setDragModule(m.id)}
                 onDragOver={(e) => {
                   e.preventDefault()
+                  if (dragModule && !sameBand(dragModule, m.id)) return
                   if (overModule !== m.id) setOverModule(m.id)
                 }}
                 onDrop={(e) => {
@@ -1539,6 +1592,7 @@ export function Cms() {
                   </div>
                 )}
               </div>
+              </Fragment>
             )
           })}
           </Section>
