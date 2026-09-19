@@ -1,4 +1,4 @@
-import { Fragment, type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { displayNumber } from '../lib/postText'
 import { onlyLive, orderPosts } from '../lib/postOrder'
@@ -885,7 +885,13 @@ export function Cms() {
    * every `special` module below every `normal` one, so such a drop would write
    * a number the page ignores and the thẻ would spring back on the next load —
    * better to refuse the drop than to fake it.
+   *
+   * The rule was a caption standing permanently between the two bands. It is a
+   * toast instead: a line of print nobody is reading explains the refusal to
+   * everyone except the person who just ran into it.
    */
+  const BAND_RULE = 'Nhật ký — luôn xếp sau các module đọc'
+
   const sameBand = (a: string, b: string) => {
     const ka = kindOf(a)
     return ka !== undefined && ka === kindOf(b)
@@ -896,7 +902,10 @@ export function Cms() {
     setDragModule(null)
     setOverModule(null)
     if (!src || src === targetId) return
-    if (!sameBand(src, targetId)) return
+    if (!sameBand(src, targetId)) {
+      toast.info(BAND_RULE)
+      return
+    }
     // `shownModules`, not `modules`: the numbers written here become the site's
     // order, so they have to be written over the list the owner just dragged.
     const order = shownModules.map((m) => m.id)
@@ -1141,29 +1150,9 @@ export function Cms() {
             const open = openModule === m.id
             // Which fields this module actually uses — see admin/moduleForm.ts.
             const shape = formShapeOf(m)
-            // The site keeps the journals below the reading modules, so the
-            // editor says where that line falls instead of letting a drag find
-            // it by springing back.
-            const bandStarts = mi > 0 && m.kind === 'special' && shownModules[mi - 1].kind !== 'special'
             return (
-              <Fragment key={m.id}>
-              {bandStarts && (
-                <div
-                  style={{
-                    fontFamily: sans,
-                    fontSize: 10.5,
-                    fontWeight: 500,
-                    letterSpacing: '.2em',
-                    textTransform: 'uppercase',
-                    color: ink.faint,
-                    borderBottom: `1px solid ${paper.rule}`,
-                    padding: '16px 0 7px',
-                  }}
-                >
-                  Nhật ký — luôn xếp sau các module đọc
-                </div>
-              )}
               <div
+                key={m.id}
                 draggable
                 onDragStart={() => setDragModule(m.id)}
                 onDragOver={(e) => {
@@ -1592,7 +1581,6 @@ export function Cms() {
                   </div>
                 )}
               </div>
-              </Fragment>
             )
           })}
           </Section>
