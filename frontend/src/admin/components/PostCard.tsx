@@ -35,6 +35,18 @@ const ACTIONS_BY_STATUS: Record<PostStatus, { label: string; action: StatusActio
   ],
 }
 
+/*
+ * Width of the actions column, in px.
+ *
+ * Each card is its own grid, so `auto` sizes that column per row — and rows
+ * carry three to five buttons, so the right-aligned group started at a
+ * different x on every row and the column of "Sửa" read as a saw edge. A fixed
+ * width makes the one button you reach for most sit in the same place all the
+ * way down. Measured against the widest row, `deleted` (Sửa · Nhân bản ·
+ * Khôi phục · Xoá vĩnh viễn); anything wider wraps rather than overflows.
+ */
+const ACTIONS_WIDTH = 400
+
 // No color field on PostSummary — pick a stable garden tint per card from
 // the post id so the thumbnail fallback reads like the mockup without a
 // schema change. Used only when the post has no picture anywhere in it.
@@ -69,7 +81,7 @@ export function PostCard({
       onMouseLeave={() => setHover(false)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '52px minmax(0,1fr) auto',
+        gridTemplateColumns: `52px minmax(0,1fr) ${ACTIONS_WIDTH}px`,
         alignItems: 'center',
         gap: 16,
         padding: '14px 40px',
@@ -101,8 +113,8 @@ export function PostCard({
         Mixed in with the text they read as part of the description, which is
         most of why they did not read as controls at all.
       */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flex: 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8, flex: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
           <span
             style={{
               fontFamily: sans,
@@ -130,7 +142,7 @@ export function PostCard({
           <StatusBadge status={post.status} />
         </div>
 
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <Button size="sm" onClick={() => onEdit(post.id)} icon={<IconEdit size={14} />}>
             Sửa
           </Button>

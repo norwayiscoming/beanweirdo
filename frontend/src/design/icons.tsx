@@ -21,14 +21,17 @@ type IconProps = {
   style?: CSSProperties
 }
 
-function svg(size: number, style: CSSProperties | undefined, children: JSX.Element) {
+/**
+ * `filled` swaps the stroke for a solid shape. One mark needs it — see IconPin.
+ */
+function svg(size: number, style: CSSProperties | undefined, children: JSX.Element, filled = false) {
   return (
     <svg
       viewBox="0 0 24 24"
       width={size}
       height={size}
-      fill="none"
-      stroke="currentColor"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke={filled ? 'none' : 'currentColor'}
       strokeWidth={2.2}
       strokeLinecap="square"
       strokeLinejoin="miter"
@@ -102,15 +105,19 @@ export const IconCopy = ({ size = 16, style }: IconProps) =>
     </>,
   )
 
+/*
+ * The one solid mark in the set, and the reason is size.
+ *
+ * A thumbtack was outlined first — angled shoulders, a 6-unit head. Rendered
+ * at the 16px it is actually used at, a 2.2 stroke is 1.5px wide and the
+ * interior closes into a blob. Redrawing it as three strokes was worse: with
+ * the contour gone it read as a dagger. Five candidates were rendered at 16px
+ * side by side and compared; the solid silhouette was the only one still
+ * legible, because at this size a shape survives where a line drawing does
+ * not. It sits a touch heavier than its neighbours, which is the trade.
+ */
 export const IconPin = ({ size = 16, style }: IconProps) =>
-  svg(
-    size,
-    style,
-    <>
-      <path d="M12 16.5V22" />
-      <path d="M9 2.5h6l-1 6 3 3v2.5H7V11.5l3-3-1-6z" />
-    </>,
-  )
+  svg(size, style, <path d="M7 3h10v2.5h-2l2 7H7l2-7H7V3zM11 13h2l-1 8z" />, true)
 
 export const IconUpload = ({ size = 16, style }: IconProps) =>
   svg(
