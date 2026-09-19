@@ -160,26 +160,35 @@ export const CONFIG_BOXES = [
 export type ConfigBox = (typeof CONFIG_BOXES)[number]['id']
 
 /**
- * The grid names itself, so a test — and a screen reader — can tell a box from
- * the breadcrumb of the same name overhead.
+ * The index names itself, so a test — and a screen reader — can tell an index
+ * entry from the breadcrumb of the same name overhead.
  */
 export const GRID_LABEL = 'Mục cấu hình'
 
 /**
- * The grid of boxes, which is what `Cấu hình` opens on.
+ * The left column of `Cấu hình`: every subject, as an index.
  *
- * A whole card is the target, not a link inside it: at this size the text is
- * the smallest part of the thing you are aiming at.
+ * It was a grid of five cards, and clicking one replaced the grid with that
+ * one subject. That made five screens where there is one job — the site
+ * owner kept going back to the grid to reach the next field. Now the right
+ * column holds all five at once and this column is only the way to jump, so
+ * nothing is ever hidden behind a click.
+ *
+ * `aria-current` rather than `aria-pressed`: these do not toggle anything on,
+ * they say which part of one long page you are looking at.
  */
-function BoxGrid({ onOpen }: { onOpen: (id: ConfigBox) => void }) {
+function BoxIndex({ active, onPick }: { active: ConfigBox | null; onPick: (id: ConfigBox) => void }) {
   return (
     <nav
       aria-label={GRID_LABEL}
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(262px, 1fr))',
-        gap: 14,
-        marginTop: 8,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        // Dính lại khi cột phải cuộn: chỉ mục mà cuộn mất thì nó không còn là
+        // chỉ mục, chỉ là một cái tiêu đề ở trên cùng.
+        position: 'sticky',
+        top: 16,
       }}
     >
       {CONFIG_BOXES.map((b) => (
@@ -187,14 +196,15 @@ function BoxGrid({ onOpen }: { onOpen: (id: ConfigBox) => void }) {
           key={b.id}
           type="button"
           className="ab-box"
-          onClick={() => onOpen(b.id)}
+          aria-current={active === b.id}
+          onClick={() => onPick(b.id)}
           style={{
             display: 'block',
             textAlign: 'left',
-            background: paper.white,
-            border: `1px solid ${paper.rule}`,
+            background: active === b.id ? paper.hover : paper.white,
+            border: `1px solid ${active === b.id ? ink.border : paper.rule}`,
             borderRadius: radius,
-            padding: '17px 18px 19px',
+            padding: '12px 14px 13px',
             cursor: 'pointer',
             font: 'inherit',
             color: 'inherit',
@@ -203,7 +213,7 @@ function BoxGrid({ onOpen }: { onOpen: (id: ConfigBox) => void }) {
           <div
             style={{
               fontFamily: serif,
-              fontSize: 22,
+              fontSize: 17,
               lineHeight: 1.15,
               letterSpacing: '-.02em',
               color: ink.base,
@@ -215,10 +225,10 @@ function BoxGrid({ onOpen }: { onOpen: (id: ConfigBox) => void }) {
             style={{
               fontFamily: sans,
               fontWeight: 300,
-              fontSize: 12.5,
-              lineHeight: 1.45,
+              fontSize: 11.5,
+              lineHeight: 1.4,
               color: ink.muted,
-              marginTop: 7,
+              marginTop: 5,
             }}
           >
             {b.d}
@@ -229,36 +239,40 @@ function BoxGrid({ onOpen }: { onOpen: (id: ConfigBox) => void }) {
   )
 }
 
-/** The way back to the grid, named once. */
-export const BACK_LABEL = '← Tất cả mục'
-
-/** The bar that says which box is open, and the way back to the grid. */
-function BoxHeader({ id, onBack }: { id: ConfigBox; onBack: () => void }) {
-  const box = CONFIG_BOXES.find((b) => b.id === id)
+/**
+ * One subject in the right column.
+ *
+ * Everything is on screen at once, so the only thing a pick changes is which
+ * subject is lit. Dimming the rest is a hint, not a lock — they stay readable
+ * and stay editable, because a person who jumped to `Tag` may well fix the
+ * line above it without going back to the index first.
+ */
+function Section({
+  id,
+  active,
+  children,
+}: {
+  id: ConfigBox
+  active: ConfigBox | null
+  children: ReactNode
+}) {
+  const lit = active === null || active === id
   return (
-    <div
+    <section
+      id={id}
+      aria-labelledby={`${id}-head`}
       style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 20,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        flexWrap: 'wrap',
-        padding: '12px 0 13px',
-        marginBottom: 8,
-        background: paper.cream,
-        borderBottom: `1px solid ${paper.rule}`,
+        // Chừa chỗ cho thanh tab dính phía trên, để phần được cuộn tới không
+        // nằm khuất dưới nó.
+        scrollMarginTop: 72,
+        opacity: lit ? 1 : 0.34,
+        transition: 'opacity .18s ease',
       }}
     >
-      <Button size="sm" onClick={onBack}>
-        {BACK_LABEL}
-      </Button>
-      <span style={{ fontFamily: sans, fontSize: 12.5, color: ink.soft }}>{box?.d}</span>
-    </div>
+      {children}
+    </section>
   )
 }
-
 
 /** Names where a field turns up on the site — identification, not instruction. */
 function Where({ children }: { children: ReactNode }) {
@@ -701,13 +715,31 @@ export function Cms() {
   /** Đang hỏi lại trước khi xoá sạch nội dung đã sửa của cả trang. */
   const [resetting, setResetting] = useState(false)
   /**
-   * Ô nào của `Cấu hình` đang mở. `null` là lưới.
+   * Phần nào của `Cấu hình` đang được chiếu sáng. `null` là chưa chọn gì.
    *
-   * Nó không nằm trong địa chỉ: một ô là một chặng bên trong màn, không phải
-   * một trang, và `useRoute` chỉ biết tới tab. Hệ quả là F5 quay về lưới —
-   * chấp nhận được, vì từ lưới tới ô là đúng một cú bấm.
+   * Nó không còn quyết định phần nào **có mặt** — cả năm phần luôn ở đó, cuộn
+   * tới được. Nên `null` không phải một màn riêng: nó chỉ có nghĩa là chưa ai
+   * bấm vào chỉ mục, và lúc ấy cả năm phần đều rõ như nhau. Làm mờ bốn phần
+   * ngay khi mới mở màn là tự chọn hộ người ta một chỗ để nhìn.
+   *
+   * Không nằm trong địa chỉ, vì nó là chỗ đang nhìn trong một trang, không
+   * phải một trang.
    */
   const [box, setBox] = useState<ConfigBox | null>(null)
+
+  /**
+   * Bấm một mục ở chỉ mục: chiếu sáng phần ấy và cuộn tới nó.
+   *
+   * Cuộn nằm trong `requestAnimationFrame` vì `setBox` ở dòng trên làm bốn
+   * phần kia mờ đi, và cuộn trước khi trình duyệt vẽ xong là cuộn theo bố cục
+   * cũ. `block: 'start'` đi cùng `scrollMarginTop` của `Section`.
+   */
+  const pickBox = useCallback((id: ConfigBox) => {
+    setBox(id)
+    requestAnimationFrame(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -998,14 +1030,26 @@ export function Cms() {
       )}
 
       {tab === 'config' && (
-        <div style={{ padding: '0 56px 130px', maxWidth: 1080 }}>
-          {box === null ? (
-            <div style={{ paddingTop: 34 }}>
-              <BoxGrid onOpen={setBox} />
-            </div>
-          ) : (
-            <BoxHeader id={box} onBack={() => setBox(null)} />
-          )}
+        /*
+         * Hai cột: chỉ mục bên trái, toàn bộ nội dung bên phải.
+         *
+         * `align-items: start` là thứ làm cột trái dính được — một `grid` mặc
+         * định kéo mỗi ô cao bằng hàng, và một `position: sticky` bên trong một
+         * ô cao bằng cả nội dung thì không bao giờ có chỗ để dính.
+         */
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(210px, 258px) minmax(0, 1fr)',
+            alignItems: 'start',
+            gap: 34,
+            padding: '34px 56px 130px',
+            maxWidth: 1180,
+          }}
+        >
+          <BoxIndex active={box} onPick={pickBox} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 40, minWidth: 0 }}>
 
           {/*
             Ba ô chữ này từng là tiêu đề của cây sơ đồ, và cây ấy chỉ để đọc.
@@ -1013,7 +1057,7 @@ export function Cms() {
             (`Sidebar.tsx`) và chặng đầu của đường dẫn (`crumbs.ts`), nên
             chúng là thứ sửa được duy nhất trên cây cũ.
           */}
-          {box === 'modules' && (<>
+          <Section id="modules" active={box}>
           <div
             style={{
               display: 'flex',
@@ -1023,9 +1067,8 @@ export function Cms() {
               borderBottom: `2px solid ${ink.base}`,
               paddingBottom: 9,
               marginBottom: 6,
-              scrollMarginTop: 64,
             }}
-            id="modules"
+            id="modules-head"
           >
             <div
               style={{
@@ -1498,10 +1541,10 @@ export function Cms() {
               </div>
             )
           })}
-          </>)}
+          </Section>
 
-          {box === 'landing' && (<>
-          <div id="landing" style={sectionHead}>Trang chủ — landing</div>
+          <Section id="landing" active={box}>
+          <div id="landing-head" style={sectionHead}>Trang chủ — landing</div>
           <div style={grid(two)}>
             <Field label="Nhãn trên cùng">
               <input
@@ -1553,21 +1596,21 @@ export function Cms() {
             * của trang Lưu trữ thì có trong dữ liệu nhưng chưa bao giờ có ô để
             * sửa — khai ra rồi bỏ đó cũng là không sửa được.
             */}
-          </>)}
+          </Section>
 
           {/*
             * Tag dùng chung cho cả ghi chép lẫn bài đăng — sửa ở đây, ăn cả hai
             * chỗ. Trước đây bốn dạng ghi viết cứng trong code, muốn đổi một chữ
             * là phải sửa code.
             */}
-          {box === 'tag' && (<>
-          <div id="tag" style={sectionHead}>Tag</div>
+          <Section id="tag" active={box}>
+          <div id="tag-head" style={sectionHead}>Tag</div>
           <TagsPanel />
 
-          </>)}
+          </Section>
 
-          {box === 'notes' && (<>
-          <div id="notes" style={sectionHead}>Trang Ghi chép</div>
+          <Section id="notes" active={box}>
+          <div id="notes-head" style={sectionHead}>Trang Ghi chép</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề trang">
               <input {...field('notesTitle')} style={serifInput} />
@@ -1593,10 +1636,10 @@ export function Cms() {
             </Field>
           </div>
 
-          </>)}
+          </Section>
 
-          {box === 'index' && (<>
-          <div id="index" style={sectionHead}>Trang mục lục</div>
+          <Section id="index" active={box}>
+          <div id="index-head" style={sectionHead}>Trang mục lục</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề — dòng 1">
               <input {...field('t1')} style={serifInput} />
@@ -1645,7 +1688,7 @@ export function Cms() {
             ))}
           </div>
 
-          </>)}
+          </Section>
 
           {/*
             The most destructive control on the screen was the faintest thing
@@ -1654,11 +1697,11 @@ export function Cms() {
             and the question is a second press rather than a `confirm()` the
             browser can suppress.
 
-            It sits on the grid, not inside a box: it wipes every box at once,
-            so it belongs to none of them.
+            Nó nằm ở cuối cột nội dung, ngoài mọi phần: nó xoá chữ của cả năm
+            phần một lúc, nên không thuộc phần nào. Và nó không mờ đi theo phần
+            nào cả — một nút xoá lúc mờ lúc rõ là một nút xoá bấm nhầm.
           */}
-          {box === null && (
-          <div style={{ marginTop: 44, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             {resetting ? (
               <>
                 <span style={{ fontFamily: sans, fontSize: 12.5, color: ink.danger }}>
@@ -1690,7 +1733,7 @@ export function Cms() {
               </Button>
             )}
           </div>
-          )}
+          </div>
         </div>
       )}
     </div>
