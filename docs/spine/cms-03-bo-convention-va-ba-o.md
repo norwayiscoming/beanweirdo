@@ -1,7 +1,7 @@
 # Bỏ trang System conventions, và ba ô chữ không ai sửa
 
 - Nhánh: `claude/project-thread-vvnk0a`
-- PR: *(điền khi mở)*
+- PR: #18
 - Lane: kiến trúc
 
 Chủ site yêu cầu 2026-09-19 14:09: xoá `/ad-convention` "cả UI các thứ luôn",
