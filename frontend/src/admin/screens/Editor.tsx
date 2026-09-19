@@ -1,6 +1,8 @@
 import {
   Fragment,
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -644,7 +646,7 @@ function EditorStyles() {
       .awc-grip:active{ cursor: grabbing; }
       .awc-grip-tip{ position: absolute; top: calc(100% + 6px); left: 0; white-space: nowrap; background: #23211A; color: #FDFBF2; font-family: 'Be Vietnam Pro', system-ui, sans-serif; font-size: 11px; letter-spacing: .01em; padding: 5px 9px; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 5; }
       .awc-grip:hover .awc-grip-tip, .awc-grip:focus-visible .awc-grip-tip{ opacity: 1; }
-      .awc-dropline{ height: 2px; margin: 6px 0; }
+      .awc-dropline{ height: 2px; margin: 6px 0; background: #5A4632; }
 
       /* the notes column */
       .awc-note-head{ font-family: 'Be Vietnam Pro', system-ui, sans-serif; font-size: 9.5px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; margin-bottom: 8px; }
@@ -1337,6 +1339,10 @@ function ArticleEditor({
                 setSections(insertAt(sections, run.at[0] + lineIndex + 1, blankReportBlock(t) as never))
                 setMenuAt(null)
               }}
+              drop={{
+                active: drag.from !== null,
+                onDrop: (lineIndex) => drag.drop(run.at[0] + lineIndex),
+              }}
               onBackspaceAtStart={() => {
                 const before = run.at[0] - 1
                 if (before < 0) return false
@@ -1522,6 +1528,10 @@ function LongformEditor({
               onInsertAfterLine={(lineIndex, t) => {
                 write(insertAt(blocks, run.at[0] + lineIndex + 1, blankReportBlock(t) as never))
                 setMenuAt(null)
+              }}
+              drop={{
+                active: drag.from !== null,
+                onDrop: (lineIndex) => drag.drop(run.at[0] + lineIndex),
               }}
               onBackspaceAtStart={() => {
                 const before = run.at[0] - 1
@@ -1728,18 +1738,24 @@ function StoredBlockFields({
 }
 
 /**
- * Một dải chữ, kèm cái máng `+` **bám theo dòng con trỏ đang ở**.
+ * Một dải chữ: cái máng `+` bám con trỏ soạn, và cả dải nhận thả khối.
  *
- * Chủ site: *"cái [+] ấy tôi muốn nó đi theo con trỏ chuột chứ giờ cái button
- * [+] chỉ hiển thị ở hàng bên trên thôi"*.
+ * **Máng `+`.** Trước đây một khối là một dòng, nên cái máng ghim ở đỉnh khối
+ * cũng chính là đỉnh dòng. Từ khi mấy khối chữ liền nhau gộp vào **một** ô,
+ * một dải dài mấy chục dòng vẫn chỉ có một cái máng nằm chết ở dòng đầu. Bản
+ * vá đầu cho nó chạy theo `onMouseMove`, và chủ site bắt đúng chỗ sai: *"nút
+ * [+] đang đi theo trỏ chuột thay vì vị trí của trỏ editor là cái [|]"*. Nay
+ * nó đo con trỏ soạn — chuột đưa đi đâu thì đưa, chỗ chèn vẫn là chỗ đang gõ.
  *
- * Trước đây một khối là một dòng, nên cái máng ghim ở đỉnh khối cũng chính là
- * đỉnh dòng. Từ khi mấy khối chữ liền nhau gộp vào **một** ô, một dải dài mấy
- * chục dòng vẫn chỉ có một cái máng nằm chết ở dòng đầu — muốn chèn vào giữa
- * bài thì không có chỗ nào để bấm.
+ * **Chỗ thả.** Ảnh và bảng có tay nắm từ lâu, nhưng chỉ khối khác mới nhận
+ * thả, nên trong một bài "chữ – ảnh – chữ" nhấc cái ảnh lên là không có điểm
+ * rơi nào và nó về chỗ cũ. Dải chữ nay nhận thả, với một vạch rơi chạy theo
+ * chuột tới đúng dòng đang hover.
  *
- * Nên chỗ này đo: con trỏ đang ở trên dòng nào trong ô, rồi dời cái máng xuống
- * đúng dòng ấy. Chèn thì chèn vào **sau** dòng đó, không phải đầu dải.
+ * Chữ **không** vì thế mà thành khối: nó vẫn là một dòng chảy, không có tay
+ * nắm, không cắt theo đoạn. Chủ site: *"chữ không có khối, không tách
+ * paragraph, tất cả là long form edit như lark/markdown/ghost"*. Cái đi lại
+ * được là ảnh, bảng, trích dẫn — dải chữ chỉ cho chúng một chỗ để hạ cánh.
  */
 function LiveRun({
   text,
@@ -1747,6 +1763,7 @@ function LiveRun({
   onToggleMenu,
   onCommit,
   onInsertAfterLine,
+  drop,
   onBackspaceAtStart,
   onDeleteAtEnd,
 }: {
@@ -1756,33 +1773,113 @@ function LiveRun({
   onCommit: (markdown: string) => void
   /** `line` là dòng thứ mấy trong dải, đếm từ 0. */
   onInsertAfterLine: (line: number, type: string) => void
+  /** Nhận khối đang được kéo. Vắng thì dải này không phải chỗ hạ cánh. */
+  drop?: { active: boolean; onDrop: (line: number) => void }
 } & LiveEdges) {
   const host = useRef<HTMLDivElement>(null)
-  /** Dòng con trỏ đang ở, và nó nằm cách đỉnh dải bao nhiêu. */
+  /** Dòng con trỏ soạn đang ở, và nó nằm cách đỉnh dải bao nhiêu. */
   const [line, setLine] = useState<{ index: number; top: number }>({ index: 0, top: 0 })
+  /** Dòng chuột đang trỏ tới trong lúc kéo; `null` là không có ai đang kéo. */
+  const [over, setOver] = useState<{ index: number; top: number } | null>(null)
+
+  /**
+   * Dòng nào của dải nằm gần độ cao `clientY` nhất.
+   *
+   * Đo bằng hình chữ nhật thật của từng dòng, không chia đều chiều cao dải:
+   * tiêu đề, đoạn văn và danh sách cao khác nhau, nên chia đều là lệch ngay
+   * từ dòng thứ hai.
+   *
+   * **Gần nhất**, không phải *trúng*. Giữa hai dòng có khoảng cách, dải có
+   * đệm ở hai đầu, và con trỏ kéo thì hay rơi đúng vào mấy chỗ ấy — trả về
+   * rỗng ở đó nghĩa là thả xong không có gì xảy ra, đúng cái lỗi đang sửa.
+   * Kẹp về dòng gần nhất thì mọi điểm trong dải đều là một điểm hạ cánh.
+   */
+  const lineAtY = (clientY: number) => {
+    const box = host.current
+    const input = box?.querySelector('.awc-live-input')
+    if (!box || !input) return null
+    const top = box.getBoundingClientRect().top
+    const lines = Array.from(input.children) as HTMLElement[]
+    if (lines.length === 0) return null
+    const y = Number.isFinite(clientY) ? clientY : top
+    let best = 0
+    let gap = Infinity
+    for (let i = 0; i < lines.length; i++) {
+      const r = lines[i].getBoundingClientRect()
+      const from = y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0
+      if (from < gap) {
+        best = i
+        gap = from
+      }
+      if (gap === 0) break
+    }
+    return { index: best, top: Math.round(lines[best].getBoundingClientRect().top - top) }
+  }
 
   /*
-   * Đo bằng hình chữ nhật thật của từng dòng, không tính theo chiều cao trung
-   * bình: tiêu đề, đoạn văn và danh sách cao khác nhau, nên chia đều là lệch
-   * ngay từ dòng thứ hai.
+   * Con trỏ soạn đang ở dòng nào.
+   *
+   * Đi từ nút neo của vùng chọn lên tới đứa con trực tiếp của ô nhập — mỗi
+   * đứa con ấy là một dòng — rồi lấy thứ tự của nó. Không đo bằng toạ độ:
+   * `getBoundingClientRect` của một vùng chọn rỗng trả về số 0 ở vài trình
+   * duyệt, còn cây DOM thì luôn nói đúng dòng.
    */
-  const follow = (e: { clientY: number }) => {
+  const followCaret = useCallback(() => {
     const box = host.current
     const input = box?.querySelector('.awc-live-input')
     if (!box || !input) return
-    const lines = Array.from(input.children) as HTMLElement[]
-    const top = box.getBoundingClientRect().top
-    for (let i = 0; i < lines.length; i++) {
-      const r = lines[i].getBoundingClientRect()
-      if (e.clientY >= r.top && e.clientY <= r.bottom) {
-        setLine({ index: i, top: Math.round(r.top - top) })
-        return
-      }
-    }
-  }
+    const anchor = window.getSelection()?.anchorNode
+    if (!anchor || !input.contains(anchor)) return
+    let node: Node | null = anchor
+    while (node && node.parentNode !== input) node = node.parentNode
+    if (!(node instanceof HTMLElement)) return
+    const index = Array.prototype.indexOf.call(input.children, node)
+    if (index < 0) return
+    setLine({ index, top: Math.round(node.getBoundingClientRect().top - box.getBoundingClientRect().top) })
+  }, [])
+
+  useEffect(() => {
+    // `selectionchange` là sự kiện của cả tài liệu, không của một ô — đó là
+    // đường duy nhất nghe được con trỏ đi lại bằng phím mũi tên lẫn bằng chuột.
+    document.addEventListener('selectionchange', followCaret)
+    return () => document.removeEventListener('selectionchange', followCaret)
+  }, [followCaret])
+
+  // Chữ đổi thì các dòng xê dịch, mà con trỏ không đi đâu cả nên
+  // `selectionchange` không bắn. Đo lại sau mỗi lần vẽ có chữ mới.
+  useLayoutEffect(followCaret, [text, followCaret])
 
   return (
-    <div className="awc-rep-block" ref={host} onMouseMove={follow}>
+    <div
+      className="awc-rep-block"
+      ref={host}
+      onDragOver={
+        drop?.active
+          ? (e) => {
+              e.preventDefault()
+              const at = lineAtY(e.clientY)
+              if (at) setOver(at)
+            }
+          : undefined
+      }
+      onDragLeave={drop?.active ? () => setOver(null) : undefined}
+      onDrop={
+        drop?.active
+          ? (e) => {
+              e.preventDefault()
+              const at = lineAtY(e.clientY) ?? over
+              setOver(null)
+              if (at) drop.onDrop(at.index)
+            }
+          : undefined
+      }
+    >
+      {over && drop?.active && (
+        <div
+          className="awc-dropline"
+          style={{ position: 'absolute', left: 122, right: 0, top: over.top, margin: 0 }}
+        />
+      )}
       <div className="awc-gutter" style={{ top: line.top }}>
         <InsertPlus
           open={menuOpen}
@@ -1873,6 +1970,10 @@ function useElementBody({
            * Không có hai móc này thì xoá ngược tới chúng là cụt đường, và
            * cách duy nhất còn lại là với tay ra chuột.
            */
+          drop={{
+            active: drag.from !== null,
+            onDrop: (lineIndex) => drag.drop(run.at[0] + lineIndex),
+          }}
           onBackspaceAtStart={() => {
             const before = run.at[0] - 1
             if (before < 0) return false
@@ -2654,19 +2755,41 @@ function ReportEditor({
               <Fragment key={run.kind === 'text' ? `t${run.at[0]}` : `b${run.at}`}>
                 <div style={{ gridColumn: 1, gridRow: ri + 1, minWidth: 0 }}>
                   {run.kind === 'text' ? (
-                    <div className="awc-rep-block">
-                      <div className="awc-gutter">
-                        <InsertPlus
-                          open={menuAt === run.at[0]}
-                          onToggle={() => setMenuAt(menuAt === run.at[0] ? null : run.at[0])}
-                          onInsert={(t) => insertBlock(run.at[1], t)}
-                        />
-                      </div>
-                      <LiveText
-                        text={run.text}
-                        onCommit={(md) => setBlocks(writeRun(blocks, run.at, md))}
-                      />
-                    </div>
+                    /*
+                     * Report là khuôn cuối còn dựng dải chữ bằng tay, và nó
+                     * thiếu đúng ba thứ năm khuôn kia đã có: máng `+` bám con
+                     * trỏ, chỗ thả khối, và hai móc xoá xuyên qua khối. Chủ
+                     * site báo cái thứ ba: *"delete keyboard cứ tới các khối
+                     * là dừng"* — đúng, ở report thì dừng thật.
+                     */
+                    <LiveRun
+                      text={run.text}
+                      menuOpen={menuAt === run.at[0]}
+                      onToggleMenu={() => setMenuAt(menuAt === run.at[0] ? null : run.at[0])}
+                      onCommit={(md) => setBlocks(writeRun(blocks, run.at, md))}
+                      onInsertAfterLine={(lineIndex, t) => insertBlock(run.at[0] + lineIndex, t)}
+                      drop={{
+                        active: dragFrom !== null,
+                        onDrop: (lineIndex) => drop(run.at[0] + lineIndex),
+                      }}
+                      /*
+                       * Xoá qua `requestRemove`, không xoá thẳng: khối bị nuốt
+                       * có thể đang mang ghi chú cạnh bài, và nó phải hỏi chỗ
+                       * để chữ ấy đi — y như bấm Delete trên tay nắm.
+                       */
+                      onBackspaceAtStart={() => {
+                        const before = run.at[0] - 1
+                        if (before < 0) return false
+                        requestRemove(before)
+                        return true
+                      }}
+                      onDeleteAtEnd={() => {
+                        const after = run.at[1] + 1
+                        if (after >= blocks.length) return false
+                        requestRemove(after)
+                        return true
+                      }}
+                    />
                   ) : (
                     <div
                       onDragOver={(e) => {
