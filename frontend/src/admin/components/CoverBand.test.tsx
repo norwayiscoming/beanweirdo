@@ -60,6 +60,19 @@ describe('ô trang bìa', () => {
     expect(buttons(container)).not.toContain('đặt vào khung')
   })
 
+  it('rộng hết khung sửa, không co lại theo trần chiều cao', () => {
+    /*
+     * Chủ site chụp màn hình một cái băng rộng 573px giữa khung sửa rộng
+     * 1320px: để `width` là `auto` thì trình duyệt suy bề ngang ngược lại từ
+     * `maxHeight` qua `aspectRatio`. jsdom không tự tính ra chỗ ấy, nên bài
+     * kiểm hỏi thẳng cái thuộc tính đã sửa — bỏ nó đi là lỗi quay lại y hệt.
+     */
+    const { container } = render(<CoverBand {...props} />)
+    const band = container.querySelector<HTMLElement>('[data-cover-band]')!
+    expect(band.style.width).toBe('100%')
+    expect(band.style.maxHeight).toBe('420px')
+  })
+
   it('thả tệp lên băng cũng là đặt ảnh bìa', () => {
     const onPick = vi.fn()
     const { container } = render(<CoverBand {...props} onPick={onPick} />)
