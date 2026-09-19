@@ -23,7 +23,7 @@ vi.mock('../admin/lib/apiClient', () => ({
   listPosts: () => Promise.resolve([]),
   listTemplates: () => Promise.resolve([]),
   updateSite: (p: unknown) => Promise.resolve(p),
-  // Bảng tag nằm cùng tab "Sửa nội dung"; không giả lập thì màn không dựng nổi.
+  // Bảng tag nằm cùng tab chữ; không giả lập thì màn không dựng nổi.
   listTags: () => Promise.resolve([]),
   createTag: vi.fn(), renameTag: vi.fn(), deleteTag: vi.fn(),
   createModule: vi.fn(), deleteModule: vi.fn(), reorderModules: vi.fn(),
@@ -32,7 +32,7 @@ vi.mock('../admin/lib/apiClient', () => ({
 }))
 /*
  * Tab nằm trong địa chỉ, nên `nav` phải nhớ được tab vừa bấm — một object đứng
- * yên thì bấm sang "Sửa nội dung" không đi tới đâu. `useNav` là hook, nên nó
+ * yên thì bấm sang tab khác không đi tới đâu. `useNav` là hook, nên nó
  * giữ state ngay trong màn đang gọi nó.
  */
 vi.mock('../lib/nav', async () => {
@@ -45,7 +45,10 @@ vi.mock('../lib/nav', async () => {
   }
 })
 
-const { Cms } = await import('./Cms')
+const { Cms, TABS } = await import('./Cms')
+
+/** The copy tab, by key — so renaming its label does not break this test. */
+const COPY_TAB = TABS.find((t) => t.k === 'content')!.t
 
 describe('CMS hiện nội dung thật', () => {
   it('ô chữ đổi theo dữ liệu về sau, không đứng ở chữ mặc định', async () => {
@@ -59,7 +62,7 @@ describe('CMS hiện nội dung thật', () => {
     getSite.mockReturnValue(new Promise((r) => (traVe = r)))
 
     render(<Cms />)
-    ;(await screen.findByText(/sửa nội dung/i)).click()
+    ;(await screen.findByText(COPY_TAB)).click()
     // Ô đã có mặt, mang chữ mặc định, trong lúc mạng còn đang chờ.
     await waitFor(() => expect(screen.queryByDisplayValue(SITE_DEFAULTS.blurb)).not.toBeNull())
 

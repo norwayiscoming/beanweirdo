@@ -132,27 +132,34 @@ function countLabel(id: string, live: number): string {
 }
 
 /** The three tabs, named once so the site map and the tab bar cannot drift. */
-const TABS = [
-  { k: 'posts', t: 'Tạo bài đăng' },
-  { k: 'map', t: 'Sơ đồ trang' },
-  { k: 'content', t: 'Sửa nội dung' },
+export const TABS = [
+  { k: 'posts', t: 'Bài viết' },
+  { k: 'map', t: 'Cấu trúc' },
+  { k: 'content', t: 'Chữ trên trang' },
 ] as const
 
 /**
- * The seven things Sửa nội dung holds, in the order they appear.
+ * The sections of `Chữ trên trang`, in the order they appear, and the anchors
+ * the jump bar scrolls to.
  *
- * They were one uninterrupted scroll: landing copy, tags, two page blurbs, the
- * index, every module with its image editors nested inside, then the admin
- * blurb. Changing one word in the last block meant scrolling past all six.
+ * Every `id` here must exist as a `div id=` in the tab below, and every such
+ * div must be named here: the bar reads this list and scrolls to that id, so a
+ * section renamed on one side and not the other leaves a button pointing at
+ * nothing — and nothing about that is a type error or a failing render.
+ * `Cms.sections.test.tsx` runs the two against each other.
+ *
+ * The module editor used to be the sixth of these, 484 lines of it, which is
+ * most of why this tab read as one endless scroll. It now lives in `Cấu trúc`,
+ * beside the tree it edits — which is also where the site owner went looking
+ * for it.
  */
-const CONTENT_SECTIONS = [
+export const CONTENT_SECTIONS = [
   { id: 'landing', t: 'Trang chủ' },
   { id: 'tag', t: 'Tag' },
   { id: 'notes', t: 'Ghi chép' },
   { id: 'archive', t: 'Lưu trữ' },
   { id: 'index', t: 'Mục lục' },
-  { id: 'modules', t: 'Module' },
-  { id: 'admin', t: 'Quản trị' },
+  { id: 'admin', t: 'Khu quản trị' },
 ] as const
 
 /**
@@ -475,12 +482,27 @@ function ImageSlot({
  * trỏ vào một tag không còn tồn tại — nó biến mất khỏi mọi thanh lọc mà vẫn nằm
  * đó, đúng cái lỗi "viết xong rồi không tìm thấy được".
  */
+/**
+ * Tag: danh sách bên trái, chi tiết bên phải.
+ *
+ * Trước đây mỗi tag là một ô nhập nằm thẳng trong danh sách, và **gõ xong rời
+ * ô là đổi tên luôn** — không có bước xác nhận nào giữa "tôi bấm nhầm vào đây"
+ * và "tag đã đổi tên trên mọi bài đang đeo nó". Nút xoá cũng lặp lại trên từng
+ * dòng, nên thứ nguy hiểm nhất lại là thứ nhiều nhất trên màn.
+ *
+ * Nay danh sách chỉ để đọc và chọn. Đổi tên và xoá nằm ở khung chi tiết, mỗi
+ * lần một tag, và đổi tên phải bấm Lưu.
+ */
 function TagsPanel() {
   const [tags, setTags] = useState<Tag[]>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [asking, setAsking] = useState<{ id: string; wearing: { posts: string[]; notes: string[] } } | null>(null)
-  const [adding, setAdding] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  /** Tag đang mở ở khung chi tiết. */
+  const [picked, setPicked] = useState<string | null>(null)
+  /** Ô tạo tag, và ô đổi tên — cả hai chỉ ghi khi bấm nút. */
+  const [fresh, setFresh] = useState('')
+  const [rename, setRename] = useState('')
 
   const load = () => void listTagsCached().then(setTags)
   useEffect(load, [])
@@ -501,85 +523,166 @@ function TagsPanel() {
     }
   }
 
+  const open = tags.find((t) => t.id === picked) ?? null
+  const pick = (t: Tag) => {
+    setPicked(t.id)
+    setRename(t.label)
+    setAsking(null)
+  }
+
+  const create = () => {
+    const v = fresh.trim()
+    if (!v) return
+    setFresh('')
+    void run('new', () => createTag(v))
+  }
+
+  const dot = (label: string, size = 9) => (
+    <span
+      style={{ width: size, height: size, borderRadius: 999, background: tagColor(label), flex: 'none' }}
+    />
+  )
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-      {err && <div role="alert" style={{ fontSize: 12, color: '#8E1E42' }}>{err}</div>}
-      {tags.map((t) => (
-        <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ width: 9, height: 9, borderRadius: 999, background: tagColor(t.label), flex: 'none' }} />
-          <input
-            defaultValue={t.label}
-            key={t.label}
-            aria-label={`tên tag ${t.label}`}
-            onBlur={(e) => {
-              const v = e.target.value.trim()
-              if (v && v !== t.label) void run(t.id, () => renameTag(t.id, v))
-            }}
-            style={{ ...boxed, maxWidth: 260, padding: '5px 9px', fontSize: 13 }}
-          />
-          <IconButton
-            size="sm"
-            level="danger"
-            label={`Xoá tag ${t.label}`}
-            disabled={busy === t.id}
-            onClick={() =>
-              void run(t.id, async () => {
-                try {
-                  await deleteTag(t.id)
-                } catch (e) {
-                  // Máy chủ từ chối vì còn thứ đang đeo, và trả về danh sách ấy.
-                  const w = (e as { payload?: { wearing?: { posts: string[]; notes: string[] } } }).payload?.wearing
-                  if (!w) throw e
-                  setAsking({ id: t.id, wearing: w })
-                }
-              })
-            }
-          >
-            <IconTrash size={14} />
-          </IconButton>
-          {asking?.id === t.id && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: ink.mid }}>
-              {asking.wearing.posts.length + asking.wearing.notes.length} thứ đang đeo — chuyển sang
-              <select
-                aria-label="chuyển sang tag"
-                defaultValue=""
-                onChange={(e) => {
-                  const to = e.target.value === '' ? null : e.target.value
-                  setAsking(null)
-                  void run(t.id, () => deleteTag(t.id, to))
-                }}
-                style={{ ...boxed, width: 'auto', padding: '3px 6px', fontSize: 11.5 }}
-              >
-                <option value="">(bỏ trống)</option>
-                {tags.filter((o) => o.id !== t.id).map((o) => (
-                  <option key={o.id} value={o.id}>{o.label}</option>
-                ))}
-              </select>
-            </span>
+    <div style={{ marginBottom: 18 }}>
+      {err && <div role="alert" style={{ fontSize: 12, color: '#8E1E42', marginBottom: 10 }}>{err}</div>}
+
+      {/* Tạo tag: một ô và một nút. Gõ không tạo gì cho tới khi bấm. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <input
+          value={fresh}
+          aria-label="tên tag mới"
+          placeholder="tên tag mới"
+          onChange={(e) => setFresh(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') create()
+          }}
+          style={{ ...boxed, maxWidth: 260, padding: '6px 10px', fontSize: 13 }}
+        />
+        <Button size="sm" level="primary" disabled={!fresh.trim() || busy === 'new'} onClick={create} icon={<IconPlus size={14} />}>
+          Tạo tag
+        </Button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,240px) minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
+        {/* Danh sách — chỉ để đọc và chọn. */}
+        <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${paper.rule}` }}>
+          {tags.length === 0 && (
+            <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.faint, padding: '10px 12px' }}>
+              chưa có tag nào
+            </div>
+          )}
+          {tags.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={picked === t.id}
+              onClick={() => pick(t)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 9,
+                width: '100%',
+                textAlign: 'left',
+                background: picked === t.id ? paper.white : 'transparent',
+                border: 0,
+                borderLeft: `2px solid ${picked === t.id ? ink.base : 'transparent'}`,
+                padding: '8px 12px',
+                fontFamily: sans,
+                fontSize: 13,
+                color: ink.base,
+                cursor: 'pointer',
+              }}
+            >
+              {dot(t.label)}
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Chi tiết — mỗi lần một tag. */}
+        <div style={{ border: `1px solid ${paper.rule}`, padding: 16, background: paper.white }}>
+          {!open ? (
+            <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.faint }}>
+              Chọn một tag bên trái để sửa tên hoặc xoá.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                {dot(open.label, 11)}
+                <span style={{ fontFamily: serif, fontSize: 20, lineHeight: 1.1 }}>{open.label}</span>
+              </div>
+
+              <Field label="Tên tag">
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    value={rename}
+                    aria-label={`tên tag ${open.label}`}
+                    onChange={(e) => setRename(e.target.value)}
+                    style={{ ...boxed, maxWidth: 260, padding: '6px 10px', fontSize: 13 }}
+                  />
+                  <Button
+                    size="sm"
+                    level="primary"
+                    disabled={busy === open.id || !rename.trim() || rename.trim() === open.label}
+                    onClick={() => {
+                      const v = rename.trim()
+                      if (v && v !== open.label) void run(open.id, () => renameTag(open.id, v))
+                    }}
+                  >
+                    Lưu tên
+                  </Button>
+                </div>
+              </Field>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <Button
+                  size="sm"
+                  level="danger"
+                  disabled={busy === open.id}
+                  icon={<IconTrash size={14} />}
+                  onClick={() =>
+                    void run(open.id, async () => {
+                      try {
+                        await deleteTag(open.id)
+                        setPicked(null)
+                      } catch (e) {
+                        // Máy chủ từ chối vì còn thứ đang đeo, và trả về danh sách ấy.
+                        const w = (e as { payload?: { wearing?: { posts: string[]; notes: string[] } } }).payload?.wearing
+                        if (!w) throw e
+                        setAsking({ id: open.id, wearing: w })
+                      }
+                    })
+                  }
+                >
+                  Xoá tag
+                </Button>
+                {asking?.id === open.id && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: ink.mid }}>
+                    {asking.wearing.posts.length + asking.wearing.notes.length} thứ đang đeo — chuyển sang
+                    <select
+                      aria-label="chuyển sang tag"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const to = e.target.value === '' ? null : e.target.value
+                        setAsking(null)
+                        setPicked(null)
+                        void run(open.id, () => deleteTag(open.id, to))
+                      }}
+                      style={{ ...boxed, width: 'auto', padding: '3px 6px', fontSize: 11.5 }}
+                    >
+                      <option value="">(bỏ trống)</option>
+                      {tags.filter((o) => o.id !== open.id).map((o) => (
+                        <option key={o.id} value={o.id}>{o.label}</option>
+                      ))}
+                    </select>
+                  </span>
+                )}
+              </div>
+            </div>
           )}
         </div>
-      ))}
-      {adding ? (
-        <input
-          autoFocus
-          placeholder="tên tag mới rồi Enter"
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') return setAdding(false)
-            if (e.key !== 'Enter') return
-            const v = (e.target as HTMLInputElement).value.trim()
-            setAdding(false)
-            if (v) void run('new', () => createTag(v))
-          }}
-          onBlur={() => setAdding(false)}
-          style={{ ...boxed, maxWidth: 260, padding: '5px 9px', fontSize: 13 }}
-        />
-      ) : (
-        <div style={{ alignSelf: 'flex-start' }}>
-          <Button size="sm" onClick={() => setAdding(true)} icon={<IconPlus size={14} />}>
-            Tag mới
-          </Button>
-        </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -600,6 +703,16 @@ export function Cms() {
   const [dragEntry, setDragEntry] = useState<string | null>(null)
   /** Đang hỏi lại trước khi xoá sạch nội dung đã sửa của cả trang. */
   const [resetting, setResetting] = useState(false)
+  /*
+   * Chữ của khu quản trị: gập lại, mặc định đóng.
+   *
+   * Sáu ô này đặt tiêu đề cho ba màn *quản trị* — Design system, System
+   * conventions, và chính màn đang mở. Chúng vẫn vẽ ra chữ thật, nên bỏ đi là
+   * mất chỗ sửa chứ không phải dọn rác. Nhưng chúng cũng không phải chữ của
+   * trang công khai, mà lại nằm chình ình cuối một màn dành cho chữ công khai.
+   * Gập lại: giữ được chỗ sửa, mà không bắt ai cũng phải cuộn qua nó.
+   */
+  const [adminOpen, setAdminOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -1014,162 +1127,6 @@ export function Cms() {
               ))}
             </div>
           ))}
-
-          <RoutesPanel
-            stored={site.routes}
-            modules={modules}
-            onSave={(routes) => saveSite({ routes } as SiteOverrides)}
-          />
-        </div>
-      )}
-
-      {tab === 'content' && (
-        <div style={{ padding: '0 56px 130px', maxWidth: 1080 }}>
-          <ContentIndex />
-          <div id="landing" style={{ ...sectionHead, scrollMarginTop: 64 }}>Trang chủ — landing</div>
-          <div style={grid(two)}>
-            <Field label="Nhãn trên cùng">
-              <input
-                {...field('lEyebrow')}
-                style={boxed}
-              />
-            </Field>
-            <Field label="Nhãn xem mục lục">
-              <input {...field('lCta')} style={boxed} />
-            </Field>
-            <Field
-              label={
-                <>
-                  Tên lớn — dòng 1 · chữ <span style={{ color: '#F2A0A5' }}>ӕ</span> phóng to màu hồng
-                </>
-              }
-            >
-              <input
-                {...field('lTitle1')}
-                style={serifInput}
-              />
-            </Field>
-            <Field label="Tên lớn — dòng 2 (nghiêng, xanh)">
-              <input
-                {...field('lTitle2')}
-                style={serifItalicInput}
-              />
-            </Field>
-            <Field label="Đoạn dẫn — cột 1">
-              <textarea
-                {...field('lIntro1')}
-                rows={4}
-                style={area}
-              />
-            </Field>
-            <Field label="Đoạn dẫn — cột 2">
-              <textarea
-                {...field('lIntro2')}
-                rows={4}
-                style={area}
-              />
-            </Field>
-          </div>
-
-          {/*
-            * Trang Ghi chép và trang Lưu trữ.
-            *
-            * Năm dòng của trang Ghi chép từng nằm cứng trong mã, còn hai dòng
-            * của trang Lưu trữ thì có trong dữ liệu nhưng chưa bao giờ có ô để
-            * sửa — khai ra rồi bỏ đó cũng là không sửa được.
-            */}
-          {/*
-            * Tag dùng chung cho cả ghi chép lẫn bài đăng — sửa ở đây, ăn cả hai
-            * chỗ. Trước đây bốn dạng ghi viết cứng trong code, muốn đổi một chữ
-            * là phải sửa code.
-            */}
-          <div id="tag" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Tag</div>
-          <TagsPanel />
-
-          <div id="notes" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Ghi chép</div>
-          <div style={grid(two)}>
-            <Field label="Tiêu đề trang">
-              <input {...field('notesTitle')} style={serifInput} />
-            </Field>
-            <Field label="Dòng dưới tiêu đề">
-              <input {...field('notesSubtitle')} style={serifItalicInput} />
-            </Field>
-          </div>
-          <div style={grid(two, 18)}>
-            <Field label="Đoạn dẫn — góc phải">
-              <textarea {...field('notesIntro')} rows={3} style={{ ...area, fontSize: 14 }} />
-            </Field>
-            <Field label="Dòng hướng dẫn — dưới đoạn dẫn">
-              <textarea {...field('notesHint')} rows={3} style={{ ...area, fontSize: 14 }} />
-            </Field>
-          </div>
-          <div style={grid(two, 18)}>
-            <Field label="Lời kết — cuối trang">
-              <input {...field('notesEnd')} style={serifItalicInput} />
-            </Field>
-            <Field label="Lời kết — dòng phụ">
-              <input {...field('notesEndNote')} style={boxed} />
-            </Field>
-          </div>
-
-          <div id="archive" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Lưu trữ</div>
-          <div style={grid(two)}>
-            <Field label="Tiêu đề trang">
-              <input {...field('archiveTitle')} style={serifInput} />
-            </Field>
-            <Field label="Dòng phụ — cạnh số bài">
-              <input {...field('archiveNote')} style={boxed} />
-            </Field>
-          </div>
-
-          <div id="index" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Mục lục</div>
-          <div style={grid(two)}>
-            <Field label="Tiêu đề — dòng 1">
-              <input {...field('t1')} style={serifInput} />
-            </Field>
-            <Field label="Tiêu đề — dòng 2 (nghiêng, xanh)">
-              <input
-                {...field('t2')}
-                style={serifItalicInput}
-              />
-            </Field>
-          </div>
-          <div style={grid(two, 18)}>
-            <Field label="Đoạn dẫn — dạng danh sách">
-              <textarea
-                {...field('blurb')}
-                rows={3}
-                style={{ ...area, fontSize: 14 }}
-              />
-            </Field>
-            <Field label="Đoạn dẫn — dạng cột">
-              <textarea
-                {...field('blurbShort')}
-                rows={3}
-                style={{ ...area, fontSize: 14 }}
-              />
-            </Field>
-          </div>
-          <div style={grid(three, 40)}>
-            {([1, 2, 3] as const).map((slot) => (
-              <ImageSlot
-                key={slot}
-                label={`Chú thích ảnh ${slot}`}
-                caption={copy[`plate${slot}` as const]}
-                url={copy[`plateImg${slot}` as const] || null}
-                onCaption={(v) => void saveSite({ [`plate${slot}`]: v } as SiteOverrides)}
-                onUpload={(f) => savePlate(slot, f)}
-                onClear={() => void saveSite({ [`plateImg${slot}`]: '' } as SiteOverrides)}
-                onPlace={(next) => void saveSite({ [`plateImg${slot}`]: next } as SiteOverrides)}
-                ratio={16 / 9}
-                drag={{
-                  ...plateSwap.slotProps(slot),
-                  handle: plateSwap.handleProps(slot),
-                  marked: plateSwap.over === slot,
-                }}
-              />
-            ))}
-          </div>
 
           <div
             style={{
@@ -1656,8 +1613,189 @@ export function Cms() {
             )
           })}
 
-          <div id="admin" style={{ ...sectionHead, margin: '44px 0 18px', scrollMarginTop: 64 }}>{copy.sections.Admin}</div>
-          <div style={grid(two, 20)}>
+          <RoutesPanel
+            stored={site.routes}
+            modules={modules}
+            onSave={(routes) => saveSite({ routes } as SiteOverrides)}
+          />
+        </div>
+      )}
+
+      {tab === 'content' && (
+        <div style={{ padding: '0 56px 130px', maxWidth: 1080 }}>
+          <ContentIndex />
+          <div id="landing" style={{ ...sectionHead, scrollMarginTop: 64 }}>Trang chủ — landing</div>
+          <div style={grid(two)}>
+            <Field label="Nhãn trên cùng">
+              <input
+                {...field('lEyebrow')}
+                style={boxed}
+              />
+            </Field>
+            <Field label="Nhãn xem mục lục">
+              <input {...field('lCta')} style={boxed} />
+            </Field>
+            <Field
+              label={
+                <>
+                  Tên lớn — dòng 1 · chữ <span style={{ color: '#F2A0A5' }}>ӕ</span> phóng to màu hồng
+                </>
+              }
+            >
+              <input
+                {...field('lTitle1')}
+                style={serifInput}
+              />
+            </Field>
+            <Field label="Tên lớn — dòng 2 (nghiêng, xanh)">
+              <input
+                {...field('lTitle2')}
+                style={serifItalicInput}
+              />
+            </Field>
+            <Field label="Đoạn dẫn — cột 1">
+              <textarea
+                {...field('lIntro1')}
+                rows={4}
+                style={area}
+              />
+            </Field>
+            <Field label="Đoạn dẫn — cột 2">
+              <textarea
+                {...field('lIntro2')}
+                rows={4}
+                style={area}
+              />
+            </Field>
+          </div>
+
+          {/*
+            * Trang Ghi chép và trang Lưu trữ.
+            *
+            * Năm dòng của trang Ghi chép từng nằm cứng trong mã, còn hai dòng
+            * của trang Lưu trữ thì có trong dữ liệu nhưng chưa bao giờ có ô để
+            * sửa — khai ra rồi bỏ đó cũng là không sửa được.
+            */}
+          {/*
+            * Tag dùng chung cho cả ghi chép lẫn bài đăng — sửa ở đây, ăn cả hai
+            * chỗ. Trước đây bốn dạng ghi viết cứng trong code, muốn đổi một chữ
+            * là phải sửa code.
+            */}
+          <div id="tag" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Tag</div>
+          <TagsPanel />
+
+          <div id="notes" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Ghi chép</div>
+          <div style={grid(two)}>
+            <Field label="Tiêu đề trang">
+              <input {...field('notesTitle')} style={serifInput} />
+            </Field>
+            <Field label="Dòng dưới tiêu đề">
+              <input {...field('notesSubtitle')} style={serifItalicInput} />
+            </Field>
+          </div>
+          <div style={grid(two, 18)}>
+            <Field label="Đoạn dẫn — góc phải">
+              <textarea {...field('notesIntro')} rows={3} style={{ ...area, fontSize: 14 }} />
+            </Field>
+            <Field label="Dòng hướng dẫn — dưới đoạn dẫn">
+              <textarea {...field('notesHint')} rows={3} style={{ ...area, fontSize: 14 }} />
+            </Field>
+          </div>
+          <div style={grid(two, 18)}>
+            <Field label="Lời kết — cuối trang">
+              <input {...field('notesEnd')} style={serifItalicInput} />
+            </Field>
+            <Field label="Lời kết — dòng phụ">
+              <input {...field('notesEndNote')} style={boxed} />
+            </Field>
+          </div>
+
+          <div id="archive" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Lưu trữ</div>
+          <div style={grid(two)}>
+            <Field label="Tiêu đề trang">
+              <input {...field('archiveTitle')} style={serifInput} />
+            </Field>
+            <Field label="Dòng phụ — cạnh số bài">
+              <input {...field('archiveNote')} style={boxed} />
+            </Field>
+          </div>
+
+          <div id="index" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Mục lục</div>
+          <div style={grid(two)}>
+            <Field label="Tiêu đề — dòng 1">
+              <input {...field('t1')} style={serifInput} />
+            </Field>
+            <Field label="Tiêu đề — dòng 2 (nghiêng, xanh)">
+              <input
+                {...field('t2')}
+                style={serifItalicInput}
+              />
+            </Field>
+          </div>
+          <div style={grid(two, 18)}>
+            <Field label="Đoạn dẫn — dạng danh sách">
+              <textarea
+                {...field('blurb')}
+                rows={3}
+                style={{ ...area, fontSize: 14 }}
+              />
+            </Field>
+            <Field label="Đoạn dẫn — dạng cột">
+              <textarea
+                {...field('blurbShort')}
+                rows={3}
+                style={{ ...area, fontSize: 14 }}
+              />
+            </Field>
+          </div>
+          <div style={grid(three, 40)}>
+            {([1, 2, 3] as const).map((slot) => (
+              <ImageSlot
+                key={slot}
+                label={`Chú thích ảnh ${slot}`}
+                caption={copy[`plate${slot}` as const]}
+                url={copy[`plateImg${slot}` as const] || null}
+                onCaption={(v) => void saveSite({ [`plate${slot}`]: v } as SiteOverrides)}
+                onUpload={(f) => savePlate(slot, f)}
+                onClear={() => void saveSite({ [`plateImg${slot}`]: '' } as SiteOverrides)}
+                onPlace={(next) => void saveSite({ [`plateImg${slot}`]: next } as SiteOverrides)}
+                ratio={16 / 9}
+                drag={{
+                  ...plateSwap.slotProps(slot),
+                  handle: plateSwap.handleProps(slot),
+                  marked: plateSwap.over === slot,
+                }}
+              />
+            ))}
+          </div>
+
+          <button
+            id="admin"
+            type="button"
+            aria-expanded={adminOpen}
+            onClick={() => setAdminOpen((v) => !v)}
+            style={{
+              ...sectionHead,
+              margin: '44px 0 18px',
+              scrollMarginTop: 64,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'transparent',
+              border: 0,
+              borderBottom: `2px solid ${ink.base}`,
+              textAlign: 'left',
+              cursor: 'pointer',
+            }}
+          >
+            <IconChevron size={13} open={adminOpen} />
+            Chữ của khu quản trị
+            <span style={{ fontWeight: 300, letterSpacing: 0, textTransform: 'none', color: ink.faint }}>
+              tiêu đề của ba màn quản trị, không phải chữ trên trang công khai
+            </span>
+          </button>
+          <div style={{ ...grid(two, 20), display: adminOpen ? undefined : 'none' }}>
             <Field label="Design system — tiêu đề dòng 1">
               <input
                 {...field('artT1')}
