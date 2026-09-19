@@ -2,6 +2,7 @@ import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ElementList } from './elements'
 import { paletteFrom } from './palette'
 import { garden, ink, layout, paper, sans, serif, wrapTitle } from './tokens'
+import { fillStyle } from './focus'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
 import type { ArticlePlateData, ArticlePostData, FigureData } from './types'
 
@@ -161,9 +162,7 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
             bottom: 0,
             width: mobile ? '100%' : 300,
             height: mobile ? 200 : undefined,
-            background: post.heroPlate.imageUrl ? undefined : post.heroPlate.tint,
-            backgroundImage: post.heroPlate.imageUrl ? `url(${post.heroPlate.imageUrl})` : undefined,
-            backgroundSize: 'cover',
+            ...fillStyle(post.heroPlate.imageUrl, post.heroPlate.tint),
             display: 'flex',
             alignItems: 'flex-end',
             padding: 14,
@@ -212,9 +211,7 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
                 style={{
                   ...plateHost,
                   height: 280,
-                  background: post.platePrimary.imageUrl ? undefined : post.platePrimary.tint,
-                  backgroundImage: post.platePrimary.imageUrl ? `url(${post.platePrimary.imageUrl})` : undefined,
-                  backgroundSize: 'cover',
+                  ...fillStyle(post.platePrimary.imageUrl, post.platePrimary.tint),
                   display: 'flex',
                   alignItems: 'flex-end',
                   padding: 14,
@@ -235,9 +232,7 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
                   ...plateHost,
                   height: 180,
                   alignSelf: 'end',
-                  background: post.plateSecondary.imageUrl ? undefined : post.plateSecondary.tint,
-                  backgroundImage: post.plateSecondary.imageUrl ? `url(${post.plateSecondary.imageUrl})` : undefined,
-                  backgroundSize: 'cover',
+                  ...fillStyle(post.plateSecondary.imageUrl, post.plateSecondary.tint),
                   display: 'flex',
                   alignItems: 'flex-end',
                   padding: 12,
@@ -316,9 +311,7 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
                           style={{
                             ...plateHost,
                             height: s.fig.h,
-                            background: s.fig.imageUrl ? undefined : s.fig.tint,
-                            backgroundImage: s.fig.imageUrl ? `url(${s.fig.imageUrl})` : undefined,
-                            backgroundSize: 'cover',
+                            ...fillStyle(s.fig.imageUrl, s.fig.tint),
                             display: 'flex',
                             alignItems: 'flex-end',
                             padding: 12,
@@ -386,9 +379,7 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
               style={{
                 ...plateHost,
                 aspectRatio: '1',
-                background: post.detailPlate.imageUrl ? undefined : post.detailPlate.tint,
-                backgroundImage: post.detailPlate.imageUrl ? `url(${post.detailPlate.imageUrl})` : undefined,
-                backgroundSize: 'cover',
+                ...fillStyle(post.detailPlate.imageUrl, post.detailPlate.tint),
                 display: 'flex',
                 alignItems: 'flex-end',
                 padding: 12,
