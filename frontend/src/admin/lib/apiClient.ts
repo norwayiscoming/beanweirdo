@@ -14,9 +14,15 @@ import type { LogEntry } from '../../content/hours'
 /** Kho ảnh của bài — cùng tên với migration 0004, và bucket ấy là public. */
 const IMAGE_BUCKET = 'post-images'
 
-/** The 3 real post templates (the old `templates` table is gone). */
-export const TEMPLATES = ['article', 'cards', 'report', 'longform', 'memo', 'bitesize'] as const
-export type PostTemplate = (typeof TEMPLATES)[number]
+/**
+ * The post templates, kept in `content/templates.ts` with every other place
+ * that names them. Re-exported because this module is what the admin screens
+ * import their types from.
+ */
+import type { PostTemplate } from '../../content/templates'
+
+export { POST_TEMPLATE_KEYS as TEMPLATES } from '../../content/templates'
+export type { PostTemplate }
 
 export type PostKind = 'note' | 'essay' | 'ref' | 'log'
 export type PostStatus = 'draft' | 'published' | 'archived' | 'deleted'

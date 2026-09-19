@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import type { PostTemplate } from '../content/templates'
 
 export type PostKind = 'note' | 'essay' | 'ref' | 'log'
-export type PostTemplate = 'article' | 'cards' | 'report' | 'longform' | 'memo' | 'bitesize'
+export type { PostTemplate }
 export type PostStatus = 'draft' | 'published' | 'archived' | 'deleted'
 
 /**
