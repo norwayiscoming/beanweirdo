@@ -73,17 +73,23 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
         },
       ],
     })
-    expect(corners(container)).toEqual(['detail', 'fig-0', 'hero', 'primary', 'secondary'])
+    // Không có `hero`: ảnh bìa đặt ở băng "trang bìa", một chỗ cho cả sáu khuôn.
+    expect(corners(container)).toEqual(['detail', 'fig-0', 'primary', 'secondary'])
   })
 
-  it('memo: ô ảnh đầu trang dựng cả khi bài chưa có ảnh', () => {
+  /*
+   * Memo chỉ có đúng một ô ảnh và nó là ảnh bìa, mà ảnh bìa nay đặt ở băng
+   * "trang bìa". Nên trong màn sửa memo không còn ô ảnh nào mang nút — khẳng
+   * định ra đây để "không có nút" đọc là cố ý chứ không phải một chỗ quên nối.
+   */
+  it('memo: ô ảnh duy nhất là ảnh bìa, nên không còn nút ở ô nào', () => {
     const { container } = draw('memo')
-    expect(corners(container)).toEqual(['hero'])
+    expect(corners(container)).toEqual([])
   })
 
-  it('bitesize: ô phương tiện và ô ảnh phụ', () => {
+  it('bitesize: chỉ ô ảnh phụ, vì ô phương tiện là ảnh bìa', () => {
     const { container } = draw('bitesize', { body: { sub: 'chữ ô phụ' } })
-    expect(corners(container)).toEqual(['hero', 'sub'])
+    expect(corners(container)).toEqual(['sub'])
   })
 
   it('longform: mỗi khung ảnh, kể cả khung trong hộp ghi chú', () => {
@@ -112,9 +118,10 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
     const labels = Array.from(container.querySelectorAll('[data-plate-corner] button')).map((b) =>
       b.getAttribute('aria-label'),
     )
-    // Bốn ô, mỗi ô hai lối đưa ảnh vào. Chưa ô nào có ảnh nên chưa có nút gỡ
-    // hay nút đặt khung.
-    expect(labels).toEqual(Array(4).fill(['tải ảnh lên', 'đặt link']).flat())
+    // Ba ô: ảnh chính, ảnh phụ, chi tiết. Hero đi chỗ khác, và bài này không
+    // có phần nào có hình. Mỗi ô hai lối đưa ảnh vào; chưa ô nào có ảnh nên
+    // chưa có nút gỡ hay nút đặt khung.
+    expect(labels).toEqual(Array(3).fill(['tải ảnh lên', 'đặt link']).flat())
   })
 
   /*
@@ -136,7 +143,6 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
           ],
         },
       ],
-      ['memo', undefined],
       ['bitesize', { body: { sub: 'chữ ô phụ' } }],
       ['longform', { body: [{ k: 'h1', runs: [{ t: 'Tiêu đề gốc' }] }, { k: 'fig' }] }],
     ]
