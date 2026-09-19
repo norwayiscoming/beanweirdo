@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { rootsOf } from '../lib/contentTree'
+import type { ModuleLayout } from '../content/layouts'
+export type { ModuleLayout }
 import { supabase } from '../lib/supabaseClient'
 
-export type ModuleLayout = 'band' | 'specimen' | 'sequence'
 
 /** A row from the public `modules` table — see backend/supabase/migrations/0001 and 0007. */
 export type ModuleRow = {

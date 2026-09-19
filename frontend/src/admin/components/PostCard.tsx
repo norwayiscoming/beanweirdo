@@ -1,20 +1,11 @@
 import { useState } from 'react'
-import type { PostStatus, PostSummary, PostTemplate, StatusAction } from '../lib/apiClient'
+import type { PostStatus, PostSummary, StatusAction } from '../lib/apiClient'
+import { TEMPLATE_LABEL } from '../../content/templates'
 import { garden, ink, paper, sans, serif } from '../../design/tokens'
 import { Button, IconButton } from '../../design/Button'
 import { IconCopy, IconEdit, IconPin } from '../../design/icons'
 import { StatusBadge } from './StatusBadge'
 
-// Real template names — the old band/specimen/sequence naming is gone along
-// with the invented DB-shaped templates table.
-const TEMPLATE_LABEL: Record<PostTemplate, string> = {
-  article: 'Article',
-  cards: 'Cards',
-  report: 'Report',
-  longform: 'Long-form',
-  memo: 'Memo',
-  bitesize: 'Bitesize note',
-}
 
 /**
  * What each action does to the post, which decides how loud its button is.

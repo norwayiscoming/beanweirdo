@@ -2,6 +2,7 @@ import { useMemo, type CSSProperties } from 'react'
 import { displayNumber } from '../lib/postText'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import type { ModuleRow } from '../data/useModules'
+import { MODULE_LAYOUTS, type ModuleLayout } from '../content/layouts'
 import { indexModules, useModules } from '../data/useModules'
 import { usePublishedPosts } from '../data/usePublishedPosts'
 import { ink, layout, paper, prose, sans, serif, wrapTitle } from '../design/tokens'
@@ -658,7 +659,21 @@ export function ModuleScreen() {
     else openPost(nav, e.post)
   }
 
-  if (m.layout === 'band') return <Band m={m} rows={rows} onOpen={onOpen} />
-  if (m.layout === 'specimen') return <Specimen m={m} rows={rows} onOpen={onOpen} />
-  return <Sequence m={m} rows={rows} onOpen={onOpen} />
+  const Layout = LAYOUT_SCREENS[m.layout] ?? LAYOUT_SCREENS[MODULE_LAYOUTS[0].key]
+  return <Layout m={m} rows={rows} onOpen={onOpen} />
+}
+
+/**
+ * Which component draws which layout.
+ *
+ * `Record<ModuleLayout, …>` is the whole point: add a row to
+ * `content/layouts.ts` without adding a component here and the compiler says
+ * so, at the one place that would otherwise fail silently by falling through
+ * to `Sequence`. The old `if / if / return` had no such check — a fourth
+ * layout would simply have drawn as the third.
+ */
+const LAYOUT_SCREENS: Record<ModuleLayout, (p: LayoutProps) => JSX.Element> = {
+  band: Band,
+  specimen: Specimen,
+  sequence: Sequence,
 }

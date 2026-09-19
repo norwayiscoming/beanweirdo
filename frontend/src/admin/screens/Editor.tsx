@@ -37,6 +37,7 @@ import {
   type PostTemplate,
 } from '../lib/apiClient'
 import { listModulesCached } from '../lib/lists'
+import { TEMPLATE_LABEL } from '../../content/templates'
 import { useNav } from '../../lib/nav'
 import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
@@ -128,14 +129,6 @@ type CanvasProps = {
 }
 
 const REPORT_BLUE = '#6FA8C0'
-const TEMPLATE_LABEL: Record<string, string> = {
-  article: 'Article',
-  cards: 'Cards',
-  report: 'Report',
-  longform: 'Long-form',
-  memo: 'Memo',
-  bitesize: 'Bitesize note',
-}
 
 /**
  * The outer edit screen — fetches the post + modules by id, wires the

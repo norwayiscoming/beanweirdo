@@ -39,6 +39,7 @@ import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
 import { coverStyle } from '../lib/imageFocus'
 import { depthOf, possibleParents, rootsOf } from '../lib/contentTree'
+import { MODULE_LAYOUTS } from '../content/layouts'
 import { moduleMapRow, type MapRow } from '../lib/siteMapRows'
 import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
@@ -1360,9 +1361,11 @@ export function Cms() {
                             onChange={(e) => void patchModule(m.id, { layout: e.target.value })}
                             style={boxed}
                           >
-                            <option value="band">band</option>
-                            <option value="specimen">specimen</option>
-                            <option value="sequence">sequence</option>
+                            {MODULE_LAYOUTS.map((l) => (
+                              <option key={l.key} value={l.key}>
+                                {l.label}
+                              </option>
+                            ))}
                           </select>
                         </Field>
                       )}
