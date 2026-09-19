@@ -1,5 +1,6 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import { getElement, type StoredElement } from './elements'
+import { PlateCorner, plateHost, type PlateAction } from './plates'
 import { paletteFrom } from './palette'
 import { paper, sans, serif, wrapTitle } from './tokens'
 
@@ -109,6 +110,12 @@ export type BitesizeOverrides = {
   wrapElement?: (element: ReactNode, index: number, attributes: { type: string }) => ReactNode
   /** Chỗ màn sửa đặt nút "thêm khối", dưới khối cuối cùng. */
   renderAfterElements?: () => ReactNode
+  /**
+   * Móc treo nút tải ảnh vào góc hai ô ảnh cố định: `hero` là ô phương tiện,
+   * `sub` là ô ảnh phụ. Thẻ thu trong lưới Ghi 01 không truyền — ở đó ô ảnh là
+   * một tấm để xem, không phải một chỗ để sửa.
+   */
+  renderPlateAction?: PlateAction
 }
 
 export type BitesizeProps = BitesizeOverrides & {
@@ -192,12 +199,14 @@ function Media({
   width,
   hint,
   style,
+  action,
 }: {
   post: BitesizePostData
   aspect: string
   width: string
   hint?: ReactNode
   style?: CSSProperties
+  action?: PlateAction
 }) {
   return (
     <div
@@ -242,6 +251,7 @@ function Media({
         />
       ) : null}
       {post.image ? null : (hint ?? post.mediaHint)}
+      <PlateCorner action={action} slot={{ key: 'hero', imageUrl: post.image }} />
     </div>
   )
 }
@@ -438,6 +448,7 @@ export function Bitesize({
   renderSub,
   wrapElement,
   renderAfterElements,
+  renderPlateAction,
 }: BitesizeProps) {
   const clip = post.media === 'vid'
   /*
@@ -475,6 +486,7 @@ export function Bitesize({
     <div style={{ width: clipDoc ? 130 : SUB_W, flex: 'none' }}>
       <div
         style={{
+          ...plateHost,
           aspectRatio: '4/5',
           backgroundColor: post.subImage ? undefined : post.wash,
           backgroundImage: post.subImage ? `url(${post.subImage})` : undefined,
@@ -494,6 +506,7 @@ export function Bitesize({
         <span style={post.subImage ? { background: 'rgba(24,22,17,.55)', padding: '3px 7px' } : undefined}>
           {renderSub ? renderSub(post.sub) : post.sub}
         </span>
+        <PlateCorner action={renderPlateAction} slot={{ key: 'sub', imageUrl: post.subImage }} />
       </div>
     </div>
   ) : null
@@ -508,6 +521,7 @@ export function Bitesize({
        */
       width={mobile || clipNgang ? '100%' : clipDoc ? '250px' : '300px'}
       hint={renderMediaHint?.(post.mediaHint)}
+      action={renderPlateAction}
       style={
         mobile || clipNgang
           ? { marginBottom: clipNgang ? 26 : 22 }

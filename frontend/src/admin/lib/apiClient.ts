@@ -62,6 +62,16 @@ export type PostDetail = PostSummary & {
   slug: string
   body: SectionData[] | null
   hero_caption: string | null
+  /**
+   * Ảnh của các ô ảnh cố định do template đặt tên — migration 0027.
+   *
+   * Bắt buộc có mặt, dù có thể là `null`: `toPostDetail` bên backend trả
+   * `row.plate_images ?? null`, kể cả khi database chưa chạy 0027 và cột vắng
+   * hẳn. Khai tuỳ chọn thì bước hoàn tác của màn sửa dựng ra
+   * `{ plate_images: undefined }`, mà `JSON.stringify` bỏ khoá ấy đi — PATCH
+   * rỗng, và một lần Cmd+Z im lặng không làm gì.
+   */
+  plate_images: Record<string, string | null> | null
   lead: string | null
   pull_quote: string | null
   further_reading: string[] | null
@@ -272,6 +282,8 @@ export async function updatePost(
     body: SectionData[]
     hero_image_url: string
     hero_caption: string
+    /** Ảnh của các ô ảnh cố định do khuôn bài đặt tên — migration 0027. */
+    plate_images: Record<string, string | null> | null
     lead: string
     pull_quote: string
     further_reading: string[]

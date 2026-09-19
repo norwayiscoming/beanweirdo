@@ -20,6 +20,7 @@ import {
 import type {
   CardData,
   CardPart,
+  FigureData,
   LongformBlock,
   ReportBlock,
   ReportChartPoint,
@@ -44,6 +45,7 @@ import { usePostAddresses } from '../../data/usePostAddresses'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
 import { FocusPicker } from '../components/FocusPicker'
+import { PlateImageUpload, PlateUpload } from '../components/PlateUpload'
 import { blankReportBlock, getBody, ORDERED_LIST, resolveTemplate } from '../lib/postData'
 import {
   addColumn,
@@ -116,6 +118,13 @@ export type EditPatch = Partial<{
   further_reading: string[]
   body: unknown
   hero_image_url: string
+  /**
+   * Ảnh của các ô ảnh cố định do khuôn bài đặt tên — migration 0027.
+   *
+   * Ghi cả bản đồ chứ không ghi từng khoá: `plate_images` là một cột jsonb,
+   * nên PATCH một khoá lẻ sẽ thay cả cột bằng mỗi khoá ấy.
+   */
+  plate_images: Record<string, string | null>
   /** Màu riêng của bài; null trả nó về theo màu module. */
   theme_color: string | null
 }>
@@ -531,18 +540,25 @@ export function EditorCanvas({ template, post, module, onChange, onHeroDrop }: C
     >
       <EditorStyles />
       <div style={{ border: `1px solid ${paper.rule}`, overflow: 'hidden', background: paper.white }}>
+        {/*
+          `onHeroDrop` đi tiếp xuống ba khuôn có ô ảnh bìa vẽ sẵn trên trang.
+          Ảnh bìa không phải một địa chỉ đơn thuần: đính vào thì còn phải đo
+          khung hình để bitesize tự đổi dàn trang, lấy poster nếu là clip, và
+          mở khung cắt nếu là ảnh — nên nút ở góc ô gọi đúng đường ấy thay vì
+          tự ghi `hero_image_url`.
+        */}
         {template === 'cards' ? (
           <CardsEditor post={post} module={module} onChange={onChange} />
         ) : template === 'report' ? (
           <ReportEditor post={post} module={module} onChange={onChange} />
         ) : template === 'bitesize' ? (
-          <BitesizeEditor post={post} module={module} onChange={onChange} />
+          <BitesizeEditor post={post} module={module} onChange={onChange} onHeroDrop={onHeroDrop} />
         ) : template === 'memo' ? (
-          <MemoEditor post={post} module={module} onChange={onChange} />
+          <MemoEditor post={post} module={module} onChange={onChange} onHeroDrop={onHeroDrop} />
         ) : template === 'longform' ? (
           <LongformEditor post={post} module={module} onChange={onChange} />
         ) : (
-          <ArticleEditor post={post} module={module} onChange={onChange} />
+          <ArticleEditor post={post} module={module} onChange={onChange} onHeroDrop={onHeroDrop} />
         )}
       </div>
     </div>
@@ -1243,12 +1259,36 @@ function MediaBar({ slots }: { slots: MediaSlotSpec[] }) {
   )
 }
 
+/**
+ * Ghi ảnh cho **một** ô ảnh cố định mà không làm mất những ô khác.
+ *
+ * `plate_images` là một cột jsonb, và PATCH ghi đè cả giá trị của cột chứ
+ * không trộn — gửi lên mỗi `{ primary: … }` là hai ô kia biến mất. Nên bản đồ
+ * cũ phải đi cùng, mỗi lần.
+ *
+ * `null` là gỡ ảnh ra. Không xoá hẳn khoá đi: một khoá còn đó với giá trị rỗng
+ * đọc ra vẫn là "ô này chưa có ảnh", và `plateImage` trả `null` cho cả hai.
+ */
+function platePatch(post: PostDetail, key: string, url: string | null): EditPatch {
+  return { plate_images: { ...(post.plate_images ?? {}), [key]: url } }
+}
+
 // ---------------------------------------------------------------------------
 // article — every editable field is wired through Article's own overrides,
 // so what's on screen while editing is exactly the public render.
 // ---------------------------------------------------------------------------
 
-function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: Module; onChange: (patch: EditPatch) => void }) {
+function ArticleEditor({
+  post,
+  module,
+  onChange,
+  onHeroDrop,
+}: {
+  post: PostDetail
+  module?: Module
+  onChange: (patch: EditPatch) => void
+  onHeroDrop: (file: File) => void
+}) {
   // Same adapter as the public journal, so the canvas is edited against what
   // will actually ship.
   const data = toArticleData(post, module?.title ?? post.module_id, [], -1, module)
@@ -1325,6 +1365,46 @@ function ArticleEditor({ post, module, onChange }: { post: PostDetail; module?: 
         />
       )}
       renderFurtherReadingItem={(item, i) => <EditableField value={item} onCommit={(v) => updateFurtherReading(i, v)} />}
+      /*
+       * Nút tải ảnh ở góc từng ô ảnh.
+       *
+       * Article có nhiều ô ảnh cố định nhất trong sáu khuôn — hero, cặp ô mở
+       * đầu, ô vuông ở cột phải, cộng một ô cho mỗi phần có hình — và ba ô ở
+       * giữa xưa nay không có chỗ nào đặt ảnh vào cả.
+       */
+      renderPlateAction={(slot) => {
+        if (slot.key === 'hero') {
+          return (
+            <PlateUpload
+              imageUrl={slot.imageUrl}
+              accept="image/*,video/*"
+              onPick={onHeroDrop}
+              onClear={() => onChange({ hero_image_url: '' })}
+            />
+          )
+        }
+        // `fig-3` là ô ảnh của phần thứ ba; ảnh của nó nằm trong `body`, cạnh
+        // chú thích và ghi chú bên lề của chính phần ấy.
+        const at = slot.key.startsWith('fig-') ? Number(slot.key.slice(4)) : NaN
+        if (Number.isInteger(at)) {
+          const setFigImage = (imageUrl: string | null) =>
+            updateSection(at, { fig: { ...(sections[at]?.fig as FigureData), imageUrl } })
+          return (
+            <PlateImageUpload
+              imageUrl={slot.imageUrl}
+              onUrl={(url) => setFigImage(url)}
+              onClear={() => setFigImage(null)}
+            />
+          )
+        }
+        return (
+          <PlateImageUpload
+            imageUrl={slot.imageUrl}
+            onUrl={(url) => onChange(platePatch(post, slot.key, url))}
+            onClear={() => onChange(platePatch(post, slot.key, null))}
+          />
+        )
+      }}
       wrapSection={(section, i) => {
         /*
          * Mọi phần liền nhau nhập vào **một** ô duy nhất, để bôi đen đi được
@@ -1477,10 +1557,36 @@ function LongformEditor({
     formula: 'công thức', note: 'ghi chú',
   }
 
+  /**
+   * Ảnh cho một khung ảnh, kể cả khung nằm trong một hộp ghi chú.
+   *
+   * `fig-12` là khung của khối thứ 12; `fig-12-3` là khung con thứ 3 bên trong
+   * hộp ghi chú ở khối 12. Khung ảnh của long-form đến từ bản xuất Notion, nên
+   * `src` của nó xưa nay chỉ đọc — bài mất ảnh thì khung trắng nằm đó.
+   */
+  const setFigSrc = (key: string, src: string | null) => {
+    const [, outer, inner] = key.split('-')
+    const i = Number(outer)
+    if (!Number.isInteger(i)) return
+    if (inner === undefined) return at(i, (b) => ({ ...b, src: src ?? undefined }))
+    const j = Number(inner)
+    at(i, (b) => ({
+      ...b,
+      items: (b.items ?? []).map((c, k) => (k === j ? { ...c, src: src ?? undefined } : c)),
+    }))
+  }
+
   return (
     <PostRenderer
       template="longform"
       post={toLongformData(post, module)}
+      renderPlateAction={(slot) => (
+        <PlateImageUpload
+          imageUrl={slot.imageUrl}
+          onUrl={(url) => setFigSrc(slot.key, url)}
+          onClear={() => setFigSrc(slot.key, null)}
+        />
+      )}
       wrapBlock={(drawn, i, kind) => {
         /*
          * Mọi khối chữ liền nhau nhập vào **một** ô duy nhất.
@@ -1973,10 +2079,12 @@ function BitesizeEditor({
   post,
   module,
   onChange,
+  onHeroDrop,
 }: {
   post: PostDetail
   module?: Module
   onChange: (patch: EditPatch) => void
+  onHeroDrop: (file: File) => void
 }) {
   const body = (post.body ?? {}) as BitesizeBody
   const write = (patch: Partial<BitesizeBody>) =>
@@ -2048,6 +2156,27 @@ function BitesizeEditor({
         renderSub={(sub) => (
           <InlineField value={sub} placeholder="Chữ trong ô ảnh phụ" onCommit={(v) => write({ sub: v })} />
         )}
+        /*
+         * Hai ô ảnh, hai chỗ cất khác nhau: ô phương tiện là `hero_image_url`
+         * (và nhận cả clip — đính clip vào thì dàn trang tự đổi theo), ô ảnh
+         * phụ nằm trong `body` cạnh dòng chữ của chính nó.
+         */
+        renderPlateAction={(slot) =>
+          slot.key === 'sub' ? (
+            <PlateImageUpload
+              imageUrl={slot.imageUrl}
+              onUrl={(url) => write({ subImage: url })}
+              onClear={() => write({ subImage: null })}
+            />
+          ) : (
+            <PlateUpload
+              imageUrl={slot.imageUrl}
+              accept="image/*,video/*"
+              onPick={onHeroDrop}
+              onClear={() => onChange({ hero_image_url: '' })}
+            />
+          )
+        }
         wrapElement={wrapElement}
         renderAfterElements={renderAfterElements}
       />
@@ -2059,10 +2188,12 @@ function MemoEditor({
   post,
   module,
   onChange,
+  onHeroDrop,
 }: {
   post: PostDetail
   module?: Module
   onChange: (patch: EditPatch) => void
+  onHeroDrop: (file: File) => void
 }) {
   const palette = paletteFrom(post.theme_color ?? module?.accent ?? REPORT_BLUE, post.theme_color ? undefined : module?.on_color)
   const data = toMemoData(post, module)
@@ -2114,6 +2245,18 @@ function MemoEditor({
       )}
       renderSpecValue={(value, i) => (
         <EditableField value={value} placeholder="giá trị" onCommit={(v) => setSpec(i, { v })} />
+      )}
+      /*
+       * Memo chỉ có một ô ảnh, và nó là ảnh bìa. Trên trang thật ô ấy **vắng
+       * mặt** khi bài chưa có ảnh; trong màn sửa nó vẫn dựng, nếu không thì
+       * không có góc nào để bấm — xem `renderPlateAction` trong `Memo.tsx`.
+       */
+      renderPlateAction={(slot) => (
+        <PlateUpload
+          imageUrl={slot.imageUrl}
+          onPick={onHeroDrop}
+          onClear={() => onChange({ hero_image_url: '' })}
+        />
       )}
       wrapElement={wrapElement}
       renderAfterElements={renderAfterElements}
