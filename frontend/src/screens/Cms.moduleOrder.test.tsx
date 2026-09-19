@@ -78,13 +78,20 @@ vi.mock('../lib/nav', async () => {
 })
 
 const { Cms, TABS } = await import('./Cms')
+const { ToastProvider } = await import('../design/Toaster')
 const { byBandThenOrder } = await import('../lib/moduleOrder')
 
 // jsdom không cài sẵn `scrollIntoView`, mà chỉ mục của tab Cấu hình gọi nó.
 Element.prototype.scrollIntoView = function () {}
 
 async function openConfig() {
-  render(<Cms />)
+  // Toast thật, không giả: chỗ cần kiểm là chủ site có đọc được lời từ chối
+  // hay không, mà `useToast` ngoài provider thì im lặng.
+  render(
+    <ToastProvider>
+      <Cms />
+    </ToastProvider>,
+  )
   ;(await screen.findByText(TABS.find((t) => t.k === 'config')!.t)).click()
   await screen.findByText('sensory')
 }
@@ -106,8 +113,9 @@ function drag(from: string, to: string) {
 }
 
 describe('thứ tự module trong CMS', () => {
-  it('bày đúng thứ tự site đọc, nhật ký xuống dưới', async () => {
+  it('bày đúng thứ tự site đọc, nhật ký xuống dưới, không kèm nhãn nào', async () => {
     await openConfig()
+    expect(screen.queryByText('Nhật ký — luôn xếp sau các module đọc')).toBeNull()
     // Không phải thứ tự `sort_order` phẳng (…, ghi-01, tu-duy, …).
     expect(shown()).toEqual(['sensory', 'roasting', 'tu-duy', 'ghi-01', 'ghi-02'])
     // Và đúng bằng thứ tự thanh bên dựng ra từ cùng dữ liệu.
@@ -125,7 +133,7 @@ describe('thứ tự module trong CMS', () => {
     ])
   })
 
-  it('không cho kéo nhật ký lên xen giữa các module đọc', async () => {
+  it('không cho kéo nhật ký lên xen giữa các module đọc, và nói vì sao', async () => {
     await openConfig()
     reorderModules.mockClear()
     drag('ghi-01', 'sensory')
@@ -133,6 +141,18 @@ describe('thứ tự module trong CMS', () => {
     // Site sẽ xếp nó xuống lại ngay, nên ghi một con số như thế là nói dối.
     await waitFor(() => expect(reorderModules).not.toHaveBeenCalled())
     expect(shown()).toEqual(['sensory', 'roasting', 'tu-duy', 'ghi-01', 'ghi-02'])
+
+    // Chủ site: đừng để một dòng nhãn đứng đấy suốt, báo lúc kéo thôi. Nên
+    // luật chỉ lên tiếng khi có người vấp phải nó.
+    expect(await screen.findByText('Nhật ký — luôn xếp sau các module đọc')).toBeTruthy()
+  })
+
+  it('không nói gì khi kéo hợp lệ', async () => {
+    await openConfig()
+    drag('tu-duy', 'sensory')
+
+    await waitFor(() => expect(reorderModules).toHaveBeenCalled())
+    expect(screen.queryByText('Nhật ký — luôn xếp sau các module đọc')).toBeNull()
   })
 
   it('vẫn kéo được trong nội bộ nhóm nhật ký', async () => {

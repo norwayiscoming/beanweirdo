@@ -56,8 +56,13 @@ không ghi gì.
 Vì luật kia vẫn còn: thả được thì cũng chỉ ghi ra một con số mà trang bỏ qua,
 và thẻ bật về chỗ cũ ở lần tải sau. Từ chối thẳng đỡ hơn là giả vờ nhận.
 
-Để người kéo biết vì sao, có thêm một dòng nhãn nhỏ ngay trước module `special`
-đầu tiên: **"Nhật ký — luôn xếp sau các module đọc"**.
+Để người kéo biết vì sao, lời từ chối nói ra bằng một toast: hằng `BAND_RULE`
+trong `Cms.tsx`, nội dung **"Nhật ký — luôn xếp sau các module đọc"**, đẩy qua
+`toast.info` ngay trong `dropModule`.
+
+Bản đầu để nó là một dòng nhãn đứng thường trực giữa hai nhóm. Chủ site bác:
+*"đừng đẻ nhãn... mỗi khi kéo thì hiện toast đi."* Đúng — một dòng chữ đứng đấy
+suốt thì giải thích cho tất cả mọi người trừ đúng người vừa vấp phải nó.
 
 ## [SỬA LỖI] `byBandThenOrder` chuyển sang `frontend/src/lib/moduleOrder.ts`
 
@@ -90,19 +95,22 @@ việc của bản sửa này, xem `docs/spine/tree-02`.
 - `frontend/src/data/modulesRefresh.test.tsx`, ba bài: hỏi lại và trả về thứ tự
   mới; không xoá trắng danh sách khi hỏi lại; hook đã gỡ thì thôi hỏi.
   **Không đỗ vống**: bỏ `epoch` khỏi mảng phụ thuộc thì bài đầu đỏ.
-- `frontend/src/screens/Cms.moduleOrder.test.tsx`, bốn bài, dựng màn thật rồi
+- `frontend/src/screens/Cms.moduleOrder.test.tsx`, năm bài, dựng màn thật rồi
   `dragStart`/`dragOver`/`drop`. Dữ liệu dựng cố ý xen kẽ `kind` đúng như dữ
   liệu thật hôm nay.
-  **Không đỗ vống**: đổi `shownModules` về `modules` thì hai bài đỏ; bỏ dòng
-  `if (!sameBand(...)) return` thì một bài đỏ.
+  Dựng trong `ToastProvider` thật, không giả toast: chỗ cần kiểm là chủ site có
+  đọc được lời từ chối hay không.
+  **Không đỗ vống**: đổi `shownModules` về `modules` thì hai bài đỏ; bỏ nhánh
+  `if (!sameBand(...))` thì một bài đỏ; bỏ riêng dòng `toast.info(BAND_RULE)`
+  thì cũng một bài đỏ.
 
 ## Chưa ai nhìn tận mắt
 
 Cả ba đều cần chủ site mở site thật:
 
 1. Kéo một module đọc trong CMS rồi **không tải lại**, nhìn thanh bên đổi theo.
-2. Nhãn "Nhật ký — luôn xếp sau các module đọc" nằm đúng chỗ, và kéo Ghi 01 lên
-   trên thì không có vạch chỉ chỗ nào hiện ra.
+2. Kéo Ghi 01 lên trên: không có vạch chỉ chỗ nào hiện ra, và toast "Nhật ký —
+   luôn xếp sau các module đọc" bật lên.
 3. Trang chủ: nó chỉ bày module `normal` ở tầng gốc, nên kéo nhật ký không bao
    giờ đổi gì ở đó — đúng thiết kế, không phải lỗi.
 
