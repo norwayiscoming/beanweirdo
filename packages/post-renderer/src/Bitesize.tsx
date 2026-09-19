@@ -1,4 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react'
+import { fillStyle } from './focus'
 import { getElement, type StoredElement } from './elements'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
 import { paletteFrom } from './palette'
@@ -214,17 +215,7 @@ function Media({
         flex: 'none',
         aspectRatio: aspect,
         width,
-        /*
-         * Viết tách từng thuộc tính chứ không dùng lối rút gọn `background`.
-         * Lối rút gọn kèm `url(...) center/cover` bị jsdom bỏ im lặng, nên bài
-         * kiểm không nhìn thấy ảnh nào cả — và một ô ảnh mất nền thì trên
-         * trình duyệt cũng chẳng có gì báo.
-         */
-        backgroundColor: post.image ? undefined : post.wash,
-        backgroundImage: post.image ? `url(${post.image})` : undefined,
-        backgroundSize: post.image ? 'cover' : undefined,
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
+        ...fillStyle(post.image, post.wash),
         // Clip nằm phủ kín ô, nên ô phải là mốc toạ độ của nó.
         position: 'relative',
         overflow: 'hidden',
@@ -488,11 +479,7 @@ export function Bitesize({
         style={{
           ...plateHost,
           aspectRatio: '4/5',
-          backgroundColor: post.subImage ? undefined : post.wash,
-          backgroundImage: post.subImage ? `url(${post.subImage})` : undefined,
-          backgroundSize: post.subImage ? 'cover' : undefined,
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
+          ...fillStyle(post.subImage, post.wash),
           display: 'flex',
           alignItems: 'flex-end',
           padding: 12,

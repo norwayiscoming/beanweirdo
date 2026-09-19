@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, Fragment, useContext, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
+import { stripFocus } from './focus'
 import { ElementList } from './elements'
 import { paletteFrom, type Palette } from './palette'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
@@ -335,7 +336,7 @@ function AsideBlock({ items, palette, at }: { items: LongformBlock[]; palette: P
                 background: '#FFFFFF',
                 border: '1px solid #E6DFCB',
                 aspectRatio: a.ar ?? '1.5',
-                backgroundImage: a.src ? `url(${a.src})` : undefined,
+                backgroundImage: a.src ? `url(${stripFocus(a.src)})` : undefined,
                 backgroundSize: 'contain',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
@@ -857,7 +858,7 @@ export function Longform({
                       background: '#FFFFFF',
                       border: '1px solid #EDEBE0',
                       aspectRatio: b.ar ?? '1.5',
-                      backgroundImage: b.src ? `url(${b.src})` : undefined,
+                      backgroundImage: b.src ? `url(${stripFocus(b.src)})` : undefined,
                       backgroundSize: 'contain',
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
