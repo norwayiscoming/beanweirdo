@@ -41,6 +41,13 @@ describe('applyCorsHeaders', () => {
     expect(headers['Access-Control-Allow-Origin']).toBe('https://admin.example.com')
     expect(headers['Access-Control-Allow-Headers']).toContain('Authorization')
     expect(headers['Access-Control-Allow-Methods']).toContain('GET')
+    /*
+     * PUT từng bị bỏ quên, và hai endpoint dùng nó — `PUT /api/modules`,
+     * `PUT /api/posts`, cả hai là đổi thứ tự — chết hẳn trên trình duyệt:
+     * preflight trả về danh sách không có PUT nên request không bao giờ rời
+     * khỏi máy, máy chủ không thấy lỗi nào để mà báo.
+     */
+    expect(headers['Access-Control-Allow-Methods']).toContain('PUT')
   })
 
   /*

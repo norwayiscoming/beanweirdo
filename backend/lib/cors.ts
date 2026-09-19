@@ -3,6 +3,17 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 export type Handler = (req: VercelRequest, res: VercelResponse) => void | Promise<void>
 
 /**
+ * Every method the admin app actually sends.
+ *
+ * `PUT` was missing, and the two endpoints that use it — reordering modules and
+ * reordering posts inside a module — were dead in the browser: the preflight
+ * answered without `PUT` in this list, so the request never left. No error
+ * reached the server and no response reached `apiClient`, so the CMS showed the
+ * new order optimistically and the site kept the old one.
+ */
+export const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
+
+/**
  * Sets CORS headers on every response and short-circuits OPTIONS preflight
  * requests with a 204. Every route in this app is wrapped with `withCors` so
  * none of them can forget it.
@@ -12,7 +23,7 @@ export function applyCorsHeaders(req: VercelRequest, res: VercelResponse): void 
   res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Vary', 'Origin')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', ALLOWED_METHODS.join(', '))
   /*
    * Without this, every single admin request costs two round trips.
    *
