@@ -13,7 +13,6 @@ import type { Nav } from './nav'
  * Rule 05 still describes the three-step version. It stops being true here.
  */
 
-const SECTIONS = { Public: 'Public', Practice: 'Practice', Admin: 'Admin' } as never
 
 /** The owner's sketch: bean weirdo holds Roasting, Roasting holds Heat. */
 const TREE = [
@@ -39,12 +38,12 @@ const navFor = (screen: string, moduleId: string, articleFrom = 'module'): Nav =
 
 describe('the trail grows with the tree', () => {
   it('names every branch on the way down to a module', () => {
-    const trail = buildCrumbs(navFor('module', 'roasting'), TREE, SECTIONS)
+    const trail = buildCrumbs(navFor('module', 'roasting'), TREE)
     expect(trail.map((c) => c.label)).toEqual(['Trang chủ', 'Mục lục', 'bean weirdo', 'Roasting'])
   })
 
   it('grows again one level deeper, with no code that counts levels', () => {
-    const trail = buildCrumbs(navFor('module', 'heat'), TREE, SECTIONS)
+    const trail = buildCrumbs(navFor('module', 'heat'), TREE)
     expect(trail.map((c) => c.label)).toEqual([
       'Trang chủ',
       'Mục lục',
@@ -55,12 +54,12 @@ describe('the trail grows with the tree', () => {
   })
 
   it('reads exactly as before for a module still at the top', () => {
-    const trail = buildCrumbs(navFor('module', 'sensory'), TREE, SECTIONS)
+    const trail = buildCrumbs(navFor('module', 'sensory'), TREE)
     expect(trail.map((c) => c.label)).toEqual(['Trang chủ', 'Mục lục', 'sensory'])
   })
 
   it('puts the branches into a post trail too', () => {
-    const trail = buildCrumbs(navFor('article', 'heat'), TREE, SECTIONS, { trailing: 'Dẫn nhiệt' })
+    const trail = buildCrumbs(navFor('article', 'heat'), TREE, { trailing: 'Dẫn nhiệt' })
     expect(trail.map((c) => c.label)).toEqual([
       'Trang chủ',
       'Mục lục',
@@ -72,14 +71,14 @@ describe('the trail grows with the tree', () => {
   })
 
   it('leaves every branch clickable and only the current page inert', () => {
-    const trail = buildCrumbs(navFor('module', 'heat'), TREE, SECTIONS)
+    const trail = buildCrumbs(navFor('module', 'heat'), TREE)
     expect(trail.slice(0, -1).every((c) => typeof c.go === 'function')).toBe(true)
     expect(trail[trail.length - 1].go).toBeUndefined()
   })
 
   it('opens the branch it names, not the module being looked at', () => {
     const nav = navFor('module', 'heat')
-    const trail = buildCrumbs(nav, TREE, SECTIONS)
+    const trail = buildCrumbs(nav, TREE)
     trail[2].go?.()
     expect(nav.openModule).toHaveBeenCalledWith('bean')
   })

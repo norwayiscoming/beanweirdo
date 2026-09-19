@@ -19,7 +19,6 @@ const ROUNDTRIP: Where[] = [
   { area: 'admin', screen: 'cms' },
   { area: 'admin', screen: 'cms', tab: 'posts' },
   { area: 'admin', screen: 'cms', tab: 'config' },
-  { area: 'admin', screen: 'logic' },
   { area: 'admin', screen: 'archive' },
   { area: 'admin', screen: 'postNew' },
   { area: 'admin', screen: 'postEdit', slug: 'biochemistry-p260817' },

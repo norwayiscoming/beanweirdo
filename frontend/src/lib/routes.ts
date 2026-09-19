@@ -47,7 +47,6 @@ const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adConfig}`]: 'cms',
   [`${w.admin}-${w.adSitemap}`]: 'cms',
   [`${w.admin}-${w.adPageContent}`]: 'cms',
-  [`${w.admin}-${w.adConvention}`]: 'logic',
   [`${w.admin}-${w.adArchive}`]: 'archive',
 })
 
@@ -76,7 +75,6 @@ const pageOfTab = (w: RouteWords): Record<CmsTab, string> => ({
 })
 
 const screenPage = (w: RouteWords): Partial<Record<Screen, string>> => ({
-  logic: `${w.admin}-${w.adConvention}`,
   archive: `${w.admin}-${w.adArchive}`,
 })
 

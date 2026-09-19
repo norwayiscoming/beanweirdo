@@ -30,7 +30,6 @@ describe('screenAllowed', () => {
     expect(screenAllowed('public', 'cms')).toBe(false)
     expect(screenAllowed('public', 'hours')).toBe(false)
     expect(screenAllowed('public', 'archive')).toBe(false)
-    expect(screenAllowed('public', 'logic')).toBe(false)
     expect(screenAllowed('public', 'postEdit')).toBe(false)
   })
 

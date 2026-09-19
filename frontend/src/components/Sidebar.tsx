@@ -1,11 +1,10 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { NAV, type Glyph, type NavItem } from '../content/navItems'
-import type { NavGroup } from '../content/site'
+import { SECTION_NAMES, type NavGroup } from '../content/site'
 import { sidebarModules, useModules, type ModuleRow } from '../data/useModules'
 import { buildTree, flattenTree } from '../lib/contentTree'
 import { countUnder } from '../lib/postGroups'
 import { usePublishedPosts, type PostRow } from '../data/usePublishedPosts'
-import { useSiteCopy } from '../data/useSiteCopy'
 import { layout, paper, sans, serif } from '../design/tokens'
 import { areaOfGroup, goToArea, visibleGroups } from '../lib/area'
 import { useAuth } from '../lib/auth'
@@ -210,8 +209,6 @@ function go(nav: Nav, item: NavItem): () => void {
       // Thẳng tới danh sách bài. `/ad` chỉ gọi tên màn mà không gọi tên tab,
       // nên bấm vào đây từng dừng ở một địa chỉ không phải chỗ nào cả.
       return () => nav.goCms('posts')
-    case 'logic':
-      return nav.goLogic
     case 'archive':
       return nav.goArchive
     default:
@@ -235,7 +232,6 @@ export function Sidebar() {
   const { data: allModules } = useModules()
   const modules = sidebarModules(allModules)
   const { data: posts } = usePublishedPosts()
-  const { site } = useSiteCopy()
   const { authed, signOut } = useAuth()
   const dark = nav.screen === 'notes' || nav.screen === 'hours'
   const t = theme(dark)
@@ -386,7 +382,7 @@ export function Sidebar() {
       <div style={{ height: 1, background: t.rule, margin: '0 0 20px' }} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <SectionLabel>{site.sections.Public}</SectionLabel>
+        <SectionLabel>{SECTION_NAMES.Public}</SectionLabel>
         {section('Public')}
       </div>
 
@@ -399,13 +395,13 @@ export function Sidebar() {
         <>
           <div style={{ margin: '16px 0 0' }}>
             <div style={{ height: 1, background: t.rule, marginBottom: 10 }} />
-            <SectionLabel>{site.sections.Practice}</SectionLabel>
+            <SectionLabel>{SECTION_NAMES.Practice}</SectionLabel>
             {section('Practice')}
           </div>
 
           <div style={{ margin: '16px 0 0' }}>
             <div style={{ height: 1, background: t.rule, marginBottom: 10 }} />
-            <SectionLabel>{site.sections.Admin}</SectionLabel>
+            <SectionLabel>{SECTION_NAMES.Admin}</SectionLabel>
             {section('Admin')}
           </div>
 

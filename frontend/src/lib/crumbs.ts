@@ -1,7 +1,7 @@
 import type { ModuleRow } from '../data/useModules'
 import { navLabel } from '../content/navItems'
 import { ancestorsOf } from './contentTree'
-import type { NavGroup } from '../content/site'
+import { SECTION_NAMES } from '../content/site'
 import { goToArea } from './area'
 import type { Nav } from './nav'
 
@@ -22,7 +22,6 @@ export type Crumb = {
 export function buildCrumbs(
   nav: Nav,
   modules: ModuleRow[],
-  sections: Record<NavGroup, string>,
   /** What the screen itself cannot know: which post is open, and under which module. */
   ctx: {
     trailing?: string
@@ -63,7 +62,7 @@ export function buildCrumbs(
    * facing the other way.
    */
   const atCms = nav.screen === 'cms'
-  const admin: Crumb = atCms ? { label: sections.Admin } : { label: sections.Admin, go: nav.goCms }
+  const admin: Crumb = atCms ? { label: SECTION_NAMES.Admin } : { label: SECTION_NAMES.Admin, go: nav.goCms }
   const backend: Crumb = atCms ? { label: 'Backend' } : { label: 'Backend', go: nav.goCms }
   const titleOf = (id: string) => modules.find((m) => m.id === id)?.title ?? id
   const mod = (id: string): Crumb => ({
@@ -114,8 +113,6 @@ export function buildCrumbs(
       return [landing, { label: `beӕn weirdo — ${navLabel('hours')}` }]
     case 'archive':
       return [admin, { label: 'Notes', go: nav.goCms }, { label: navLabel('archive') }]
-    case 'logic':
-      return [admin, backend, { label: navLabel('logic') }]
     case 'cms':
       return [admin, backend, { label: navLabel('cms') }]
     default:
@@ -154,13 +151,6 @@ export function crumbBack(
   const out = nav.area === 'public' ? nav.goLanding : () => goToArea('public')
 
   switch (nav.screen) {
-    /*
-     * Inside admin the step back is to admin's own front door. It used to leave
-     * the area entirely, so `←` from Templates landed on the public journal —
-     * a long way from one step back.
-     */
-    case 'logic':
-      return nav.goCms
     case 'module': {
       // One step back out of Roasting is bean weirdo, not the index. The arrow
       // used to skip every branch in between, because it only knew about a
@@ -174,6 +164,11 @@ export function crumbBack(
       if (nav.articleFrom === 'module') return () => nav.openModule(moduleId ?? nav.moduleId)
       if (nav.articleFrom === 'archive') return nav.goArchive
       return out
+    /*
+     * Inside admin the step back is to admin's own front door. It used to leave
+     * the area entirely, so `←` from Archive landed on the public journal — a
+     * long way from one step back.
+     */
     case 'archive':
       return nav.goCms
     default:
