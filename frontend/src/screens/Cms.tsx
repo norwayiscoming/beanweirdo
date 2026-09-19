@@ -155,9 +155,6 @@ export const CONFIG_BOXES = [
   { id: 'index', t: 'Trang mục lục', d: 'Tiêu đề, hai đoạn dẫn và ba ảnh khay' },
   { id: 'tag', t: 'Tag', d: 'Danh sách tag, dùng chung cho ghi chép và bài đăng' },
   { id: 'notes', t: 'Trang Ghi chép', d: 'Tiêu đề, đoạn dẫn, dòng hướng dẫn, lời kết' },
-  { id: 'archive', t: 'Trang Lưu trữ', d: 'Tiêu đề và dòng phụ đứng cạnh số bài' },
-  { id: 'areas', t: 'Tên ba khu', d: 'Chữ in hoa trên sidebar, và chặng đầu của đường dẫn' },
-  { id: 'admin', t: 'Chữ khu quản trị', d: 'Tiêu đề ba màn quản trị, không phải chữ trên trang công khai' },
 ] as const
 
 export type ConfigBox = (typeof CONFIG_BOXES)[number]['id']
@@ -734,7 +731,7 @@ export function Cms() {
   const copy = useMemo(() => resolveSite(site), [site])
 
   async function saveSite(patch: SiteOverrides) {
-    setSite((s) => ({ ...s, ...patch, sections: { ...s.sections, ...patch.sections } }))
+    setSite((s) => ({ ...s, ...patch }))
     try {
       setSite(await updateSite(patch))
     } catch (e) {
@@ -943,7 +940,7 @@ export function Cms() {
                 margin: 0,
               }}
             >
-              {copy.cmsTitle}
+              Content
             </h1>
             <div
               style={{
@@ -956,7 +953,7 @@ export function Cms() {
                 opacity: 0.85,
               }}
             >
-              {copy.cmsIntro}
+              Mọi thứ trong khu quản trị: bài viết, và cấu hình của trang.
             </div>
           </div>
           <div
@@ -1016,25 +1013,6 @@ export function Cms() {
             (`Sidebar.tsx`) và chặng đầu của đường dẫn (`crumbs.ts`), nên
             chúng là thứ sửa được duy nhất trên cây cũ.
           */}
-          {box === 'areas' && (
-            <div id="areas" style={{ marginTop: 26 }}>
-              <div style={grid(two, 20)}>
-                {(['Public', 'Practice', 'Admin'] as const).map((g) => (
-                  <Field key={g} label={`Khu ${g}`}>
-                    <input
-                      value={copy.sections[g]}
-                      onChange={(e) =>
-                        setSite((s) => ({ ...s, sections: { ...s.sections, [g]: e.target.value } }))
-                      }
-                      onBlur={(e) => void saveSite({ sections: { [g]: e.target.value } })}
-                      style={boxed}
-                    />
-                  </Field>
-                ))}
-              </div>
-            </div>
-          )}
-
           {box === 'modules' && (<>
           <div
             style={{
@@ -1617,19 +1595,6 @@ export function Cms() {
 
           </>)}
 
-          {box === 'archive' && (<>
-          <div id="archive" style={sectionHead}>Trang Lưu trữ</div>
-          <div style={grid(two)}>
-            <Field label="Tiêu đề trang">
-              <input {...field('archiveTitle')} style={serifInput} />
-            </Field>
-            <Field label="Dòng phụ — cạnh số bài">
-              <input {...field('archiveNote')} style={boxed} />
-            </Field>
-          </div>
-
-          </>)}
-
           {box === 'index' && (<>
           <div id="index" style={sectionHead}>Trang mục lục</div>
           <div style={grid(two)}>
@@ -1682,59 +1647,6 @@ export function Cms() {
 
           </>)}
 
-          {box === 'admin' && (<>
-          <div id="admin" style={sectionHead}>Chữ của khu quản trị</div>
-          <div style={grid(two, 20)}>
-            <Field label="Design system — tiêu đề dòng 1">
-              <input
-                {...field('artT1')}
-                style={{ ...serifInput, fontSize: 20 }}
-              />
-            </Field>
-            <Field label="Design system — tiêu đề dòng 2 (nghiêng, xanh)">
-              <input
-                {...field('artT2')}
-                style={{ ...serifItalicInput, fontSize: 20 }}
-              />
-            </Field>
-            <div style={{ gridColumn: 'span 2' }}>
-              <Field label="Design system — đoạn dẫn">
-                <textarea
-                  {...field('artIntro')}
-                  rows={3}
-                  style={area}
-                />
-              </Field>
-            </div>
-            <Field label="System conventions — tiêu đề">
-              <input
-                {...field('logicTitle')}
-                style={{ ...serifInput, fontSize: 20 }}
-              />
-            </Field>
-            <Field label="System conventions — đoạn dẫn">
-              <textarea
-                {...field('logicIntro')}
-                rows={2}
-                style={area}
-              />
-            </Field>
-            <Field label="Content — tiêu đề">
-              <input
-                {...field('cmsTitle')}
-                style={{ ...serifInput, fontSize: 20 }}
-              />
-            </Field>
-            <Field label="Content — đoạn dẫn">
-              <textarea
-                {...field('cmsIntro')}
-                rows={2}
-                style={area}
-              />
-            </Field>
-          </div>
-          </>)}
-
           {/*
             The most destructive control on the screen was the faintest thing
             on it — 10.5px in `ink.faint`, styled as a footnote, and it wiped
@@ -1759,9 +1671,7 @@ export function Cms() {
                     // Every field back to its shipped default: clear the whole blob.
                     try {
                       setSite(await updateSite(Object.fromEntries(
-                        Object.keys(SITE_DEFAULTS)
-                          .filter((k) => k !== 'sections')
-                          .map((k) => [k, '']),
+                        Object.keys(SITE_DEFAULTS).map((k) => [k, '']),
                       ) as SiteOverrides))
                       await load()
                       toast.ok('Đã trả toàn bộ nội dung về bản gốc')

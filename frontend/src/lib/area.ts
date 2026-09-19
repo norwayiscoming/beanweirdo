@@ -47,7 +47,6 @@ const AREA_SCREENS: Record<Area, readonly string[]> = {
   practice: ['hours'],
   admin: [
     'cms',
-    'logic',
     'archive',
     'article',
     'postNew',

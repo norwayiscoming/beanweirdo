@@ -29,7 +29,6 @@ import { Cms } from './screens/Cms'
 import { Hours } from './screens/Hours'
 import { IndexScreen } from './screens/IndexScreen'
 import { Landing } from './screens/Landing'
-import { Logic } from './screens/Logic'
 import { ModuleScreen } from './screens/ModuleScreen'
 import { Notes } from './screens/Notes'
 
@@ -144,7 +143,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       goHours: () => at({ screen: 'hours' }),
       goNotes: () => at({ screen: 'notes' }),
       goCms: (tab?: CmsTab) => at({ screen: 'cms', tab }),
-      goLogic: () => at({ screen: 'logic' }),
       openModule,
       openArticle,
       newPost: () => at({ screen: 'postNew' }),
@@ -178,7 +176,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       {shown === 'article' && <Article />}
       {shown === 'archive' && <Archive />}
       {shown === 'cms' && <Cms />}
-      {shown === 'logic' && <Logic />}
       {shown === 'postNew' && <NewPostWizard />}
       {shown === 'postEdit' && postId && <Editor postId={postId} />}
       {shown === 'postPreview' && postId && <Preview postId={postId} />}
