@@ -43,6 +43,18 @@ vi.mock('../lib/apiClient', () => ({
 
 const { PostsPanel } = await import('./PostsPanel')
 
+/**
+ * Open a row's menu.
+ *
+ * The row's actions are not on the row any more: there is one three-dot button
+ * per row and the actions live behind it. So every test that used to click an
+ * action straight away has to open the menu first — that is the behaviour
+ * change, not test bookkeeping.
+ */
+async function openRowMenu() {
+  await userEvent.click(screen.getByRole('button', { name: 'Hành động khác' }))
+}
+
 describe('PostsPanel', () => {
   it('lists posts with template, meta and preview, and publishes one on click', async () => {
     render(<PostsPanel />)
@@ -58,7 +70,8 @@ describe('PostsPanel', () => {
     // status badge
     expect(screen.getByTestId('status-badge')).toHaveTextContent('Nháp')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Đăng' }))
+    await openRowMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Đăng' }))
     expect(transitionStatus).toHaveBeenCalledWith('p1', 'publish')
   })
 
@@ -67,8 +80,8 @@ describe('PostsPanel', () => {
     await screen.findByText('Senses of Flavors')
     listPosts.mockClear()
 
-    // Filter buttons carry their own testid — the "Lưu trữ" filter label and
-    // the row's "Lưu trữ" (archive) action button share the same visible text.
+    // Filters are picked by testid, not by their words: five of them read the
+    // same as a row action, and a filter is not an action.
     await userEvent.click(screen.getByTestId('tab-archived'))
     expect(listPosts).toHaveBeenCalledWith('archived')
   })
@@ -98,13 +111,14 @@ describe('PostsPanel', () => {
     render(<PostsPanel />)
     await screen.findByText('First Crack Field Notes')
 
-    expect(screen.getByRole('button', { name: 'Bỏ đăng' })).toBeInTheDocument()
-    // The row's "Lưu trữ" (archive) button shares its label with the
-    // "Lưu trữ" status filter — pick the one that isn't a filter (no aria-pressed).
-    const archiveButtons = screen.getAllByRole('button', { name: 'Lưu trữ' })
-    const rowArchiveButton = archiveButtons.find((b) => !b.hasAttribute('aria-pressed'))
-    expect(rowArchiveButton).toBeTruthy()
-    await userEvent.click(rowArchiveButton!)
+    await openRowMenu()
+    expect(screen.getByRole('menuitem', { name: 'Bỏ đăng' })).toBeInTheDocument()
+    /*
+     * The row's "Lưu trữ" used to need unpicking from the "Lưu trữ" status
+     * filter, which carries the same words. It does not any more: the filter is
+     * a button and the action is a menuitem, so the role tells them apart.
+     */
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Lưu trữ' }))
     expect(transitionStatus).toHaveBeenCalledWith('p2', 'archive')
   })
 
@@ -130,10 +144,12 @@ describe('PostsPanel', () => {
     render(<PostsPanel />)
     await screen.findByText('Chlorogenic Acids (CGA)')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Khôi phục' }))
+    await openRowMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Khôi phục' }))
     expect(transitionStatus).toHaveBeenCalledWith('p3', 'restore-trash')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Xoá vĩnh viễn' }))
+    await openRowMenu()
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá vĩnh viễn' }))
     expect(transitionStatus).toHaveBeenCalledWith('p3', 'permanently-delete')
   })
 })

@@ -236,3 +236,72 @@
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* The title of a row that is itself a target. It looks like the heading it
+   replaced — the button exists so the keyboard and a screen reader get a named
+   control, since a row you click with the mouse is a div and cannot be one. */
+.ab-rowtitle {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: #23211a;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+}
+.ab-rowtitle:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ab-rowtitle:focus-visible {
+  outline: 2px solid #3e7a4e;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* The row's actions, opened from the three-dot button.
+
+   Anchored to the button rather than to the page: the list scrolls, and a menu
+   measured against the viewport walks away from the row it belongs to. `right:
+   0` because the button sits at the right edge of a wide screen, so a menu
+   growing rightwards would leave it. */
+.ab-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 168px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border-radius: 4px;
+  border: 1px solid #b5ae99;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(35, 33, 26, 0.12);
+}
+
+.ab-menuitem {
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  text-align: left;
+  height: 32px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: #3b3729;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ab-menuitem:hover { background: #f6f2e2; }
+.ab-menuitem:focus-visible {
+  outline: 2px solid #3e7a4e;
+  outline-offset: -2px;
+}
+.ab-menuitem-danger { color: #8e1e42; }
+.ab-menuitem-danger:hover { background: #fbe7e5; }

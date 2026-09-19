@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { PostCard } from './PostCard'
 import type { PostSummary } from '../lib/apiClient'
@@ -61,9 +62,71 @@ describe('ghim bài', () => {
     expect(pin().className).toContain('ab-primary')
   })
 
-  it('“Xoá” không trông giống “Sửa”', () => {
+})
+
+describe('hành động của một dòng', () => {
+  const menuButton = () => screen.getByRole('button', { name: 'Hành động khác' })
+
+  it('dòng không còn bày nút hành động nào; chúng nằm sau nút ba chấm', async () => {
     render(<PostCard post={post()} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />)
-    expect(screen.getByRole('button', { name: 'Sửa' }).className).toContain('ab-ghost')
-    expect(screen.getByRole('button', { name: 'Xoá' }).className).toContain('ab-danger')
+    // Nút "Sửa" bỏ hẳn — bấm vào dòng là vào màn sửa.
+    expect(screen.queryByRole('button', { name: 'Sửa' })).toBeNull()
+    expect(screen.queryByText('Nhân bản')).toBeNull()
+    expect(screen.queryByText('Bỏ đăng')).toBeNull()
+
+    await userEvent.click(menuButton())
+    expect(screen.getByRole('menuitem', { name: 'Nhân bản' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Bỏ đăng' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Xoá' }).className).toContain('ab-menuitem-danger')
+  })
+
+  it('bấm vào dòng là vào màn sửa; bấm vào tiêu đề cũng vậy', async () => {
+    const onEdit = vi.fn()
+    render(<PostCard post={post()} onAction={vi.fn()} onEdit={onEdit} onCopy={vi.fn()} onPin={vi.fn()} />)
+
+    await userEvent.click(screen.getByText('mô tả'))
+    expect(onEdit).toHaveBeenCalledWith('p1')
+
+    onEdit.mockClear()
+    // Tiêu đề là nút thật, để bàn phím và trình đọc màn hình có chỗ bấm có tên.
+    await userEvent.click(screen.getByRole('button', { name: 'Sensory Lexicon' }))
+    expect(onEdit).toHaveBeenCalledWith('p1')
+  })
+
+  it('bấm nút ghim hay nút ba chấm thì KHÔNG vào màn sửa', async () => {
+    const onEdit = vi.fn()
+    const onPin = vi.fn()
+    render(<PostCard post={post()} onAction={vi.fn()} onEdit={onEdit} onCopy={vi.fn()} onPin={onPin} />)
+
+    await userEvent.click(screen.getByRole('button', { name: /ghim/i }))
+    expect(onPin).toHaveBeenCalled()
+    expect(onEdit).not.toHaveBeenCalled()
+
+    await userEvent.click(menuButton())
+    expect(onEdit).not.toHaveBeenCalled()
+  })
+
+  it('“Nhân bản” gọi onCopy, không phải một phép đổi trạng thái', async () => {
+    const onCopy = vi.fn()
+    const onAction = vi.fn()
+    render(<PostCard post={post()} onAction={onAction} onEdit={vi.fn()} onCopy={onCopy} onPin={vi.fn()} />)
+
+    await userEvent.click(menuButton())
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Nhân bản' }))
+    expect(onCopy).toHaveBeenCalledWith('p1')
+    expect(onAction).not.toHaveBeenCalled()
+  })
+
+  it('chọn xong thì menu đóng lại, và Esc cũng đóng', async () => {
+    render(<PostCard post={post()} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />)
+
+    await userEvent.click(menuButton())
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Lưu trữ' }))
+    expect(screen.queryByRole('menu')).toBeNull()
+
+    await userEvent.click(menuButton())
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).toBeNull()
   })
 })
