@@ -44,7 +44,7 @@ import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
-import { FocusPicker } from '../components/FocusPicker'
+import { FramingProvider, useFraming } from '../components/framing'
 import { PlateImageUpload, PlateUpload } from '../components/PlateUpload'
 import { blankReportBlock, getBody, ORDERED_LIST, resolveTemplate } from '../lib/postData'
 import {
@@ -73,6 +73,7 @@ import {
   nextId,
   notesOn,
   paletteFrom,
+  fillStyle,
   allElements,
   flatElements,
   htmlToMarkdown,
@@ -148,7 +149,14 @@ const REPORT_BLUE = '#6FA8C0'
  */
 export function Editor({ postId }: { postId: string }) {
   return (
+    /*
+     * Khung cắt ảnh bọc cả màn, chứ không dựng riêng ở từng chỗ đăng ảnh: chủ
+     * site muốn mọi chỗ đăng ảnh ra cùng một hộp thoại, và một hộp cho cả màn
+     * thì không có cách nào lệch nhau được.
+     */
+    <FramingProvider>
       <EditorContent postId={postId} />
+    </FramingProvider>
   )
 }
 
@@ -158,20 +166,32 @@ function EditorContent({ postId }: { postId: string }) {
   const [post, setPost] = useState<PostDetail | null>(null)
   const [modules, setModules] = useState<Module[]>([])
   /*
-   * Đặt ảnh bìa xong thì mở luôn khung căn.
-   *
+   * Phải đứng TRÊN chỗ `return` sớm bên dưới. State của khung căn ảnh từng
+   * đứng dưới, cạnh hàm dùng nó — đọc thì gọn, chạy thì vỡ: lượt vẽ đầu `post`
+   * còn null nên hàm thoát sớm và chỉ chạy bốn hook; tải xong bài thì lượt sau
+   * chạy năm. React đếm không khớp là ném lỗi và cả màn trắng xoá. Nghĩa là
+   * bấm "Sửa" bài nào cũng trắng, không riêng bài nào.
+   */
+  const frame = useFraming()
+
+  /**
    * Ảnh bìa của một bài không chỉ hiện một chỗ: trang module dạng dải cắt nó
    * thành 172×130, dạng specimen cắt 3:2. Đặt xong mà không căn thì chủ site
-   * phải tự đi tìm xem nó rơi vào khung nào — nên mở khung căn ngay, bày cả hai
-   * hình cắt, và đóng lại là xong.
+   * phải tự đi tìm xem nó rơi vào khung nào — nên mở khung căn ngay và bày cả
+   * hai hình cắt cạnh nhau.
    *
-   * Phải đứng TRÊN chỗ `return` sớm bên dưới. Nó từng đứng dưới, cạnh hàm dùng
-   * nó — đọc thì gọn, chạy thì vỡ: lượt vẽ đầu `post` còn null nên hàm thoát
-   * sớm và chỉ chạy bốn hook; tải xong bài thì lượt sau chạy năm. React đếm
-   * không khớp là ném lỗi và cả màn trắng xoá. Nghĩa là bấm "Sửa" bài nào cũng
-   * trắng, không riêng bài nào.
+   * Khung kéo lấy hình cắt hẹp hơn: căn vừa nó thì hình kia luôn vừa.
    */
-  const [framing, setFraming] = useState<string | null>(null)
+  const frameHero = (url: string) =>
+    frame({
+      url,
+      name: 'Ảnh bìa · hiện ở danh sách bài trong module',
+      ratio: 172 / 130,
+      previews: [
+        { label: 'module dạng dải · 172×130', ratio: 172 / 130 },
+        { label: 'module dạng specimen · 3:2', ratio: 3 / 2 },
+      ],
+    })
 
   /*
    * Lịch sử sửa bài, giữ trong ref chứ không trong state.
@@ -225,13 +245,11 @@ function EditorContent({ postId }: { postId: string }) {
   /** The cover, set from the button in the header or by dropping on the page. */
   async function setHero(file: File) {
     const { url } = await uploadImage(file)
+    // Lưu trước rồi mới căn: người dùng bấm Huỷ thì ảnh vẫn ở lại, huỷ là huỷ
+    // việc căn chứ không phải huỷ tấm ảnh vừa tải lên. `frameHero` tự bỏ qua
+    // clip — căn tâm chẳng có nghĩa gì với một hình đang chạy.
     saveHero(url)
-    /*
-     * Khung căn ảnh vẽ tệp ra bằng `background-image`, mà clip thì không vẽ ra
-     * được kiểu ấy: mở nó cho một clip là bày ba ô trắng trơn. Và căn tâm ảnh
-     * cũng chẳng có nghĩa gì với một hình đang chạy.
-     */
-    if (!looksLikeVideo(file)) setFraming(url)
+    saveHero(await frameHero(url))
   }
 
   function saveHero(url: string) {
@@ -272,6 +290,8 @@ function EditorContent({ postId }: { postId: string }) {
   async function setSub(file: File) {
     const { url } = await uploadImage(file)
     saveSub(url)
+    // 4/5 là hình dạng ô ấy vẽ ra trong `Bitesize.tsx` (`subBox`).
+    saveSub(await frame({ url, name: 'Ảnh body 1 · ô dọc cạnh dòng chữ', ratio: 4 / 5 }))
   }
 
   function saveSub(url: string) {
@@ -363,11 +383,14 @@ function EditorContent({ postId }: { postId: string }) {
       onPick: (f) => void setHero(f),
       onLink: (url) => {
         saveHero(url)
-        if (!looksLikeVideo(url)) setFraming(url)
+        void frameHero(url).then(saveHero)
       },
       extra:
         post.hero_image_url && !heroIsClip
-          ? { label: 'đặt vào khung', onClick: () => setFraming(post.hero_image_url) }
+          ? {
+              label: 'đặt vào khung',
+              onClick: () => void frameHero(post.hero_image_url as string).then(saveHero),
+            }
           : undefined,
       /*
        * Ô xem trước thay cho dòng "thumbnail" từng có ở đây.
@@ -435,23 +458,6 @@ function EditorContent({ postId }: { postId: string }) {
               </option>
             ))}
           </select>
-        )}
-        {framing && (
-          <FocusPicker
-            url={framing}
-            name="Ảnh bìa · hiện ở danh sách bài trong module"
-            /* Khung kéo lấy hình cắt hẹp hơn — căn vừa nó thì hình kia luôn vừa. */
-            ratio={172 / 130}
-            previews={[
-              { label: 'module dạng dải · 172×130', ratio: 172 / 130 },
-              { label: 'module dạng specimen · 3:2', ratio: 3 / 2 },
-            ]}
-            onCancel={() => setFraming(null)}
-            onSave={(url) => {
-              saveHero(url)
-              setFraming(null)
-            }}
-          />
         )}
         {/*
           * The colour a post wears stays changeable after it exists — it is
@@ -1269,6 +1275,13 @@ function MediaBar({ slots }: { slots: MediaSlotSpec[] }) {
  * `null` là gỡ ảnh ra. Không xoá hẳn khoá đi: một khoá còn đó với giá trị rỗng
  * đọc ra vẫn là "ô này chưa có ảnh", và `plateImage` trả `null` cho cả hai.
  */
+/** Tên ba ô ảnh của article, đúng chữ hiện trên chính ô ấy khi nó còn trống. */
+const ARTICLE_PLATE_NAME: Record<string, string> = {
+  primary: 'Ảnh chính',
+  secondary: 'Ảnh phụ',
+  detail: 'Chi tiết · ô vuông ở cột phải',
+}
+
 function platePatch(post: PostDetail, key: string, url: string | null): EditPatch {
   return { plate_images: { ...(post.plate_images ?? {}), [key]: url } }
 }
@@ -1392,6 +1405,7 @@ function ArticleEditor({
           return (
             <PlateImageUpload
               imageUrl={slot.imageUrl}
+              name={`Ảnh của phần ${at + 1}`}
               onUrl={(url) => setFigImage(url)}
               onClear={() => setFigImage(null)}
             />
@@ -1400,6 +1414,7 @@ function ArticleEditor({
         return (
           <PlateImageUpload
             imageUrl={slot.imageUrl}
+            name={ARTICLE_PLATE_NAME[slot.key] ?? 'Ô ảnh của khuôn bài'}
             onUrl={(url) => onChange(platePatch(post, slot.key, url))}
             onClear={() => onChange(platePatch(post, slot.key, null))}
           />
@@ -1583,6 +1598,7 @@ function LongformEditor({
       renderPlateAction={(slot) => (
         <PlateImageUpload
           imageUrl={slot.imageUrl}
+          name="Khung ảnh trong bài dài"
           onUrl={(url) => setFigSrc(slot.key, url)}
           onClear={() => setFigSrc(slot.key, null)}
         />
@@ -2165,6 +2181,7 @@ function BitesizeEditor({
           slot.key === 'sub' ? (
             <PlateImageUpload
               imageUrl={slot.imageUrl}
+              name="Ảnh body 1 · ô dọc cạnh dòng chữ"
               onUrl={(url) => write({ subImage: url })}
               onClear={() => write({ subImage: null })}
             />
@@ -3775,12 +3792,19 @@ function ImageBlockEditor({
 }) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const dropRef = useRef<HTMLDivElement>(null)
+  const frame = useFraming()
 
   async function handleFile(file: File) {
     setUploading(true)
     try {
+      // Ô thả ảnh chính là khối ảnh, nên hình dạng của nó là hình dạng khung
+      // cắt — đo tại chỗ thay vì ghi cứng một tỉ lệ sẽ lệch khi cột đổi rộng.
+      const box = dropRef.current?.getBoundingClientRect()
+      const ratio = box && box.height > 0 ? box.width / box.height : 16 / 9
       const { url } = await uploadImage(file)
       onChange({ imageUrl: url })
+      onChange({ imageUrl: await frame({ url, name: 'Khối ảnh trong thân bài', ratio }) })
     } finally {
       setUploading(false)
     }
@@ -3789,6 +3813,7 @@ function ImageBlockEditor({
   return (
     <div>
       <div
+        ref={dropRef}
         className="awc-image-drop"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
@@ -3799,9 +3824,7 @@ function ImageBlockEditor({
         onClick={() => inputRef.current?.click()}
         style={{
           height: 160,
-          background: imageUrl ? undefined : palette.tint,
-          backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
-          backgroundSize: 'cover',
+          ...fillStyle(imageUrl, palette.tint),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
