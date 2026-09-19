@@ -10,9 +10,6 @@ export type Handler = (req: VercelRequest, res: VercelResponse) => void | Promis
  * answered without `PUT` in this list, so the request never left. No error
  * reached the server and no response reached `apiClient`, so the CMS showed the
  * new order optimistically and the site kept the old one.
- *
- * `admin/lib/apiClient.methods.test.ts` reads every `method:` in `apiClient`
- * and fails if one is not listed here, so adding a verb cannot repeat this.
  */
 export const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
 

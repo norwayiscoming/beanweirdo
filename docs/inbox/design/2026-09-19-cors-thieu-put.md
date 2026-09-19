@@ -43,17 +43,16 @@ module** cũng không lưu được.
 
 Nay danh sách là hằng `ALLOWED_METHODS` xuất từ `cors.ts`, có thêm `PUT`.
 
-## [SỬA LỖI] Test chốt: method nào apiClient gửi thì CORS phải cho phép
+## Kiểm bằng một dòng, không thêm tệp test
 
-`frontend/src/admin/lib/apiClient.methods.test.ts`.
+`backend/lib/cors.test.ts` nay kiểm thêm `Access-Control-Allow-Methods` có
+`PUT`, ngay cạnh bài đã kiểm `GET`.
 
-Nó **đọc mã nguồn `apiClient.ts`**, gom mọi `method: '…'` bằng regex, rồi buộc
-từng cái phải có trong `ALLOWED_METHODS`. Không so hai danh sách viết tay: hai
-danh sách viết tay lệch nhau chính là lỗi này.
-
-Kèm một bài chốt cho chính cái regex — nếu nó trượt (ai đó đổi cách viết
-request) thì `used` rỗng và các bài kia đỗ vống, nên bài ấy kiểm `used` có ít
-nhất bốn phần tử và có `PUT`.
+Bản đầu của tôi là một tệp test riêng, đọc mã nguồn `apiClient.ts` bằng regex để
+gom mọi `method:` rồi đối chiếu. Đã bỏ: hôm 2026-09-18 chủ site đã cho xoá cả
+loạt test kiểu đọc-mã-nguồn-rồi-so-chuỗi vì chúng đỏ khi đổi tên biến chứ không
+khi hỏng hành vi, và hôm nay họ nhắc *"test ít ít thôi"*. Một dòng ở đúng chỗ đã
+có sẵn thì rẻ hơn một tệp mới.
 
 ## Về cache preflight: chủ site có thể còn thấy lỗi sau khi deploy
 
@@ -82,10 +81,9 @@ chuyển. Không mâu thuẫn.
 
 ## Kiểm
 
-- `npm test`: 136 tệp, 1379 bài xanh, 2 bỏ qua.
-- **Không đỗ vống**: bỏ `'PUT'` khỏi `ALLOWED_METHODS` thì bài
-  `PUT nằm trong Access-Control-Allow-Methods` đỏ — tức là test tái hiện đúng
-  lỗi gốc, rồi xanh lại khi vá.
+- `npm test`: 135 tệp, 1375 bài xanh, 2 bỏ qua.
+- **Không đỗ vống**: bỏ `'PUT'` khỏi `ALLOWED_METHODS` thì bài kiểm ấy đỏ — tức
+  là nó tái hiện đúng lỗi gốc, rồi xanh lại khi vá.
 
 ## Ranh giới lane
 
