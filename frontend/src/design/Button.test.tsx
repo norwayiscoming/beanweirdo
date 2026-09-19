@@ -43,7 +43,7 @@ describe('nút phải trông như nút', () => {
     // Cả khu quản trị một bán kính. Hình viên thuốc của huy hiệu trạng thái
     // nằm inline trong StatusBadge, không nằm ở đây.
     const radii = new Set([...css.matchAll(/border-radius:\s*([\w.]+)/g)].map((m) => m[1]))
-    expect([...radii]).toEqual(['4px'])
+    expect([...radii]).toEqual(['8px'])
     // Không có quy tắc nào đổi `border-width` — viền có sẵn ở mọi trạng thái.
     expect(css).not.toMatch(/border-width:/)
   })

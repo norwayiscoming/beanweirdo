@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PostStatus, PostSummary, StatusAction } from '../lib/apiClient'
 import { TEMPLATE_LABEL } from '../../content/templates'
+import { postDescription } from '../../lib/postText'
 import { garden, ink, paper, sans } from '../../design/tokens'
 import { IconButton } from '../../design/Button'
+import { radius } from '../../design/controls'
 import { IconMore, IconPin } from '../../design/icons'
 import { StatusBadge } from './StatusBadge'
 
@@ -161,10 +163,17 @@ export function PostCard({
         gridTemplateColumns: '52px minmax(0,1fr) auto',
         alignItems: 'center',
         gap: 16,
-        padding: '14px 40px',
+        padding: '14px 18px',
         cursor: 'pointer',
-        borderBottom: `1px solid ${paper.rule}`,
-        borderLeft: `3px solid ${hover ? ink.green : 'transparent'}`,
+        /*
+         * A card, not a row in a table. The list used to be rows divided by
+         * hairlines, so hover had nothing to land on and marked itself with a
+         * green bar grown on the left edge. A card has its own edge, so hover
+         * darkens that edge instead of adding a second one, and the card keeps
+         * the same size whether or not the pointer is on it.
+         */
+        borderRadius: radius,
+        border: `1px solid ${hover ? ink.faint : paper.rule}`,
         background: hover ? paper.hover : paper.white,
       }}
     >
@@ -172,10 +181,10 @@ export function PostCard({
         <img
           src={post.thumbnail_url}
           alt=""
-          style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 4, flex: 'none' }}
+          style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: radius, flex: 'none' }}
         />
       ) : (
-        <div style={{ width: 44, height: 44, background: thumbColor(post.id), borderRadius: 4, flex: 'none' }} />
+        <div style={{ width: 44, height: 44, background: thumbColor(post.id), borderRadius: radius, flex: 'none' }} />
       )}
 
       <div style={{ minWidth: 0 }}>
@@ -185,7 +194,28 @@ export function PostCard({
         <div style={{ fontFamily: sans, fontSize: 11, color: ink.muted, marginTop: 3 }}>
           {post.module_id} · {post.kind} · {post.date_label}
         </div>
-        <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.soft, marginTop: 5, lineHeight: 1.5 }}>{post.vi}</div>
+        {/*
+          The same line the reader gets under the title on the site — `lead`
+          when the post has one, `vi` otherwise — through the same helper, so
+          the back office cannot describe a post differently from the listing
+          that publishes it. Clamped at two lines: a lead can run a paragraph,
+          and a card that grows with it stops being a card.
+        */}
+        <div
+          style={{
+            fontFamily: sans,
+            fontSize: 12.5,
+            color: ink.soft,
+            marginTop: 5,
+            lineHeight: 1.5,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {postDescription(post)}
+        </div>
       </div>
 
       {/*

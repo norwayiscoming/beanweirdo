@@ -126,7 +126,7 @@ export interface PostRow {
  * and cannot see the real schema.
  */
 export const POST_SUMMARY_COLUMNS =
-  'id, module_id, en, vi, kind, date_label, status, template, hero_image_url, thumbnail_url, theme_color, sort_order, pinned, created_at, updated_at, published_at'
+  'id, module_id, en, vi, lead, kind, date_label, status, template, hero_image_url, thumbnail_url, theme_color, sort_order, pinned, created_at, updated_at, published_at'
 
 export const POST_DETAIL_COLUMNS = '*'
 
@@ -173,6 +173,8 @@ export interface PostSummary {
   module_id: string
   en: string
   vi: string
+  /** Câu mở đầu bài, cũng là dòng preview dưới tiêu đề ở mọi danh sách. */
+  lead: string | null
   kind: PostKind
   date_label: string
   status: PostStatus
@@ -203,7 +205,6 @@ export interface PostDetail extends PostSummary {
   body: unknown | null
   hero_caption: string | null
   plate_images: Record<string, string | null> | null
-  lead: string | null
   pull_quote: string | null
   further_reading: string[] | null
   deleted_at: string | null
@@ -216,6 +217,9 @@ export function toPostSummary(row: PostRow): PostSummary {
     module_id: row.module_id,
     en: row.en,
     vi: row.vi,
+    // The listing's own preview line. Read here, not only in the detail, so a
+    // list can show what a reader would see without fetching every post's body.
+    lead: row.lead,
     kind: row.kind,
     date_label: row.date_label,
     status: row.status,
@@ -248,7 +252,6 @@ export function toPostDetail(row: PostRow): PostDetail {
     // `?? null` chứ không phải `row.plate_images`: database chưa chạy 0027 thì
     // cột vắng mặt hẳn, và `undefined` đi ra JSON là mất luôn cả khoá.
     plate_images: row.plate_images ?? null,
-    lead: row.lead,
     pull_quote: row.pull_quote,
     further_reading: row.further_reading,
     deleted_at: row.deleted_at,

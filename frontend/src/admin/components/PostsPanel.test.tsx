@@ -55,6 +55,30 @@ async function openRowMenu() {
   await userEvent.click(screen.getByRole('button', { name: 'Hành động khác' }))
 }
 
+/** A summary row with only the fields a list test cares about spelled out. */
+function row(over: Record<string, unknown>) {
+  return {
+    id: 'x',
+    module_id: 'sensory',
+    n: 1,
+    en: 'Bài',
+    vi: 'mô tả',
+    lead: null,
+    kind: 'note',
+    date_label: '2026.06',
+    status: 'draft',
+    template: 'article',
+    hero_image_url: null,
+    thumbnail_url: null,
+    pinned: false,
+    sort_order: 0,
+    created_at: '2026-06-01T00:00:00Z',
+    updated_at: '2026-06-01T00:00:00Z',
+    published_at: null,
+    ...over,
+  }
+}
+
 describe('PostsPanel', () => {
   it('lists posts with template, meta and preview, and publishes one on click', async () => {
     render(<PostsPanel />)
@@ -151,5 +175,22 @@ describe('PostsPanel', () => {
     await openRowMenu()
     await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá vĩnh viễn' }))
     expect(transitionStatus).toHaveBeenCalledWith('p3', 'permanently-delete')
+  })
+  it('bài ghim lên đầu danh sách, phần còn lại giữ thứ tự máy chủ trả về', async () => {
+    /*
+     * Máy chủ xếp theo `updated_at` giảm dần và không biết gì về ghim, nên thứ
+     * tự đến đây là A, B, C với C là bài đang ghim. Cái phải kiểm là C nhấc
+     * lên đầu mà A với B không đảo chỗ cho nhau.
+     */
+    listPosts.mockResolvedValue([
+      row({ id: 'a', en: 'Bài A' }),
+      row({ id: 'b', en: 'Bài B' }),
+      row({ id: 'c', en: 'Bài C', pinned: true }),
+    ])
+    render(<PostsPanel />)
+    await screen.findByText('Bài C')
+
+    const titles = screen.getAllByRole('button', { name: /^Bài [ABC]$/ }).map((el) => el.textContent)
+    expect(titles).toEqual(['Bài C', 'Bài A', 'Bài B'])
   })
 })
