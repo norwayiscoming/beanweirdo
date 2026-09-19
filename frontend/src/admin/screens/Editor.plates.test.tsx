@@ -39,6 +39,13 @@ const post = (template: string, over: Record<string, unknown> = {}) =>
     ...over,
   }) as never
 
+/*
+ * Truyền cả `hero`: ảnh bìa cất ở cột riêng chứ không trong `plate_images`, nên
+ * ba việc của nó đi từ màn sửa xuống. Dựng thiếu nó thì góc ô ảnh bìa chỉ còn
+ * nút tải tệp, và bài kiểm sẽ khẳng định một màn hình không ai thấy.
+ */
+const heroActions = { link: vi.fn(), reframe: vi.fn(), clear: vi.fn() }
+
 const draw = (template: string, over?: Record<string, unknown>) =>
   render(
     <EditorCanvas
@@ -46,6 +53,7 @@ const draw = (template: string, over?: Record<string, unknown>) =>
       post={post(template, over)}
       onChange={vi.fn()}
       onHeroDrop={vi.fn()}
+      hero={heroActions}
     />,
   )
 
@@ -65,17 +73,23 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
         },
       ],
     })
-    expect(corners(container)).toEqual(['detail', 'fig-0', 'hero', 'primary', 'secondary'])
+    // Không có `hero`: ảnh bìa đặt ở băng "trang bìa", một chỗ cho cả sáu khuôn.
+    expect(corners(container)).toEqual(['detail', 'fig-0', 'primary', 'secondary'])
   })
 
-  it('memo: ô ảnh đầu trang dựng cả khi bài chưa có ảnh', () => {
+  /*
+   * Memo chỉ có đúng một ô ảnh và nó là ảnh bìa, mà ảnh bìa nay đặt ở băng
+   * "trang bìa". Nên trong màn sửa memo không còn ô ảnh nào mang nút — khẳng
+   * định ra đây để "không có nút" đọc là cố ý chứ không phải một chỗ quên nối.
+   */
+  it('memo: ô ảnh duy nhất là ảnh bìa, nên không còn nút ở ô nào', () => {
     const { container } = draw('memo')
-    expect(corners(container)).toEqual(['hero'])
+    expect(corners(container)).toEqual([])
   })
 
-  it('bitesize: ô phương tiện và ô ảnh phụ', () => {
+  it('bitesize: chỉ ô ảnh phụ, vì ô phương tiện là ảnh bìa', () => {
     const { container } = draw('bitesize', { body: { sub: 'chữ ô phụ' } })
-    expect(corners(container)).toEqual(['hero', 'sub'])
+    expect(corners(container)).toEqual(['sub'])
   })
 
   it('longform: mỗi khung ảnh, kể cả khung trong hộp ghi chú', () => {
@@ -99,12 +113,53 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
   })
 
   /* Nút phải là nút thật, bấm được, có tên đọc lên được — không phải một ô màu. */
-  it('mỗi góc có một nút tải ảnh gọi tên được', () => {
+  it('mỗi góc có nút tải ảnh và nút đặt link, gọi tên được', () => {
     const { container } = draw('article')
     const labels = Array.from(container.querySelectorAll('[data-plate-corner] button')).map((b) =>
       b.getAttribute('aria-label'),
     )
-    expect(labels).toEqual(['tải ảnh lên', 'tải ảnh lên', 'tải ảnh lên', 'tải ảnh lên'])
+    // Ba ô: ảnh chính, ảnh phụ, chi tiết. Hero đi chỗ khác, và bài này không
+    // có phần nào có hình. Mỗi ô hai lối đưa ảnh vào; chưa ô nào có ảnh nên
+    // chưa có nút gỡ hay nút đặt khung.
+    expect(labels).toEqual(Array(3).fill(['tải ảnh lên', 'đặt link']).flat())
+  })
+
+  /*
+   * Thanh "ảnh bìa: tải ảnh lên – đặt link – đặt vào khung – xoá" đã bỏ, nên
+   * "đặt link" phải có mặt ở **mọi** ô, không riêng ảnh bìa. Trước đây đúng một
+   * ô trong cả sáu khuôn đặt link được.
+   */
+  it('mọi ô ảnh cố định của mọi khuôn đều đặt link được', () => {
+    const cases: [string, Record<string, unknown> | undefined][] = [
+      [
+        'article',
+        {
+          body: [
+            {
+              h: 'Phần',
+              p: 'chữ',
+              fig: { label: 'fig-1', note: '', caption: '', w: '200px', h: '140px', tint: '#EEE', margin: '0' },
+            },
+          ],
+        },
+      ],
+      ['bitesize', { body: { sub: 'chữ ô phụ' } }],
+      ['longform', { body: [{ k: 'h1', runs: [{ t: 'Tiêu đề gốc' }] }, { k: 'fig' }] }],
+    ]
+    for (const [template, over] of cases) {
+      const { container, unmount } = draw(template, over)
+      const corners = container.querySelectorAll('[data-plate-corner]')
+      expect(corners.length, template).toBeGreaterThan(0)
+      for (const corner of corners) {
+        const labels = Array.from(corner.querySelectorAll('button')).map((b) =>
+          b.getAttribute('aria-label'),
+        )
+        expect(labels, `${template} · ${corner.getAttribute('data-plate-corner')}`).toContain(
+          'đặt link',
+        )
+      }
+      unmount()
+    }
   })
 })
 

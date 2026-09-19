@@ -145,6 +145,36 @@ export const IconMore = ({ size = 16, style }: IconProps) =>
     true,
   )
 
+/**
+ * A chain link, for "đặt link" — pasting an address instead of a file.
+ *
+ * Two rounded ends and the bar between them, drawn as one continuous idea so it
+ * does not read as a paperclip (attach) or an arrow (open elsewhere).
+ */
+export const IconLink = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <path d="M10 14a4 4 0 006 0l3-3a4 4 0 00-6-6l-1.5 1.5" />
+      <path d="M14 10a4 4 0 00-6 0l-3 3a4 4 0 006 6l1.5-1.5" />
+    </>,
+  )
+
+/**
+ * Two overlapping corners — the mark for "đặt vào khung", reopening the crop
+ * dialog on a photo already in place.
+ */
+export const IconCrop = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <path d="M6.5 2.5v15h15" />
+      <path d="M2.5 6.5h15v15" />
+    </>,
+  )
+
 export const IconPlus = ({ size = 16, style }: IconProps) =>
   svg(size, style, <path d="M12 4v16M4 12h16" />)
 
