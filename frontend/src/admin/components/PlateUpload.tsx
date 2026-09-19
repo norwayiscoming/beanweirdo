@@ -16,16 +16,36 @@ import { useRef, useState } from 'react'
 import { IconButton } from '../../design/Button'
 import { IconTrash, IconUpload } from '../../design/icons'
 import { uploadImage } from '../lib/apiClient'
+import { useFraming } from './framing'
 
 export type PlateUploadProps = {
   /** Đang có gì trong ô — quyết định nút xoá có mặt hay không. */
   imageUrl: string | null
-  onPick: (file: File) => void | Promise<void>
+  /** `ratio` là hình dạng thật của ô, đo lúc bấm; vắng khi không đo được. */
+  onPick: (file: File, ratio: number | null) => void | Promise<void>
   /** Gỡ ảnh ra khỏi ô. Vắng thì ô này không gỡ được (ảnh bìa dùng hàng riêng). */
   onClear?: () => void
   /** Ô ảnh của bitesize nhận cả clip; mọi ô khác chỉ nhận ảnh. */
   accept?: string
   label?: string
+}
+
+/**
+ * Hình dạng thật của ô ảnh chứa nút này, đo từ trang chứ không tra bảng.
+ *
+ * Mỗi ô ảnh cố định là mốc toạ độ của chính nó (`plateHost`, hoặc sẵn
+ * `absolute` như hero của article), nên `offsetParent` của cái góc chính là ô
+ * ảnh. Đo như vậy thì thêm một template hay đổi dàn trang một template đã có
+ * không kéo theo một bảng tỉ lệ phải giữ cho khớp — và khung cắt luôn đúng
+ * bằng ô mà người dùng đang nhìn.
+ */
+function cellRatio(node: HTMLElement | null): number | null {
+  const corner = node?.closest('[data-plate-corner]')
+  const cell = corner instanceof HTMLElement ? corner.offsetParent : null
+  if (!(cell instanceof HTMLElement)) return null
+  const box = cell.getBoundingClientRect()
+  if (box.width < 1 || box.height < 1) return null
+  return box.width / box.height
 }
 
 export function PlateUpload({
@@ -36,19 +56,23 @@ export function PlateUpload({
   label = 'tải ảnh lên',
 }: PlateUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
   const [busy, setBusy] = useState(false)
 
   async function take(file: File) {
+    // Đo trước khi đợi tải lên: lúc tải xong ô vẫn còn đó, nhưng đo sớm thì
+    // không phụ thuộc vào việc dàn trang có đổi trong lúc chờ hay không.
+    const ratio = cellRatio(wrapRef.current)
     setBusy(true)
     try {
-      await onPick(file)
+      await onPick(file, ratio)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <div style={{ display: 'flex', gap: 6 }}>
+    <div ref={wrapRef} style={{ display: 'flex', gap: 6 }}>
       {/*
         `secondary` chứ không phải `ghost`: nút này nằm trên ảnh chứ không nằm
         trên giấy, nên nó cần nền đặc và viền đậm hơn mới đọc được trên một tấm
@@ -98,17 +122,27 @@ export function PlateImageUpload({
   imageUrl,
   onUrl,
   onClear,
+  name = 'ô ảnh của khuôn bài',
 }: {
   imageUrl: string | null
   onUrl: (url: string) => void
   onClear?: () => void
+  /** Ô nào — hiện trên đầu khung cắt để biết đang căn cho chỗ nào. */
+  name?: string
 }) {
+  const frame = useFraming()
   return (
     <PlateUpload
       imageUrl={imageUrl}
-      onPick={async (file) => {
+      onPick={async (file, ratio) => {
         const { url } = await uploadImage(file)
-        onUrl(url)
+        /*
+         * Không đo được ô thì vẫn phải mở khung cắt, chỉ là lấy tỉ lệ ô ảnh
+         * hay gặp nhất làm khung: tải ảnh lên chỗ nào cũng ra cùng một hộp
+         * thoại là điều chủ site chốt, nên bỏ qua bước căn vì một phép đo hụt
+         * là đúng cái lệch ấy quay lại.
+         */
+        onUrl(await frame({ url, name, ratio: ratio ?? 1.5 }))
       }}
       onClear={onClear}
     />

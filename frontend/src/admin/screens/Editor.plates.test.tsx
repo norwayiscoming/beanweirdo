@@ -107,3 +107,57 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
     expect(labels).toEqual(['tải ảnh lên', 'tải ảnh lên', 'tải ảnh lên', 'tải ảnh lên'])
   })
 })
+
+/*
+ * Ô ảnh trong màn sửa phải hiện ra đúng tấm ảnh.
+ *
+ * Chủ site: *"đẩy ảnh lên như nào phải hiển thị luôn ở trong edit chứ. trong
+ * trang edit thì hiện 1 mảng màu xanh nhờ nhờ như kia. phải vào xem trước thì
+ * mới xem được ảnh"*. Hai lỗi chồng nhau: ba ô giữa của article xưa nay không
+ * có chỗ lưu ảnh, và những ô tự viết `background-image` bằng tay thì giữ
+ * `cover` nhưng quên `background-position`, nên CSS neo ảnh vào góc trên-trái
+ * chứ không vào điểm căn — cùng một tấm ảnh, màn sửa và trang xem trước cắt hai
+ * kiểu vì khung của chúng rộng khác nhau.
+ */
+describe('ô ảnh trong màn sửa vẽ đúng tấm ảnh, đúng điểm căn', () => {
+  const filled = (root: HTMLElement) =>
+    Array.from(root.querySelectorAll<HTMLElement>('[data-plate-corner]'))
+      .map((corner) => corner.offsetParent ?? corner.parentElement)
+      .filter((el): el is HTMLElement => el instanceof HTMLElement)
+
+  it('ba ô của article đọc ảnh từ plate_images, kèm điểm căn', () => {
+    const { container } = draw('article', {
+      plate_images: {
+        primary: 'https://x/a.jpg#focus=0,100',
+        secondary: 'https://x/b.jpg',
+        detail: 'https://x/c.jpg#focus=100,0',
+      },
+    })
+    const styles = filled(container).map((el) => el.style)
+    const withImage = styles.filter((s) => s.backgroundImage.includes('https://x/'))
+    expect(withImage).toHaveLength(3)
+
+    // Địa chỉ tải về là địa chỉ trần: mảnh `#focus=` không phải một phần của tệp.
+    for (const s of withImage) {
+      expect(s.backgroundImage).not.toContain('#focus=')
+      // Chính chỗ này là lỗi cũ: có `cover` mà không có `background-position`.
+      expect(s.backgroundPosition).toMatch(/^\d+% \d+%$/)
+      expect(s.backgroundSize).toBe('cover')
+    }
+
+    const at = (name: string) =>
+      withImage.find((s) => s.backgroundImage.includes(name))?.backgroundPosition
+    expect(at('a.jpg')).toBe('0% 100%')
+    expect(at('c.jpg')).toBe('100% 0%')
+    // Không ghi điểm căn thì vào giữa, không phải góc trên-trái.
+    expect(at('b.jpg')).toBe('50% 50%')
+  })
+
+  it('ô nào chưa có ảnh thì vẫn là mảng màu, không phải ảnh rỗng', () => {
+    const { container } = draw('article')
+    for (const el of filled(container)) {
+      expect(el.style.backgroundImage).toBe('')
+      expect(el.style.backgroundColor).not.toBe('')
+    }
+  })
+})
