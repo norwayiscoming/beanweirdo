@@ -8,14 +8,15 @@
  * Chủ site: *"sao phải cho nó bé tí như kia. cho trang bìa là 1 cái ảnh ngang
  * bài trên đầu ấy?"* — nên chỗ ĐẶT ảnh bìa tách khỏi chỗ ảnh bìa RƠI VÀO.
  *
- * Băng này là chỗ đặt. Nó không phải một phần của trang đã đăng và không đổi
- * dàn trang của trang ấy: ảnh bìa vẫn rơi đúng chỗ template vẽ nó, ngay bên
- * dưới trong cùng khung sửa. Nên trong màn sửa tấm ảnh hiện hai lần — một lần
- * ở đây để đặt, một lần ở dưới vì dưới là trang thật.
+ * Băng này là chỗ đặt, và là chỗ DUY NHẤT tấm ảnh hiện ra trong màn sửa: ô ảnh
+ * bìa mà template vẽ đứng giữ chỗ ở dạng mảng màu, vì `Editor` truyền xuống bộ
+ * chuyển đổi một bản post không có `hero_image_url`. Chủ site: *"hiện 1 chỗ
+ * thôi chứ?"*. Trang đã đăng không đổi — ảnh bìa vẫn rơi đúng chỗ template vẽ
+ * nó, và cách nhìn thấy điều đó là bấm "xem trước".
  *
- * Hai template không vẽ ô ảnh bìa nào (`cards`, `report`) thì đây là đường
- * DUY NHẤT đặt ảnh bìa cho chúng; trước khi có băng này, bỏ hàng chữ cũ đi là
- * hai khuôn ấy không còn cách nào đặt ảnh bìa cả.
+ * Ba template không vẽ ô ảnh bìa nào (`cards`, `report`, `longform`) thì đây
+ * là đường DUY NHẤT đặt ảnh bìa cho chúng; trước khi có băng này, bỏ hàng chữ
+ * cũ đi là ba khuôn ấy không còn cách nào đặt ảnh bìa cả.
  */
 import type { CSSProperties } from 'react'
 import { coverStyle } from 'post-renderer'
@@ -25,11 +26,18 @@ import { looksLikeVideo } from '../../lib/mediaShape'
 import { PlateUpload } from './PlateUpload'
 
 /**
- * 1200×628 — đúng tỉ lệ tấm ảnh chủ site gửi kèm, và cũng là khung ảnh chia sẻ
- * hay gặp nhất. Một con số chứ không phải chiều cao cố định: khung sửa co giãn
- * theo cửa sổ, mà một băng cao 280px trên màn hẹp thì không còn "ngang" nữa.
+ * Băng **luôn rộng bằng khung sửa**; hai con số dưới đây chỉ quyết định nó cao
+ * bao nhiêu. Chủ site: *"ảnh bìa phải hiển thị ngang ra ngang, rộng bằng cái
+ * độ rộng của cái màn edit"*.
+ *
+ * 1200/628 là tỉ lệ tấm ảnh chủ site gửi kèm, và cũng là khung ảnh chia sẻ hay
+ * gặp nhất. Nó cầm lái ở cửa sổ hẹp. Từ khoảng 800px trở lên thì `BAND_MAX_H`
+ * cầm lái, vì giữ nguyên 1.91:1 ở khung sửa rộng 1320px là một cái băng cao
+ * 690px — hết màn hình, mà phần còn lại của bài thì không thấy đâu. Chặn ở
+ * 420px thì ở bề ngang lớn nhất băng thành 3.1:1, đúng dáng "ngang ra ngang".
  */
 const BAND = 1200 / 628
+const BAND_MAX_H = 420
 
 const label: CSSProperties = {
   fontFamily: sans,
@@ -73,8 +81,16 @@ export function CoverBand({ imageUrl, onPick, onLink, onReframe, onClear }: Cove
         }}
         style={{
           position: 'relative',
+          /*
+           * `width` phải nói thẳng ra là 100%. Để `auto` thì trình duyệt suy
+           * bề ngang ngược lại từ `maxHeight` qua tỉ lệ, nên băng co lại còn
+           * 573px giữa một khung sửa rộng 1320px — đúng cái chủ site chụp màn
+           * hình gửi lại. Nói rõ bề ngang thì tỉ lệ chỉ còn việc tính chiều
+           * cao, và `maxHeight` cắt bớt chiều cao chứ không kéo bề ngang theo.
+           */
+          width: '100%',
           aspectRatio: String(BAND),
-          maxHeight: 300,
+          maxHeight: BAND_MAX_H,
           borderRadius: radius,
           border: `1px solid ${ink.border}`,
           overflow: 'hidden',
