@@ -174,3 +174,16 @@ export function canReparent<T extends TreeRow>(
   }
   return { ok: true }
 }
+
+/**
+ * Every row that could become `id`'s parent, in the order it was given.
+ *
+ * The complement of `canReparent`, for the picker in the CMS: rather than
+ * offering every module and refusing four of them after the click, offer the
+ * ones that would be accepted. Itself and everything already inside it are
+ * what drop out — a module cannot be filed inside its own contents.
+ */
+export function possibleParents<T extends TreeRow>(rows: readonly T[], id: string): T[] {
+  const inside = new Set(descendantIds(rows, id))
+  return rows.filter((r) => !inside.has(r.id))
+}

@@ -38,7 +38,7 @@ import { ModuleImages } from '../admin/components/ModuleImages'
 import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
 import { coverStyle } from '../lib/imageFocus'
-import { rootsOf } from '../lib/contentTree'
+import { depthOf, possibleParents, rootsOf } from '../lib/contentTree'
 import { moduleMapRow, type MapRow } from '../lib/siteMapRows'
 import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
@@ -112,6 +112,8 @@ const three = 'repeat(3,minmax(0,1fr))'
  */
 const nameRow = 'minmax(0,1fr) 112px 124px 128px'
 const nameRowPlain = 'minmax(0,1fr) 112px'
+/** The parent picker sits alone: a full-width select for one short name reads as a mistake. */
+const parentRow = 'minmax(0,340px)'
 
 /**
  * What a module row counts.
@@ -1373,6 +1375,38 @@ export function Cms() {
                           />
                         </Field>
                       )}
+                    </div>
+
+                    {/*
+                      Where this module sits in the tree.
+
+                      Migration 0025 gave `modules` a `parent_id`, and every
+                      surface on the site learned to read it — but nothing in
+                      here could set it, so filing one module inside another
+                      meant calling the API by hand. That is exactly the chore
+                      this whole change set out to remove.
+
+                      The list leaves out the module itself and everything
+                      already inside it: a module cannot be put inside its own
+                      contents. The API refuses the same thing, so this only
+                      keeps the impossible choice off the screen.
+                    */}
+                    <div style={grid(parentRow)}>
+                      <Field label={<>Nằm trong<Where>để trống là ở tầng trên cùng</Where></>}>
+                        <select
+                          value={m.parent_id ?? ''}
+                          onChange={(e) => void patchModule(m.id, { parent_id: e.target.value || null })}
+                          style={boxed}
+                        >
+                          <option value="">— không nằm trong mục nào —</option>
+                          {possibleParents(modules, m.id).map((x) => (
+                            <option key={x.id} value={x.id}>
+                              {'　'.repeat(depthOf(modules, x.id))}
+                              {x.title}
+                            </option>
+                          ))}
+                        </select>
+                      </Field>
                     </div>
 
                     {shape.blurb && (
