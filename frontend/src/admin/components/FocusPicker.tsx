@@ -18,12 +18,12 @@ const backdrop: CSSProperties = {
 const card: CSSProperties = {
   background: paper.cream,
   /*
-   * `paper.rule` là gạch chia trong một trang giấy — nhạt nhất trong bộ. Lane
-   * Thiết kế đang thêm token `ink.border` cho viền mọi control khu quản trị
-   * (PR #19, chưa merge); khi nó vào `main` thì ba chỗ viền trong tệp này đổi
-   * sang đó, vì một hộp thoại là một control chứ không phải một trang.
+   * `ink.border` chứ không phải `paper.rule`: `paper.rule` là gạch chia trong
+   * một trang giấy, nhạt nhất trong bộ — đúng cái chủ site gọi là "nhạt nhạt".
+   * Viền của mọi control khu quản trị dùng `ink.border`, và một hộp thoại là
+   * một control chứ không phải một trang.
    */
-  border: `1px solid ${paper.rule}`,
+  border: `1px solid ${ink.border}`,
   outline: 'none',
   borderRadius: radius,
   padding: 22,
@@ -107,7 +107,7 @@ function AlignRow({
               padding: 0,
               borderRadius: radius,
               cursor: enabled ? 'pointer' : 'default',
-              border: `1px solid ${on ? ink.base : paper.rule}`,
+              border: `1px solid ${on ? ink.base : ink.border}`,
               background: on ? paper.hover : 'transparent',
               color: on ? ink.base : ink.soft,
             }}
@@ -367,7 +367,7 @@ export function FocusPicker({
                 <div
                   style={{
                     aspectRatio: String(p.ratio),
-                    border: `1px solid ${paper.rule}`,
+                    border: `1px solid ${ink.border}`,
                     borderRadius: radius,
                     backgroundImage: `url(${stripFocus(url)})`,
                     backgroundSize: 'cover',

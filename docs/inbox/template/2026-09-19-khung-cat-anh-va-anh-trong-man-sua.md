@@ -1,7 +1,7 @@
 # Khung cắt ảnh dùng chung, và ô ảnh trong màn sửa vẽ đúng tấm ảnh
 
-Nhánh: `claude/project-thread-ey2sz1`, cắt lại từ `origin/main` @ `e07212c`.
-PR: chưa mở, đang đợi chủ site gật.
+Nhánh: `claude/project-thread-ey2sz1`, cắt lại từ `origin/main` @ `8dfe87a`.
+PR: #20.
 
 Nối tiếp ghi chú `2026-09-19-nut-tai-anh-o-goc-o-anh.md` (PR #15, đã merge @
 `a53377b`). Ghi chú ấy nói về chỗ **bấm** để tải ảnh; ghi chú này nói về chuyện
@@ -204,9 +204,15 @@ Lane Thiết kế đang dựng `NewPostDialog` (PR #19) — cũng là một lớ
   mới có một chỗ dùng, tách component từ một chỗ dùng là đoán. Khi #19 vào
   `main` họ tách vỏ ra tệp riêng rồi báo tên; `FocusPicker` đổi sang dùng nó ở
   PR sau của lane này.
-- **Viền hộp sẽ đổi sang `ink.border`.** Token ấy đến cùng PR #19 và **chưa có
-  trong `main`**, nên tệp này vẫn dùng `paper.rule`; chú thích ở hằng `card`
-  ghi rõ ba chỗ phải đổi.
+- **Viền hộp đã đổi sang `ink.border`.** PR #19 merge trong lúc PR này còn mở,
+  token `ink.border` (`#5A4632`) vào `main` @ `8dfe87a`, nên ba chỗ viền trong
+  `FocusPicker.tsx` — vỏ hộp, nút căn sát mép lúc tắt, ô xem trước khung khác —
+  đã lấy theo nó. `paper.rule` không còn chỗ nào trong tệp.
+- **Màu nền lớp phủ vẫn khác của họ, cố ý.** `NewPostDialog` dùng
+  `rgba(35,33,26,.38)`; hộp này dùng `rgba(18,16,12,.78)`, đậm hơn hẳn, vì việc
+  của nó là bày một tấm ảnh — nền sáng thì mắt không đọc được đâu là phần ảnh
+  bị làm mờ. Khi tách vỏ chung, độ đậm nền nên là tham số chứ không phải một
+  hằng.
 - **Nghe `pointerdown` chứ không nghe `click`** để đóng ra nền: bôi đen chữ
   trong hộp rồi thả chuột ra ngoài cũng đếm là một `click` trên nền, và như vậy
   là đóng mất hộp đang dùng. Lane Thiết kế đã vấp chỗ này.
