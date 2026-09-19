@@ -106,8 +106,9 @@ export function PostsPanel({
   }
 
   /**
-   * Ghim, ngay tại danh sách. Bài ghim dẫn đầu module của nó, nên đổi một bài
-   * là đổi thứ tự cả module — nạp lại danh sách sau khi ghi.
+   * Ghim, ngay tại danh sách. Bài ghim dẫn đầu module của nó ngoài site, và
+   * dẫn đầu chính danh sách này trong quản trị — nên đổi một bài là đổi thứ
+   * tự, nạp lại danh sách sau khi ghi.
    */
   async function handlePin(id: string, pinned: boolean) {
     try {
@@ -145,6 +146,16 @@ export function PostsPanel({
     }
   }
 
+  /*
+   * Ghim đưa bài lên đầu danh sách.
+   *
+   * Máy chủ trả về theo `updated_at` giảm dần và không biết gì về ghim: ghim
+   * vốn chỉ nói về thứ tự trong module khi đọc ngoài site. Chủ site muốn nó
+   * nói cả ở đây, nên xếp lại tại chỗ. `sort` của JavaScript ổn định, nên các
+   * bài không ghim giữ nguyên thứ tự máy chủ đã chọn, chỉ nhóm ghim nhấc lên.
+   */
+  const ordered = [...posts].sort((a, b) => Number(b.pinned) - Number(a.pinned))
+
   const stats = [
     { n: allPosts.length, label: 'tổng' },
     { n: allPosts.filter((p) => p.status === 'draft').length, label: 'nháp' },
@@ -152,7 +163,12 @@ export function PostsPanel({
   ]
 
   return (
-    <div>
+    /*
+     * Danh sách căn giữa, có trần bề rộng. Trước đây nó chạy hết bề ngang cửa
+     * sổ, nên trên màn rộng tiêu đề và cụm nút cuối dòng cách nhau cả gang tay
+     * và mắt phải đi hết chiều ngang mới nối được hai đầu của cùng một bài.
+     */
+    <div style={{ maxWidth: 940, margin: '0 auto' }}>
       {/*
         Counts, then the filter row with the one action that starts something.
         All three used to share a single wrapping flex row, so on a narrow
@@ -246,18 +262,25 @@ export function PostsPanel({
         </div>
       </div>
 
-      {posts.map((p) => (
-        <PostCard
-          key={p.id}
-          post={p}
-          onAction={handleAction}
-          onEdit={(id) => nav.editPost(id)}
-          onCopy={handleCopy}
-          onPin={handlePin}
-        />
-      ))}
+      {/*
+        Thẻ rời nhau, không còn là các dòng dính liền ngăn bằng một nét kẻ.
+        Khoảng hở là của danh sách chứ không phải của thẻ: thẻ tự đặt lề dưới
+        thì thẻ cuối cùng luôn thừa ra một khoảng không ai cần.
+      */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 10 }}>
+        {ordered.map((p) => (
+          <PostCard
+            key={p.id}
+            post={p}
+            onAction={handleAction}
+            onEdit={(id) => nav.editPost(id)}
+            onCopy={handleCopy}
+            onPin={handlePin}
+          />
+        ))}
+      </div>
 
-      {posts.length === 0 && (
+      {ordered.length === 0 && (
         <div style={{ color: ink.faint, fontSize: 12.5, padding: '40px 0', textAlign: 'center' }}>
           {failed ? 'Không tải được danh sách bài.' : 'Chưa có bài nào.'}
         </div>

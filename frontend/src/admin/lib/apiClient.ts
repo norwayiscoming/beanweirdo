@@ -40,6 +40,8 @@ export type PostSummary = {
   module_id: string
   en: string
   vi: string
+  /** Câu mở đầu bài — dòng preview dưới tiêu đề ở mọi danh sách. */
+  lead: string | null
   kind: PostKind
   date_label: string
   status: PostStatus
@@ -72,7 +74,6 @@ export type PostDetail = PostSummary & {
    * rỗng, và một lần Cmd+Z im lặng không làm gì.
    */
   plate_images: Record<string, string | null> | null
-  lead: string | null
   pull_quote: string | null
   further_reading: string[] | null
   deleted_at: string | null

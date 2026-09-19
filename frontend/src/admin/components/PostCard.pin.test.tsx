@@ -130,3 +130,30 @@ describe('hành động của một dòng', () => {
     expect(screen.queryByRole('menu')).toBeNull()
   })
 })
+
+describe('dòng preview dưới tiêu đề', () => {
+  const render1 = (over: Partial<PostSummary>) =>
+    render(<PostCard post={post(over)} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />)
+
+  it('lấy câu mở đầu bài khi bài có', () => {
+    render1({ lead: 'Vị giác nhận ra nhiều thứ hơn cái lưỡi gọi tên được.', vi: 'mô tả tay' })
+    expect(screen.getByText('Vị giác nhận ra nhiều thứ hơn cái lưỡi gọi tên được.')).toBeInTheDocument()
+    // Không vẽ cả hai: một bài một dòng mô tả.
+    expect(screen.queryByText('mô tả tay')).not.toBeInTheDocument()
+  })
+
+  it('rơi về mô tả tự viết khi bài chưa có câu mở đầu', () => {
+    render1({ lead: null, vi: 'mô tả tay' })
+    expect(screen.getByText('mô tả tay')).toBeInTheDocument()
+  })
+
+  /*
+   * Cùng một hàm với danh sách ngoài site (`postDescription`). Đây là lý do
+   * dùng hàm chung thay vì đọc thẳng trường: quản trị và trang đọc không được
+   * phép nói khác nhau về cùng một bài.
+   */
+  it('câu mở đầu toàn khoảng trắng không tính là có', () => {
+    render1({ lead: '   ', vi: 'mô tả tay' })
+    expect(screen.getByText('mô tả tay')).toBeInTheDocument()
+  })
+})

@@ -23,7 +23,7 @@ export type Size = 'lg' | 'md' | 'sm'
  * One radius for everything, replacing the six that were in use (2, 3, 4, 6,
  * 10, 999). 999 stays only on the status pill, where the shape carries meaning.
  */
-export const radius = 4
+export const radius = 8
 
 /** One border width, at every level and every state, so hover never shifts layout by a pixel. */
 export const borderWidth = 1
