@@ -71,6 +71,13 @@ export type Module = {
   tint: string
   tint2: string
   layout: string
+  /**
+   * The module this one sits inside; null at the top level — migration 0025.
+   *
+   * Optional because a database that has not run 0025 answers without the
+   * column at all. Read it through `lib/contentTree`, never directly.
+   */
+  parent_id?: string | null
   concept: string
   blurb: string
   long_desc: string

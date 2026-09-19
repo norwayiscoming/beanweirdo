@@ -9,6 +9,7 @@ import {
   flattenTree,
   hasChildren,
   rootsOf,
+  possibleParents,
 } from './contentTree'
 
 const m = (id: string, parent_id: string | null = null) => ({ id, parent_id })
@@ -166,5 +167,43 @@ describe('canReparent', () => {
     const out = canReparent(site, 'bean', 'khong-co')
     expect(out.ok).toBe(false)
     expect(out.ok === false && out.reason).toContain('khong-co')
+  })
+})
+
+describe('the list a parent picker may offer', () => {
+  const tree = [
+    { id: 'bean' },
+    { id: 'roasting', parent_id: 'bean' },
+    { id: 'heat', parent_id: 'roasting' },
+    { id: 'sensory' },
+  ]
+
+  it('leaves out the module itself', () => {
+    expect(possibleParents(tree, 'bean').map((r) => r.id)).not.toContain('bean')
+  })
+
+  it('leaves out everything already inside it, however deep', () => {
+    // Filing bean weirdo inside Heat Transfer would make a branch with no top.
+    expect(possibleParents(tree, 'bean').map((r) => r.id)).toEqual(['sensory'])
+  })
+
+  it('offers everything else, in the order it was given', () => {
+    expect(possibleParents(tree, 'sensory').map((r) => r.id)).toEqual(['bean', 'roasting', 'heat'])
+  })
+
+  it('agrees with canReparent on every pair it offers and every pair it hides', () => {
+    // The picker exists so a refused choice is never on screen; if the two
+    // ever disagree, one of them is lying to the user.
+    for (const child of tree) {
+      const offered = new Set(possibleParents(tree, child.id).map((r) => r.id))
+      for (const parent of tree) {
+        expect(canReparent(tree, child.id, parent.id).ok).toBe(offered.has(parent.id))
+      }
+    }
+  })
+
+  it('offers nothing but the others when a module holds everything', () => {
+    const chain = [{ id: 'a' }, { id: 'b', parent_id: 'a' }]
+    expect(possibleParents(chain, 'a')).toEqual([])
   })
 })
