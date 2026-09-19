@@ -39,6 +39,13 @@ const post = (template: string, over: Record<string, unknown> = {}) =>
     ...over,
   }) as never
 
+/*
+ * Truyền cả `hero`: ảnh bìa cất ở cột riêng chứ không trong `plate_images`, nên
+ * ba việc của nó đi từ màn sửa xuống. Dựng thiếu nó thì góc ô ảnh bìa chỉ còn
+ * nút tải tệp, và bài kiểm sẽ khẳng định một màn hình không ai thấy.
+ */
+const heroActions = { link: vi.fn(), reframe: vi.fn(), clear: vi.fn() }
+
 const draw = (template: string, over?: Record<string, unknown>) =>
   render(
     <EditorCanvas
@@ -46,6 +53,7 @@ const draw = (template: string, over?: Record<string, unknown>) =>
       post={post(template, over)}
       onChange={vi.fn()}
       onHeroDrop={vi.fn()}
+      hero={heroActions}
     />,
   )
 
@@ -99,12 +107,53 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
   })
 
   /* Nút phải là nút thật, bấm được, có tên đọc lên được — không phải một ô màu. */
-  it('mỗi góc có một nút tải ảnh gọi tên được', () => {
+  it('mỗi góc có nút tải ảnh và nút đặt link, gọi tên được', () => {
     const { container } = draw('article')
     const labels = Array.from(container.querySelectorAll('[data-plate-corner] button')).map((b) =>
       b.getAttribute('aria-label'),
     )
-    expect(labels).toEqual(['tải ảnh lên', 'tải ảnh lên', 'tải ảnh lên', 'tải ảnh lên'])
+    // Bốn ô, mỗi ô hai lối đưa ảnh vào. Chưa ô nào có ảnh nên chưa có nút gỡ
+    // hay nút đặt khung.
+    expect(labels).toEqual(Array(4).fill(['tải ảnh lên', 'đặt link']).flat())
+  })
+
+  /*
+   * Thanh "ảnh bìa: tải ảnh lên – đặt link – đặt vào khung – xoá" đã bỏ, nên
+   * "đặt link" phải có mặt ở **mọi** ô, không riêng ảnh bìa. Trước đây đúng một
+   * ô trong cả sáu khuôn đặt link được.
+   */
+  it('mọi ô ảnh cố định của mọi khuôn đều đặt link được', () => {
+    const cases: [string, Record<string, unknown> | undefined][] = [
+      [
+        'article',
+        {
+          body: [
+            {
+              h: 'Phần',
+              p: 'chữ',
+              fig: { label: 'fig-1', note: '', caption: '', w: '200px', h: '140px', tint: '#EEE', margin: '0' },
+            },
+          ],
+        },
+      ],
+      ['memo', undefined],
+      ['bitesize', { body: { sub: 'chữ ô phụ' } }],
+      ['longform', { body: [{ k: 'h1', runs: [{ t: 'Tiêu đề gốc' }] }, { k: 'fig' }] }],
+    ]
+    for (const [template, over] of cases) {
+      const { container, unmount } = draw(template, over)
+      const corners = container.querySelectorAll('[data-plate-corner]')
+      expect(corners.length, template).toBeGreaterThan(0)
+      for (const corner of corners) {
+        const labels = Array.from(corner.querySelectorAll('button')).map((b) =>
+          b.getAttribute('aria-label'),
+        )
+        expect(labels, `${template} · ${corner.getAttribute('data-plate-corner')}`).toContain(
+          'đặt link',
+        )
+      }
+      unmount()
+    }
   })
 })
 
