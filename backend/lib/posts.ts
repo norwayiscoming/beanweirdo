@@ -54,6 +54,7 @@ export const POST_COLUMNS = [
   'previous_status',
   'hero_image_url',
   'hero_caption',
+  'plate_images',
   'thumbnail_url',
   'theme_color',
   'pull_quote',
@@ -86,6 +87,16 @@ export interface PostRow {
   status: PostStatus
   template: PostTemplate
   hero_image_url: string | null
+  /**
+   * Ảnh của những ô ảnh cố định mà template đặt tên — migration 0027.
+   *
+   * Không phải mọi ô ảnh của bài: chỉ những ô mà dàn trang dựng sẵn và trước
+   * đây không có chỗ nào để lưu. Ô nằm trong thân bài vẫn ở trong `body`.
+   *
+   * Tuỳ chọn vì một database chưa chạy 0027 trả lời mà không có cột này —
+   * `POST_DETAIL_COLUMNS` là `*`, nên đọc vẫn chạy, chỉ ghi là không.
+   */
+  plate_images?: Record<string, string | null> | null
   /**
    * The first image found inside `body`, kept as a column so a listing never
    * has to read `body` to draw a 44px square. Derived, never sent by a client:
@@ -191,6 +202,7 @@ export interface PostDetail extends PostSummary {
   slug: string | null
   body: unknown | null
   hero_caption: string | null
+  plate_images: Record<string, string | null> | null
   lead: string | null
   pull_quote: string | null
   further_reading: string[] | null
@@ -233,6 +245,9 @@ export function toPostDetail(row: PostRow): PostDetail {
     slug: row.slug,
     body: row.body,
     hero_caption: row.hero_caption,
+    // `?? null` chứ không phải `row.plate_images`: database chưa chạy 0027 thì
+    // cột vắng mặt hẳn, và `undefined` đi ra JSON là mất luôn cả khoá.
+    plate_images: row.plate_images ?? null,
     lead: row.lead,
     pull_quote: row.pull_quote,
     further_reading: row.further_reading,

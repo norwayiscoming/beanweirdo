@@ -34,6 +34,8 @@ interface PatchPostBody {
   theme_color?: unknown
   hero_image_url?: unknown
   hero_caption?: unknown
+  /** Ảnh của các ô ảnh cố định do template đặt tên — migration 0027. */
+  plate_images?: unknown
   lead?: unknown
   pull_quote?: unknown
   further_reading?: unknown
@@ -55,6 +57,7 @@ const PATCHABLE = [
   'theme_color',
   'hero_image_url',
   'hero_caption',
+  'plate_images',
   'lead',
   'pull_quote',
   'further_reading',

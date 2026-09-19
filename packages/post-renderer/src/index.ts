@@ -79,6 +79,9 @@ export { flatElements, sectionElements } from './memoElements'
 export { indentOf, normalizeBlocks, stepIndent, MAX_INDENT } from './longformBlocks'
 export { runsToText as longformRunsToText, textToRuns as longformTextToRuns } from './longformText'
 
+export { PlateCorner, plateHost } from './plates'
+export type { PlateAction, PlateSlot } from './plates'
+
 export { paletteFrom, shade } from './palette'
 export type { Palette } from './palette'
 

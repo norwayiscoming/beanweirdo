@@ -3,6 +3,7 @@ import { createContext, Fragment, useContext, useEffect, useMemo, useState } fro
 import type { CSSProperties } from 'react'
 import { ElementList } from './elements'
 import { paletteFrom, type Palette } from './palette'
+import { PlateCorner, plateHost, type PlateAction } from './plates'
 import { sans, serif, wrapTitle } from './tokens'
 import type { LongformBlock, LongformPostData, LongformRun } from './types'
 import { indentOf, normalizeBlocks } from './longformBlocks'
@@ -130,6 +131,14 @@ export type LongformEdit = {
    * tự vẽ — móc này chỉ bọc, không thay bộ vẽ.
    */
   wrapAsideItem?: (drawn: ReactNode, at: number, sub: number, kind: string) => ReactNode
+  /**
+   * Móc treo nút tải ảnh vào góc một khung ảnh, khoá `fig-<số khối>` — và
+   * `fig-<số khối>-<số khối con>` cho khung nằm trong một hộp ghi chú.
+   *
+   * Khung ảnh của long-form đến từ bản xuất Notion nên `src` của nó xưa nay chỉ
+   * đọc: bài mất ảnh thì khung trắng nằm đó, không đường nào đặt tấm khác vào.
+   */
+  renderPlateAction?: PlateAction
 }
 
 const EditContext = createContext<LongformEdit>({})
@@ -265,7 +274,7 @@ function NoteBody({ runs, at }: { runs?: LongformRun[]; at?: number }) {
 
 /** Blocks nested inside an `aside` — quieter, on its own sand ground. */
 function AsideBlock({ items, palette, at }: { items: LongformBlock[]; palette: Palette; at?: number }) {
-  const { wrapAsideItem } = useContext(EditContext)
+  const { wrapAsideItem, renderPlateAction } = useContext(EditContext)
   /*
    * Mỗi dòng vẽ xong thì đưa qua `wrapAsideItem` trước khi ra màn hình. Khung
    * sửa cần chỗ ấy để gộp mấy dòng chữ liền nhau vào một ô nhập — không có nó
@@ -321,6 +330,7 @@ function AsideBlock({ items, palette, at }: { items: LongformBlock[]; palette: P
             <div
               key={i}
               style={{
+                ...plateHost,
                 margin: '14px 0 16px',
                 background: '#FFFFFF',
                 border: '1px solid #E6DFCB',
@@ -330,7 +340,12 @@ function AsideBlock({ items, palette, at }: { items: LongformBlock[]; palette: P
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
               }}
-            />
+            >
+              <PlateCorner
+                action={at === undefined ? undefined : renderPlateAction}
+                slot={{ key: `fig-${at}-${i}`, imageUrl: a.src ?? null }}
+              />
+            </div>
           )
         if (a.k === 'formula')
           return (
@@ -378,6 +393,7 @@ export function Longform({
   wrapBlock,
   wrapAsideItem,
   renderAfterBlocks,
+  renderPlateAction,
 }: LongformProps) {
   // Everything this template tints comes from the one colour the post wears.
   const palette = paletteFrom(post.band?.bg ?? LONGFORM_BLUE, post.band?.fg)
@@ -442,7 +458,7 @@ export function Longform({
   const anyFolded = Object.values(folded).some(Boolean)
 
   return (
-    <EditContext.Provider value={{ renderText, wrapAsideItem }}>
+    <EditContext.Provider value={{ renderText, wrapAsideItem, renderPlateAction }}>
     <div
       style={{
         background: '#FCFCFA',
@@ -836,6 +852,7 @@ export function Longform({
                 {b.k === 'fig' && (
                   <div
                     style={{
+                      ...plateHost,
                       margin: '26px 0 30px',
                       background: '#FFFFFF',
                       border: '1px solid #EDEBE0',
@@ -845,7 +862,12 @@ export function Longform({
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
                     }}
-                  />
+                  >
+                    <PlateCorner
+                      action={renderPlateAction}
+                      slot={{ key: `fig-${at}`, imageUrl: b.src ?? null }}
+                    />
+                  </div>
                 )}
 
                 {b.k === 'aside' && <AsideBlock palette={palette} items={b.items ?? []} at={at} />}
