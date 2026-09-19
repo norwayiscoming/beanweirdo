@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { SITE_DEFAULTS } from '../content/site'
 
@@ -45,7 +45,10 @@ vi.mock('../lib/nav', async () => {
   }
 })
 
-const { Cms, CONFIG_BOXES, TABS } = await import('./Cms')
+const { Cms, CONFIG_BOXES, GRID_LABEL, TABS } = await import('./Cms')
+
+// jsdom không cài `scrollIntoView`, mà bấm một mục ở chỉ mục thì gọi tới nó.
+Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {})
 
 /** The tab and the box, by key — so renaming either label does not break this test. */
 const CONFIG_TAB = TABS.find((t) => t.k === 'config')!.t
@@ -64,7 +67,11 @@ describe('CMS hiện nội dung thật', () => {
 
     render(<Cms />)
     ;(await screen.findByText(CONFIG_TAB)).click()
-    ;(await screen.findByText(INDEX_BOX)).click()
+    /*
+     * Tìm trong đúng chỉ mục: tab Cấu hình nay bày cả năm phần một lúc, nên
+     * "Trang mục lục" có ở cả hai chỗ — mục ở chỉ mục và tiêu đề của phần.
+     */
+    ;(await within(await screen.findByLabelText(GRID_LABEL)).findByText(INDEX_BOX)).click()
     // Ô đã có mặt, mang chữ mặc định, trong lúc mạng còn đang chờ.
     await waitFor(() => expect(screen.queryByDisplayValue(SITE_DEFAULTS.blurb)).not.toBeNull())
 

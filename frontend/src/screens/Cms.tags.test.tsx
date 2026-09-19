@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -40,14 +40,23 @@ vi.mock('../lib/nav', async () => {
   }
 })
 
-const { Cms, CONFIG_BOXES, TABS } = await import('./Cms')
+const { Cms, CONFIG_BOXES, GRID_LABEL, TABS } = await import('./Cms')
 const CONFIG_TAB = TABS.find((t) => t.k === 'config')!.t
 const TAG_BOX = CONFIG_BOXES.find((b) => b.id === 'tag')!.t
 
+// jsdom không cài `scrollIntoView`, mà bấm một mục ở chỉ mục thì gọi tới nó.
+Element.prototype.scrollIntoView = Element.prototype.scrollIntoView ?? (() => {})
+
+/*
+ * Tab Cấu hình nay bày cả năm phần một lúc, nên ô Tag đã có sẵn trên màn ngay
+ * khi mở tab — bấm mục "Tag" ở chỉ mục chỉ là cuộn tới nó. Phải tìm trong đúng
+ * chỉ mục: chữ "Tag" giờ có ở cả hai chỗ, mục lẫn tiêu đề của phần.
+ */
 const openCopyTab = async () => {
   render(<Cms />)
   ;(await screen.findByText(CONFIG_TAB)).click()
-  ;(await screen.findByText(TAG_BOX)).click()
+  const index = within(await screen.findByLabelText(GRID_LABEL))
+  ;(await index.findByText(TAG_BOX)).click()
 }
 
 describe('tạo tag', () => {
