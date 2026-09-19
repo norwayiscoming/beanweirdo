@@ -18,6 +18,7 @@
  * - Chỗ nào **ghi** vào ba danh sách ấy thì gọi `forget…` để lần đọc sau lấy
  *   bản mới.
  */
+import { modulesChanged } from '../../data/modulesChanged'
 import {
   listModules,
   listTags,
@@ -53,8 +54,17 @@ export const listModulesCached = (): Promise<Module[]> => modules.get()
 export const listTagsCached = (): Promise<Tag[]> => tags.get()
 export const listTemplatesCached = (): Promise<TemplateSummary[]> => templates.get()
 
-/** Gọi sau khi ghi vào `modules`, để lần đọc sau lấy bản mới. */
-export const forgetModules = (): void => modules.forget()
+/**
+ * Gọi sau khi ghi vào `modules`, để lần đọc sau lấy bản mới.
+ *
+ * Quên cache ở đây mới chỉ sửa được nửa khu quản trị. Nửa kia là thanh bên và
+ * Trang chủ: chúng đọc `modules` thẳng từ Supabase qua `data/useModules`, nên
+ * phải được báo, không thì vẫn vẽ thứ tự cũ cho tới khi tải lại cả trang.
+ */
+export const forgetModules = (): void => {
+  modules.forget()
+  modulesChanged()
+}
 /** Gọi sau khi ghi vào `tags`. */
 export const forgetTags = (): void => tags.forget()
 /** Gọi sau khi ghi vào `templates`. */
