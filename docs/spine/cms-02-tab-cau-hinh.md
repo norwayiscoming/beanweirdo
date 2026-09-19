@@ -1,7 +1,7 @@
 # Hai tab gộp thành `Cấu hình`, và một lưới ô thay cho hai cuộn dài
 
 - Nhánh: `claude/project-thread-vvnk0a`
-- PR: *(điền khi mở)*
+- PR: #16
 - Lane: kiến trúc
 
 Chủ site yêu cầu ba việc trong hai tin nhắn 2026-09-19 13:47 và 13:48: gộp
