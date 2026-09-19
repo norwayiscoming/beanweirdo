@@ -60,9 +60,35 @@ describe('memo — thân bài là một dải chữ liền mạch', () => {
     expect(text).toContain('blooming')
   })
 
-  it('chữ nhấn vẽ ra đậm ngay trong mặt soạn, không hiện dấu sao', () => {
-    draw('memo', body)
-    expect(document.querySelector('.awc-live-bold')?.textContent).toBe('hậu vị ngắn')
+  it('nghiêng và đậm vẽ ra hai dáng khác nhau, không hiện dấu sao', () => {
+    /*
+     * Tới 2026-09-19 cả hai vẽ bằng chung một lớp vì site chỉ có một mức
+     * nhấn. Chủ site tách đôi — *"ctrl B là in đậm thôi không in nghiêng"* —
+     * nên chỗ này hỏi đúng hai lớp rời nhau.
+     */
+    const mixed = {
+      ...body,
+      sections: [
+        {
+          h: 'Bean character',
+          items: [
+            {
+              runs: [
+                { t: 'Ngọt mía, ' },
+                { t: 'hậu vị ngắn', em: true },
+                { t: ' và ' },
+                { t: 'rất đậm', b: true },
+              ],
+              cont: ['đo lúc drop'],
+            },
+          ],
+        },
+        ...body.sections.slice(1),
+      ],
+    }
+    draw('memo', mixed)
+    expect(document.querySelector('.awc-live-em')?.textContent).toBe('hậu vị ngắn')
+    expect(document.querySelector('.awc-live-bold')?.textContent).toBe('rất đậm')
     expect(document.querySelector('.awc-live-input')?.textContent).not.toContain('*')
   })
 
