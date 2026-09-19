@@ -1,9 +1,8 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
-import { NAV } from '../content/navItems'
 import { displayNumber } from '../lib/postText'
 import { onlyLive, orderPosts } from '../lib/postOrder'
-import { resolveSite, SITE_DEFAULTS, type NavGroup, type SiteCopy, type SiteOverrides } from '../content/site'
+import { resolveSite, SITE_DEFAULTS, type SiteCopy, type SiteOverrides } from '../content/site'
 import {
   createModule,
   deleteModule,
@@ -33,19 +32,18 @@ import {
 } from '../admin/lib/lists'
 import { tagColor } from '../lib/notesFilter'
 import { PostsPanel } from '../admin/components/PostsPanel'
-import { RoutesPanel } from '../admin/components/RoutesPanel'
 import { ModuleImages } from '../admin/components/ModuleImages'
 import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
 import { coverStyle } from '../lib/imageFocus'
-import { depthOf, possibleParents, rootsOf } from '../lib/contentTree'
+import { depthOf, possibleParents } from '../lib/contentTree'
 import { MODULE_LAYOUTS } from '../content/layouts'
-import { moduleMapRow, type MapRow } from '../lib/siteMapRows'
 import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
 import type { FeatureOverride } from '../content/notes'
 import { ink, paper, sans, serif } from '../design/tokens'
 import { Button, IconButton } from '../design/Button'
+import { radius } from '../design/controls'
 import { IconChevron, IconClose, IconDrag, IconPlus, IconTrash, IconUpload } from '../design/icons'
 import { useToast } from '../design/Toaster'
 import { Hover } from '../lib/Hover'
@@ -131,79 +129,124 @@ function countLabel(id: string, live: number): string {
   return live ? `${live} bài` : 'chưa có bài nào trên trang'
 }
 
-/** The three tabs, named once so the site map and the tab bar cannot drift. */
+/** The two tabs, named once so nothing else can drift from them. */
 export const TABS = [
   { k: 'posts', t: 'Bài viết' },
-  { k: 'map', t: 'Cấu trúc' },
-  { k: 'content', t: 'Chữ trên trang' },
+  { k: 'config', t: 'Cấu hình' },
 ] as const
 
 /**
- * The sections of `Chữ trên trang`, in the order they appear, and the anchors
- * the jump bar scrolls to.
+ * The boxes inside `Cấu hình`, in the order the grid lays them out.
  *
- * Every `id` here must exist as a `div id=` in the tab below, and every such
- * div must be named here: the bar reads this list and scrolls to that id, so a
- * section renamed on one side and not the other leaves a button pointing at
- * nothing — and nothing about that is a type error or a failing render.
- * `Cms.sections.test.tsx` runs the two against each other.
+ * Every `id` here must exist as an anchor in the tab below, and every such
+ * anchor must be named here: the grid opens a box by id, so a box renamed on
+ * one side and not the other opens onto an empty screen — and nothing about
+ * that is a type error or a failing render. `Cms.sections.test.tsx` runs the
+ * two lists against each other.
  *
- * The module editor used to be the sixth of these, 484 lines of it, which is
- * most of why this tab read as one endless scroll. It now lives in `Cấu trúc`,
- * beside the tree it edits — which is also where the site owner went looking
- * for it.
+ * `Cấu trúc` and `Chữ trên trang` were two tabs, each one scroll several
+ * screenfuls long, and the site owner could not find the field that puts a
+ * module inside another module in either of them. One box holds one subject,
+ * and the grid is the whole list of subjects on one screen.
  */
-export const CONTENT_SECTIONS = [
-  { id: 'landing', t: 'Trang chủ' },
-  { id: 'tag', t: 'Tag' },
-  { id: 'notes', t: 'Ghi chép' },
-  { id: 'archive', t: 'Lưu trữ' },
-  { id: 'index', t: 'Mục lục' },
-  { id: 'admin', t: 'Khu quản trị' },
+export const CONFIG_BOXES = [
+  { id: 'landing', t: 'Trang chủ', d: 'Nhãn trên cùng, tên lớn hai dòng, hai đoạn dẫn' },
+  { id: 'modules', t: 'Cây module', d: 'Thêm module, đặt nó nằm trong module khác, dàn trang và ảnh' },
+  { id: 'index', t: 'Trang mục lục', d: 'Tiêu đề, hai đoạn dẫn và ba ảnh khay' },
+  { id: 'tag', t: 'Tag', d: 'Danh sách tag, dùng chung cho ghi chép và bài đăng' },
+  { id: 'notes', t: 'Trang Ghi chép', d: 'Tiêu đề, đoạn dẫn, dòng hướng dẫn, lời kết' },
+  { id: 'archive', t: 'Trang Lưu trữ', d: 'Tiêu đề và dòng phụ đứng cạnh số bài' },
+  { id: 'areas', t: 'Tên ba khu', d: 'Chữ in hoa trên sidebar, và chặng đầu của đường dẫn' },
+  { id: 'admin', t: 'Chữ khu quản trị', d: 'Tiêu đề ba màn quản trị, không phải chữ trên trang công khai' },
 ] as const
 
+export type ConfigBox = (typeof CONFIG_BOXES)[number]['id']
+
 /**
- * The bar that jumps between them.
- *
- * It sits along the top rather than down the left: the forms below run to two
- * and three columns inside 1080px, and a rail would take that back out of the
- * widest rows.
+ * The grid names itself, so a test — and a screen reader — can tell a box from
+ * the breadcrumb of the same name overhead.
  */
-function ContentIndex() {
-  const [at, setAt] = useState<string>(CONTENT_SECTIONS[0].id)
+export const GRID_LABEL = 'Mục cấu hình'
 
-  useEffect(() => {
-    // jsdom has no IntersectionObserver; the bar still jumps, it just does not
-    // light up, which is not worth a polyfill in tests.
-    if (typeof IntersectionObserver === 'undefined') return
-    const seen = new Map<string, number>()
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) seen.set(e.target.id, e.intersectionRatio)
-        // Whichever heading is showing most of itself is the one you are at.
-        let best: string | null = null
-        let ratio = 0
-        for (const [id, r] of seen) if (r > ratio) [best, ratio] = [id, r]
-        if (best) setAt(best)
-      },
-      { rootMargin: '-64px 0px -70% 0px', threshold: [0, 0.5, 1] },
-    )
-    for (const s of CONTENT_SECTIONS) {
-      const el = document.getElementById(s.id)
-      if (el) io.observe(el)
-    }
-    return () => io.disconnect()
-  }, [])
-
+/**
+ * The grid of boxes, which is what `Cấu hình` opens on.
+ *
+ * A whole card is the target, not a link inside it: at this size the text is
+ * the smallest part of the thing you are aiming at.
+ */
+function BoxGrid({ onOpen }: { onOpen: (id: ConfigBox) => void }) {
   return (
     <nav
-      aria-label="Mục trên trang"
+      aria-label={GRID_LABEL}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(262px, 1fr))',
+        gap: 14,
+        marginTop: 8,
+      }}
+    >
+      {CONFIG_BOXES.map((b) => (
+        <button
+          key={b.id}
+          type="button"
+          className="ab-box"
+          onClick={() => onOpen(b.id)}
+          style={{
+            display: 'block',
+            textAlign: 'left',
+            background: paper.white,
+            border: `1px solid ${paper.rule}`,
+            borderRadius: radius,
+            padding: '17px 18px 19px',
+            cursor: 'pointer',
+            font: 'inherit',
+            color: 'inherit',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: serif,
+              fontSize: 22,
+              lineHeight: 1.15,
+              letterSpacing: '-.02em',
+              color: ink.base,
+            }}
+          >
+            {b.t}
+          </div>
+          <div
+            style={{
+              fontFamily: sans,
+              fontWeight: 300,
+              fontSize: 12.5,
+              lineHeight: 1.45,
+              color: ink.muted,
+              marginTop: 7,
+            }}
+          >
+            {b.d}
+          </div>
+        </button>
+      ))}
+    </nav>
+  )
+}
+
+/** The way back to the grid, named once. */
+export const BACK_LABEL = '← Tất cả mục'
+
+/** The bar that says which box is open, and the way back to the grid. */
+function BoxHeader({ id, onBack }: { id: ConfigBox; onBack: () => void }) {
+  const box = CONFIG_BOXES.find((b) => b.id === id)
+  return (
+    <div
       style={{
         position: 'sticky',
         top: 0,
         zIndex: 20,
         display: 'flex',
-        gap: 6,
+        alignItems: 'center',
+        gap: 12,
         flexWrap: 'wrap',
         padding: '12px 0 13px',
         marginBottom: 8,
@@ -211,57 +254,14 @@ function ContentIndex() {
         borderBottom: `1px solid ${paper.rule}`,
       }}
     >
-      {CONTENT_SECTIONS.map((x) => (
-        <button
-          key={x.id}
-          type="button"
-          className="ab ab-ghost ab-sm"
-          aria-current={at === x.id ? 'true' : undefined}
-          style={at === x.id ? { background: ink.base, borderColor: ink.base, color: paper.cream } : undefined}
-          onClick={() => document.getElementById(x.id)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
-        >
-          {x.t}
-        </button>
-      ))}
-    </nav>
+      <Button size="sm" onClick={onBack}>
+        {BACK_LABEL}
+      </Button>
+      <span style={{ fontFamily: sans, fontSize: 12.5, color: ink.soft }}>{box?.d}</span>
+    </div>
   )
 }
 
-
-/**
- * The rows under a page, however deep they run.
- *
- * Each step in indents by the same amount rather than by a different rule per
- * level, so the fourth level needs nothing written for it.
- */
-function MapKids({ rows, depth = 0 }: { rows: MapRow[]; depth?: number }) {
-  return (
-    <>
-      {rows.map((k, ki) => (
-        <div key={`${k.label}-${ki}`}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: 12,
-              padding: `4px 0 4px ${26 + depth * 18}px`,
-              borderLeft: `1px solid ${paper.rule}`,
-              margin: '4px 0 0 6px',
-              fontFamily: sans,
-              fontWeight: 300,
-              fontSize: 12.5,
-              color: ink.soft,
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>{k.label}</div>
-            {k.desc && <div style={{ color: ink.muted }}>{k.desc}</div>}
-          </div>
-          {k.kids.length > 0 && <MapKids rows={k.kids} depth={depth + 1} />}
-        </div>
-      ))}
-    </>
-  )
-}
 
 /** Names where a field turns up on the site — identification, not instruction. */
 function Where({ children }: { children: ReactNode }) {
@@ -703,16 +703,14 @@ export function Cms() {
   const [dragEntry, setDragEntry] = useState<string | null>(null)
   /** Đang hỏi lại trước khi xoá sạch nội dung đã sửa của cả trang. */
   const [resetting, setResetting] = useState(false)
-  /*
-   * Chữ của khu quản trị: gập lại, mặc định đóng.
+  /**
+   * Ô nào của `Cấu hình` đang mở. `null` là lưới.
    *
-   * Sáu ô này đặt tiêu đề cho ba màn *quản trị* — Design system, System
-   * conventions, và chính màn đang mở. Chúng vẫn vẽ ra chữ thật, nên bỏ đi là
-   * mất chỗ sửa chứ không phải dọn rác. Nhưng chúng cũng không phải chữ của
-   * trang công khai, mà lại nằm chình ình cuối một màn dành cho chữ công khai.
-   * Gập lại: giữ được chỗ sửa, mà không bắt ai cũng phải cuộn qua nó.
+   * Nó không nằm trong địa chỉ: một ô là một chặng bên trong màn, không phải
+   * một trang, và `useRoute` chỉ biết tới tab. Hệ quả là F5 quay về lưới —
+   * chấp nhận được, vì từ lưới tới ô là đúng một cú bấm.
    */
-  const [adminOpen, setAdminOpen] = useState(false)
+  const [box, setBox] = useState<ConfigBox | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -918,69 +916,6 @@ export function Cms() {
     }
   }
 
-  /**
-   * What an admin page holds, for the pages that hold something nameable.
-   *
-   * Content management holds its own three tabs. Phần còn lại giữ luật và
-   * tham chiếu, thứ chính trang ấy bày ra tốt hơn một dòng trong sơ đồ.
-   */
-  function childrenOf(key: string): MapRow[] {
-    if (key === 'cms') return TABS.map((t) => ({ label: t.t, desc: '', kids: [] }))
-    return []
-  }
-
-  /**
-   * The site map: every page, and what each one actually holds.
-   *
-   * It used to be assembled from two sources that disagreed. Ghi 01 and Ghi 02
-   * are modules *and* nav entries, so each was listed twice — once with the
-   * hand-typed name from `navItems.ts`, once with the real one from the
-   * database — and Ghi 02, which is private, turned up under Public as well as
-   * Practice. A page that is a module now names itself from that module and
-   * carries its posts; a module with a page of its own is not listed again.
-   *
-   * Rows the admin cannot open do not belong on a map of the site, and rows
-   * that hold something say what they hold, so nothing here is written by hand
-   * twice.
-   */
-  const moduleRow = (m: Module): MapRow => moduleMapRow(modules, m, liveOf)
-
-  const tree: { group: NavGroup; color: string; rows: MapRow[] }[] = (
-    [
-      { group: 'Public', color: ink.green },
-      { group: 'Practice', color: '#C25C7C' },
-      { group: 'Admin', color: '#6FA8C0' },
-    ] as { group: NavGroup; color: string }[]
-  ).map((g) => {
-    const rows: MapRow[] = []
-    // Modules that a nav entry already speaks for — listing them again is the
-    // duplicate this map used to show.
-    const spokenFor = new Set(NAV.map((n) => n.moduleId).filter(Boolean) as string[])
-
-    for (const item of NAV.filter((n) => n.group === g.group && !n.hiddenFromSidebar)) {
-      // Reading modules sit under Trang chủ, the gallery that shows them.
-      if (g.group === 'Public' && item.key === 'notes') {
-        // Only the modules nothing else holds. Everything filed inside one is
-        // reached by recursing into it, so a module is drawn exactly once
-        // however deep it sits — the flat loop that used to be here listed a
-        // sub-module beside its own parent.
-        for (const m of rootsOf(modules).filter((x) => !spokenFor.has(x.id))) {
-          rows.push(moduleRow(m))
-        }
-      }
-
-      const m = item.moduleId ? modules.find((x) => x.id === item.moduleId) : undefined
-      rows.push({
-        // The database wins where it has something to say; the nav entry is the
-        // fallback for a module that has not loaded or does not exist yet.
-        label: m?.title ?? item.label,
-        desc: m?.concept ? `module · ${m.concept}` : item.desc,
-        kids: m ? moduleRow(m).kids : childrenOf(item.key),
-      })
-    }
-    return { ...g, rows }
-  })
-
   const postCount = posts.length
 
   return (
@@ -1065,69 +1000,42 @@ export function Cms() {
         </div>
       )}
 
-      {tab === 'map' && (
-        <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
-          {tree.map((g) => (
-            <div key={g.group} style={{ marginBottom: 40 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  borderBottom: `2px solid ${ink.base}`,
-                  paddingBottom: 9,
-                  marginBottom: 6,
-                }}
-              >
-                <div style={{ width: 9, height: 9, background: g.color }} />
-                <input
-                  value={copy.sections[g.group]}
-                  onChange={(e) =>
-                    setSite((s) => ({ ...s, sections: { ...s.sections, [g.group]: e.target.value } }))
-                  }
-                  onBlur={(e) => void saveSite({ sections: { [g.group]: e.target.value } })}
-                  title="Tên section — đồng bộ với sidebar"
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    background: 'transparent',
-                    border: 0,
-                    outline: 'none',
-                    color: ink.base,
-                    fontFamily: sans,
-                    fontSize: 10.5,
-                    fontWeight: 500,
-                    letterSpacing: '.2em',
-                    textTransform: 'uppercase',
-                    padding: '0 0 1px',
-                  }}
-                />
-              </div>
-              {g.rows.map((r, i) => (
-                <div key={`${r.label}-${i}`} style={{ borderBottom: '1px solid #F0EBDB', padding: '11px 0' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
-                    <div
-                      style={{
-                        fontFamily: serif,
-                        fontSize: 21,
-                        lineHeight: 1.1,
-                        letterSpacing: '-.02em',
-                        flex: 1,
-                        minWidth: 0,
-                      }}
-                    >
-                      {r.label}
-                    </div>
-                    <div style={{ fontFamily: sans, fontWeight: 300, fontSize: 12, color: ink.muted }}>
-                      {r.desc}
-                    </div>
-                  </div>
-                  <MapKids rows={r.kids} />
-                </div>
-              ))}
+      {tab === 'config' && (
+        <div style={{ padding: '0 56px 130px', maxWidth: 1080 }}>
+          {box === null ? (
+            <div style={{ paddingTop: 34 }}>
+              <BoxGrid onOpen={setBox} />
             </div>
-          ))}
+          ) : (
+            <BoxHeader id={box} onBack={() => setBox(null)} />
+          )}
 
+          {/*
+            Ba ô chữ này từng là tiêu đề của cây sơ đồ, và cây ấy chỉ để đọc.
+            Bỏ cây đi thì ba ô phải có chỗ đứng: chúng vẽ ra nhãn sidebar
+            (`Sidebar.tsx`) và chặng đầu của đường dẫn (`crumbs.ts`), nên
+            chúng là thứ sửa được duy nhất trên cây cũ.
+          */}
+          {box === 'areas' && (
+            <div id="areas" style={{ marginTop: 26 }}>
+              <div style={grid(two, 20)}>
+                {(['Public', 'Practice', 'Admin'] as const).map((g) => (
+                  <Field key={g} label={`Khu ${g}`}>
+                    <input
+                      value={copy.sections[g]}
+                      onChange={(e) =>
+                        setSite((s) => ({ ...s, sections: { ...s.sections, [g]: e.target.value } }))
+                      }
+                      onBlur={(e) => void saveSite({ sections: { [g]: e.target.value } })}
+                      style={boxed}
+                    />
+                  </Field>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {box === 'modules' && (<>
           <div
             style={{
               display: 'flex',
@@ -1612,19 +1520,10 @@ export function Cms() {
               </div>
             )
           })}
+          </>)}
 
-          <RoutesPanel
-            stored={site.routes}
-            modules={modules}
-            onSave={(routes) => saveSite({ routes } as SiteOverrides)}
-          />
-        </div>
-      )}
-
-      {tab === 'content' && (
-        <div style={{ padding: '0 56px 130px', maxWidth: 1080 }}>
-          <ContentIndex />
-          <div id="landing" style={{ ...sectionHead, scrollMarginTop: 64 }}>Trang chủ — landing</div>
+          {box === 'landing' && (<>
+          <div id="landing" style={sectionHead}>Trang chủ — landing</div>
           <div style={grid(two)}>
             <Field label="Nhãn trên cùng">
               <input
@@ -1676,15 +1575,21 @@ export function Cms() {
             * của trang Lưu trữ thì có trong dữ liệu nhưng chưa bao giờ có ô để
             * sửa — khai ra rồi bỏ đó cũng là không sửa được.
             */}
+          </>)}
+
           {/*
             * Tag dùng chung cho cả ghi chép lẫn bài đăng — sửa ở đây, ăn cả hai
             * chỗ. Trước đây bốn dạng ghi viết cứng trong code, muốn đổi một chữ
             * là phải sửa code.
             */}
-          <div id="tag" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Tag</div>
+          {box === 'tag' && (<>
+          <div id="tag" style={sectionHead}>Tag</div>
           <TagsPanel />
 
-          <div id="notes" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Ghi chép</div>
+          </>)}
+
+          {box === 'notes' && (<>
+          <div id="notes" style={sectionHead}>Trang Ghi chép</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề trang">
               <input {...field('notesTitle')} style={serifInput} />
@@ -1710,7 +1615,10 @@ export function Cms() {
             </Field>
           </div>
 
-          <div id="archive" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Trang Lưu trữ</div>
+          </>)}
+
+          {box === 'archive' && (<>
+          <div id="archive" style={sectionHead}>Trang Lưu trữ</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề trang">
               <input {...field('archiveTitle')} style={serifInput} />
@@ -1720,7 +1628,10 @@ export function Cms() {
             </Field>
           </div>
 
-          <div id="index" style={{ ...sectionHead, margin: '34px 0 18px', scrollMarginTop: 64 }}>Mục lục</div>
+          </>)}
+
+          {box === 'index' && (<>
+          <div id="index" style={sectionHead}>Trang mục lục</div>
           <div style={grid(two)}>
             <Field label="Tiêu đề — dòng 1">
               <input {...field('t1')} style={serifInput} />
@@ -1769,33 +1680,11 @@ export function Cms() {
             ))}
           </div>
 
-          <button
-            id="admin"
-            type="button"
-            aria-expanded={adminOpen}
-            onClick={() => setAdminOpen((v) => !v)}
-            style={{
-              ...sectionHead,
-              margin: '44px 0 18px',
-              scrollMarginTop: 64,
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: 'transparent',
-              border: 0,
-              borderBottom: `2px solid ${ink.base}`,
-              textAlign: 'left',
-              cursor: 'pointer',
-            }}
-          >
-            <IconChevron size={13} open={adminOpen} />
-            Chữ của khu quản trị
-            <span style={{ fontWeight: 300, letterSpacing: 0, textTransform: 'none', color: ink.faint }}>
-              tiêu đề của ba màn quản trị, không phải chữ trên trang công khai
-            </span>
-          </button>
-          <div style={{ ...grid(two, 20), display: adminOpen ? undefined : 'none' }}>
+          </>)}
+
+          {box === 'admin' && (<>
+          <div id="admin" style={sectionHead}>Chữ của khu quản trị</div>
+          <div style={grid(two, 20)}>
             <Field label="Design system — tiêu đề dòng 1">
               <input
                 {...field('artT1')}
@@ -1844,6 +1733,7 @@ export function Cms() {
               />
             </Field>
           </div>
+          </>)}
 
           {/*
             The most destructive control on the screen was the faintest thing
@@ -1851,8 +1741,12 @@ export function Cms() {
             every copy field on the site with no way back. It asks first now,
             and the question is a second press rather than a `confirm()` the
             browser can suppress.
+
+            It sits on the grid, not inside a box: it wipes every box at once,
+            so it belongs to none of them.
           */}
-          <div style={{ marginTop: 34, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {box === null && (
+          <div style={{ marginTop: 44, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             {resetting ? (
               <>
                 <span style={{ fontFamily: sans, fontSize: 12.5, color: ink.danger }}>
@@ -1886,6 +1780,7 @@ export function Cms() {
               </Button>
             )}
           </div>
+          )}
         </div>
       )}
     </div>

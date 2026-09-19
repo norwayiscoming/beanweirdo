@@ -40,12 +40,14 @@ vi.mock('../lib/nav', async () => {
   }
 })
 
-const { Cms, TABS } = await import('./Cms')
-const COPY_TAB = TABS.find((t) => t.k === 'content')!.t
+const { Cms, CONFIG_BOXES, TABS } = await import('./Cms')
+const CONFIG_TAB = TABS.find((t) => t.k === 'config')!.t
+const TAG_BOX = CONFIG_BOXES.find((b) => b.id === 'tag')!.t
 
 const openCopyTab = async () => {
   render(<Cms />)
-  ;(await screen.findByText(COPY_TAB)).click()
+  ;(await screen.findByText(CONFIG_TAB)).click()
+  ;(await screen.findByText(TAG_BOX)).click()
 }
 
 describe('tạo tag', () => {

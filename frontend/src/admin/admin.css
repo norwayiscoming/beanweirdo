@@ -305,3 +305,15 @@
 }
 .ab-menuitem-danger { color: #8e1e42; }
 .ab-menuitem-danger:hover { background: #fbe7e5; }
+
+/*
+ * Thẻ trong lưới của tab Cấu hình.
+ *
+ * Cả thẻ là cái để bấm, nên nó cần trạng thái hover và một vòng focus như mọi
+ * nút khác — hai thứ không viết inline được, nên chúng ở đây.
+ */
+.ab-box:hover { border-color: #8c8674; background: #fffdf7; }
+.ab-box:focus-visible {
+  outline: 2px solid #3e7a4e;
+  outline-offset: 2px;
+}

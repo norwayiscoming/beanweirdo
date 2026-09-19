@@ -45,10 +45,11 @@ vi.mock('../lib/nav', async () => {
   }
 })
 
-const { Cms, TABS } = await import('./Cms')
+const { Cms, CONFIG_BOXES, TABS } = await import('./Cms')
 
-/** The copy tab, by key — so renaming its label does not break this test. */
-const COPY_TAB = TABS.find((t) => t.k === 'content')!.t
+/** The tab and the box, by key — so renaming either label does not break this test. */
+const CONFIG_TAB = TABS.find((t) => t.k === 'config')!.t
+const INDEX_BOX = CONFIG_BOXES.find((b) => b.id === 'index')!.t
 
 describe('CMS hiện nội dung thật', () => {
   it('ô chữ đổi theo dữ liệu về sau, không đứng ở chữ mặc định', async () => {
@@ -56,13 +57,14 @@ describe('CMS hiện nội dung thật', () => {
     const daLuu = 'Ba mạch chính: cảm quan, lý–hoá–sinh, rang.'
     expect(daLuu).not.toBe(SITE_DEFAULTS.blurb)
     // Giữ mạng lại: biểu mẫu phải vẽ ra *trước* khi nội dung về, đúng như khi
-    // mở thẳng tab "Sửa nội dung" trên một đường truyền chậm. Nếu ô chỉ đọc giá
+    // mở thẳng ô "Trang mục lục" trên một đường truyền chậm. Nếu ô chỉ đọc giá
     // trị một lần lúc vẽ, nó đứng mãi ở chữ mặc định.
     let traVe: (v: unknown) => void = () => {}
     getSite.mockReturnValue(new Promise((r) => (traVe = r)))
 
     render(<Cms />)
-    ;(await screen.findByText(COPY_TAB)).click()
+    ;(await screen.findByText(CONFIG_TAB)).click()
+    ;(await screen.findByText(INDEX_BOX)).click()
     // Ô đã có mặt, mang chữ mặc định, trong lúc mạng còn đang chờ.
     await waitFor(() => expect(screen.queryByDisplayValue(SITE_DEFAULTS.blurb)).not.toBeNull())
 

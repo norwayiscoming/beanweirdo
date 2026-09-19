@@ -18,8 +18,7 @@ const ROUNDTRIP: Where[] = [
   { area: 'practice', screen: 'hours' },
   { area: 'admin', screen: 'cms' },
   { area: 'admin', screen: 'cms', tab: 'posts' },
-  { area: 'admin', screen: 'cms', tab: 'map' },
-  { area: 'admin', screen: 'cms', tab: 'content' },
+  { area: 'admin', screen: 'cms', tab: 'config' },
   { area: 'admin', screen: 'logic' },
   { area: 'admin', screen: 'archive' },
   { area: 'admin', screen: 'postNew' },
@@ -72,11 +71,15 @@ describe('routes — tên trong địa chỉ', () => {
   })
 
   it('opens each Content management tab at its own address', () => {
-    for (const p of ['/ad-post', '/ad-sitemap', '/ad-page-content', '/ad']) {
+    for (const p of ['/ad-post', '/ad-config', '/ad-sitemap', '/ad-page-content', '/ad']) {
       expect(parsePath(p).screen, p).toBe('cms')
     }
-    expect(parsePath('/ad-sitemap').tab).toBe('map')
-    expect(parsePath('/ad-page-content').tab).toBe('content')
+    expect(parsePath('/ad-config').tab).toBe('config')
+    expect(toPath({ area: 'admin', screen: 'cms', tab: 'config' })).toBe('/ad-config')
+    // Hai nửa cũ của tab ấy. Không còn được sinh ra, nhưng link đã phát ra rồi
+    // thì vẫn phải mở đúng chỗ — người cầm link không biết chúng đã gộp.
+    expect(parsePath('/ad-sitemap').tab).toBe('config')
+    expect(parsePath('/ad-page-content').tab).toBe('config')
     // `/ad` names the screen and not a tab, so it opens on the first one
     // without rewriting itself to another address on arrival.
     expect(parsePath('/ad').tab).toBeUndefined()
