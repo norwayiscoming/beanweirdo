@@ -30,12 +30,28 @@ const longform = [
   { k: 'p', runs: [{ t: 'Đoạn ba.' }] },
 ]
 const cards = [{ t: 'Thẻ một', d: 'mô tả' }, { t: 'Thẻ hai', d: 'mô tả' }]
+/*
+ * `?b=empty` dựng bài rỗng, `?b=heads` dựng bài toàn tiêu đề — hai hình dạng
+ * mà bài thật hay có mà bộ mẫu ở trên thì không.
+ */
+const variant = new URLSearchParams(location.search).get('b') ?? ''
+const heads = [
+  { type: 'heading', id: 'h1', level: 2, text: 'Tiêu đề một' },
+  { type: 'heading', id: 'h2', level: 2, text: 'Tiêu đề hai' },
+]
+const lfHeads = [
+  { k: 'h1', runs: [{ t: 'Tiêu đề lớn' }] },
+  { k: 'h2', runs: [{ t: 'Tiêu đề nhỏ' }] },
+]
+const pick = <T,>(normal: T, empty: T, headings: T): T =>
+  variant === 'empty' ? empty : variant === 'heads' ? headings : normal
+
 const body =
-  tpl === 'report' ? els
-  : tpl === 'article' ? sections
-  : tpl === 'longform' ? longform
+  tpl === 'report' ? pick(els, [] as unknown as typeof els, heads as unknown as typeof els)
+  : tpl === 'article' ? pick(sections, [] as unknown as typeof sections, sections.map((x) => ({ h: x.h, p: '' })))
+  : tpl === 'longform' ? pick(longform, [] as unknown as typeof longform, lfHeads as unknown as typeof longform)
   : tpl === 'cards' ? cards
-  : { len: 'ngắn', subtitle: 'phụ đề', elements: els }
+  : { len: 'ngắn', subtitle: 'phụ đề', elements: pick(els, [] as unknown as typeof els, heads as unknown as typeof els) }
 function Harness() {
   const [b, setB] = useState<unknown>(body)
   return (

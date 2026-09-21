@@ -1386,13 +1386,27 @@ function ArticleEditor({
           </RowShell>
         )
       }}
-      renderAfterSections={() => (
-        <div className="awc-rep-block">
-          <div className="awc-gutter" style={{ opacity: 1 }}>
-            {insertPlus(-1, sections.length)}
+      /* Bài rỗng thì đây là mặt soạn **duy nhất** — xem `renderAfterElements`. */
+      renderAfterSections={() =>
+        sections.length === 0 ? (
+          <LiveRun
+            text=""
+            menuOpen={menuAt === -1}
+            onToggleMenu={() => setMenuAt(menuAt === -1 ? null : -1)}
+            onCommit={(md) => setSections(writeSectionRun(sections, [0, -1], md))}
+            onInsertAfterLine={(_line, t) => {
+              setSections(insertSectionThing(sections, [0, -1], '', 0, blankReportBlock(t) as never))
+              setMenuAt(null)
+            }}
+          />
+        ) : (
+          <div className="awc-rep-block">
+            <div className="awc-gutter" style={{ opacity: 1 }}>
+              {insertPlus(-1, sections.length)}
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
     />
   )
 }
@@ -1607,20 +1621,34 @@ function LongformEditor({
           />
         )
       }}
-      renderAfterBlocks={() => (
-        <div className="awc-rep-block">
-          <div className="awc-gutter" style={{ opacity: 1 }}>
-            <InsertPlus
-              open={menuAt === -1}
-              onToggle={() => setMenuAt(menuAt === -1 ? null : -1)}
-              onInsert={(t) => {
-                write(insertAt(blocks, blocks.length, blankReportBlock(t) as never))
-                setMenuAt(null)
-              }}
-            />
+      /* Bài rỗng thì đây là mặt soạn **duy nhất** — xem `renderAfterElements`. */
+      renderAfterBlocks={() =>
+        blocks.length === 0 ? (
+          <LiveRun
+            text=""
+            menuOpen={menuAt === -1}
+            onToggleMenu={() => setMenuAt(menuAt === -1 ? null : -1)}
+            onCommit={(md) => write(writeLongformRun(blocks, [0, -1], md))}
+            onInsertAfterLine={(_line, t) => {
+              write(insertLongformThing(blocks, [0, -1], '', 0, blankReportBlock(t) as never))
+              setMenuAt(null)
+            }}
+          />
+        ) : (
+          <div className="awc-rep-block">
+            <div className="awc-gutter" style={{ opacity: 1 }}>
+              <InsertPlus
+                open={menuAt === -1}
+                onToggle={() => setMenuAt(menuAt === -1 ? null : -1)}
+                onInsert={(t) => {
+                  write(insertAt(blocks, blocks.length, blankReportBlock(t) as never))
+                  setMenuAt(null)
+                }}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
       renderText={(text, i, sub) => (
         <EditableField
           value={text}
@@ -2056,14 +2084,31 @@ function useElementBody({
     )
   }
 
-  /** Bài rỗng vẫn phải có một chỗ bấm để bắt đầu. */
+  /**
+   * Bài rỗng vẫn phải có một **chỗ gõ**, không chỉ một chỗ bấm.
+   *
+   * Trước 2026-09-21 chỗ này chỉ vẽ cái máng `+`, nên một bài longform hay
+   * bitesize chưa có gì trong thân thì không có mặt soạn nào trên màn: bấm
+   * vào giữa trang không ra con trỏ, và thứ duy nhất gõ được là dòng tiêu đề.
+   * Chủ site: *"longform với bitesize không gõ được mà cứ ở headlines mãi,
+   * click vào không ra con trỏ"*.
+   *
+   * `toRuns([])` vốn đã hứa một dải rỗng để gõ vào; thiếu sót nằm ở đây, chỗ
+   * vẽ — `wrapElement` chạy theo từng element, nên mảng rỗng thì nó không
+   * chạy lần nào. Nay dải ấy được vẽ ra, và `LiveRun` mang sẵn cái máng `+`.
+   */
   const renderAfterElements = (): ReactNode =>
     elements.length === 0 ? (
-      <div className="awc-rep-block">
-        <div className="awc-gutter" style={{ opacity: 1 }}>
-          {insertPlus(-1, 0)}
-        </div>
-      </div>
+      <LiveRun
+        text=""
+        menuOpen={menuAt === -1}
+        onToggleMenu={() => setMenuAt(menuAt === -1 ? null : -1)}
+        onCommit={(md) => write(writeRun(elements, [0, -1], md))}
+        onInsertAfterLine={(_line, t) => {
+          write(insertThing(elements, [0, -1], '', 0, blankReportBlock(t)))
+          setMenuAt(null)
+        }}
+      />
     ) : null
 
   return { wrapElement, renderAfterElements }
