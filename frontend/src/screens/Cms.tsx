@@ -37,7 +37,8 @@ import { ModuleImages } from '../admin/components/ModuleImages'
 import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
 import { coverStyle } from '../lib/imageFocus'
-import { depthOf, possibleParents } from '../lib/contentTree'
+import { buildTree, depthOf, flattenTree, possibleParents } from '../lib/contentTree'
+import { planModuleMove, type DropWhere } from '../lib/moduleMove'
 import { MODULE_LAYOUTS } from '../content/layouts'
 import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
@@ -114,6 +115,17 @@ const nameRow = 'minmax(0,1fr) 112px 124px 128px'
 const nameRowPlain = 'minmax(0,1fr) 112px'
 /** The parent picker sits alone: a full-width select for one short name reads as a mistake. */
 const parentRow = 'minmax(0,340px)'
+
+/**
+ * Một nấc thụt lề trong cây module.
+ *
+ * 29px là bề ngang tay nắm cộng mũi tên cộng khoảng hở giữa chúng, nên chấm
+ * màu của một module con rơi thẳng hàng dưới mũi tên của cha nó.
+ */
+const INDENT = 29
+
+/** Vạch chỉ chỗ thẻ sẽ hạ xuống. Nét liền, cùng màu chữ — xem luật hình. */
+const dropBar: CSSProperties = { height: 2, background: ink.base }
 
 /**
  * What a module row counts.
@@ -711,7 +723,14 @@ export function Cms() {
   const [posts, setPosts] = useState<PostSummary[]>([])
   const [openModule, setOpenModule] = useState<string | null>(null)
   const [dragModule, setDragModule] = useState<string | null>(null)
-  const [overModule, setOverModule] = useState<string | null>(null)
+  /**
+   * Chỗ con trỏ đang chỉ tới trong lúc kéo: thẻ nào, và phần nào của thẻ ấy.
+   *
+   * Trước đây chỉ có một id, vì thả chỉ có một nghĩa — chen vào trước thẻ kia.
+   * Cây thì mỗi thẻ có ba vùng thả, nên id thôi không đủ nói người ta đang
+   * định làm gì.
+   */
+  const [dropAt, setDropAt] = useState<{ id: string; where: DropWhere } | null>(null)
   const [dragEntry, setDragEntry] = useState<string | null>(null)
   /** Đang hỏi lại trước khi xoá sạch nội dung đã sửa của cả trang. */
   const [resetting, setResetting] = useState(false)
@@ -897,29 +916,107 @@ export function Cms() {
     return ka !== undefined && ka === kindOf(b)
   }
 
-  async function dropModule(targetId: string) {
+  /**
+   * Cây module đúng như màn hình bày nó: cha trước con, mỗi hàng mang độ sâu.
+   *
+   * `shownModules` là thứ tự chung của cả bảng; cái cây thì dựng từ `parent_id`.
+   * Một hàng xuất hiện đúng một lần, dưới cha của nó — `buildTree` giữ nguyên
+   * thứ tự đưa vào, nên thứ tự anh em vẫn là thứ tự chủ site kéo ra.
+   */
+  const moduleRows = useMemo(
+    () => flattenTree(buildTree(shownModules)).map((n) => ({ m: n.row, depth: n.depth })),
+    [shownModules],
+  )
+
+  /** Số thứ tự đếm lại từ 01 trong mỗi cấp, vì đó là cái người đọc thấy. */
+  const siblingIndex = useMemo(() => {
+    const seen = new Map<string, number>()
+    const out = new Map<string, number>()
+    for (const { m } of moduleRows) {
+      const key = m.parent_id ?? ''
+      const n = (seen.get(key) ?? 0) + 1
+      seen.set(key, n)
+      out.set(m.id, n)
+    }
+    return out
+  }, [moduleRows])
+
+  /**
+   * Thả một thẻ xuống chỗ con trỏ đang chỉ.
+   *
+   * Hai lượt ghi, đúng thứ tự ấy: `parent_id` trước, rồi `sort_order`. Ngược
+   * lại thì `PUT /api/modules` trả về danh sách đọc từ database *trước* khi
+   * cha mới kịp ghi, và màn hình dựng lại cây cũ đè lên cây vừa kéo.
+   */
+  async function dropModule(targetId: string, where: DropWhere) {
     const src = dragModule
     setDragModule(null)
-    setOverModule(null)
+    setDropAt(null)
     if (!src || src === targetId) return
     if (!sameBand(src, targetId)) {
       toast.info(BAND_RULE)
       return
     }
+
     // `shownModules`, not `modules`: the numbers written here become the site's
     // order, so they have to be written over the list the owner just dragged.
-    const order = shownModules.map((m) => m.id)
-    const i = order.indexOf(src)
-    const j = order.indexOf(targetId)
-    if (i < 0 || j < 0) return
-    order.splice(j, 0, order.splice(i, 1)[0])
-    setModules(order.map((id) => modules.find((m) => m.id === id)!))
+    const plan = planModuleMove(shownModules, src, targetId, where)
+    if ('error' in plan) {
+      toast.info('Không đặt được module vào trong chính nó')
+      return
+    }
+
+    const before = modules
+    const byId = new Map(modules.map((m) => [m.id, m]))
+    setModules(
+      plan.order.map((id) =>
+        id === src ? { ...byId.get(id)!, parent_id: plan.parentId } : byId.get(id)!,
+      ),
+    )
     forgetModules()
     try {
-      setModules(await reorderModules(order))
+      if ((byId.get(src)?.parent_id ?? null) !== plan.parentId) {
+        await updateModule(src, { parent_id: plan.parentId })
+      }
+      setModules(await reorderModules(plan.order))
     } catch (e) {
+      // Ghi hỏng thì trả màn hình về đúng cây cũ, chứ không để nó bày một cây
+      // chỉ có trên trình duyệt này.
+      setModules(before)
       toast.fromError(e)
     }
+  }
+
+  /**
+   * Nước đi này có hợp lệ không — hỏi trước khi vẽ dấu hiệu thả.
+   *
+   * Vẽ cái viền "nằm trong" rồi mới từ chối lúc thả là hứa một việc sắp làm
+   * xong. Hỏi cùng một hàm mà lúc thả sẽ hỏi, nên hai câu trả lời không thể
+   * lệch nhau.
+   */
+  const canDropHere = (src: string, targetId: string, where: DropWhere) =>
+    sameBand(src, targetId) && !('error' in planModuleMove(shownModules, src, targetId, where))
+
+  /**
+   * Con trỏ đang ở phần nào của thẻ: mép trên, mép dưới, hay giữa.
+   *
+   * Một phần tư trên và một phần tư dưới là "đứng cạnh", nửa giữa là "nằm
+   * trong". Chia tư chứ không chia đôi vì thả vào trong là việc mới và là việc
+   * hay làm hơn, nên nó chiếm vùng rộng nhất và dễ trúng nhất.
+   */
+  function whereIn(e: { clientY: number; currentTarget: HTMLElement }): DropWhere {
+    const box = e.currentTarget.getBoundingClientRect()
+    const part = (e.clientY - box.top) / box.height
+    /*
+     * Không đo được thì trả lời `before` — tức đúng cái nút này vẫn làm trước
+     * khi có cây. `inside` đổi cả cha của module lẫn đường dẫn của mọi bài
+     * trong nó, nên nó phải là câu trả lời khi đã **đo được** là con trỏ nằm
+     * giữa thẻ, không bao giờ là câu trả lời mặc định khi phép đo hỏng.
+     */
+    if (!Number.isFinite(part)) return 'before'
+    if (part < 0.25) return 'before'
+    if (part > 0.75) return 'after'
+    return 'inside'
   }
 
   /**
@@ -1121,7 +1218,7 @@ export function Cms() {
                 color: ink.muted,
               }}
             >
-              Module — kéo thẻ để đổi thứ tự
+              Module — kéo để xếp và lồng vào nhau
             </div>
             <Button
               level="primary"
@@ -1142,7 +1239,7 @@ export function Cms() {
             </Button>
           </div>
 
-          {shownModules.map((m, mi) => {
+          {moduleRows.map(({ m, depth }) => {
             // Only what a reader sees. Order is a fact about the page, so a
             // post that is not on the page has no place in this list — the
             // drafts and the archive are managed on Tạo bài đăng.
@@ -1150,6 +1247,11 @@ export function Cms() {
             const open = openModule === m.id
             // Which fields this module actually uses — see admin/moduleForm.ts.
             const shape = formShapeOf(m)
+            // Mỗi tầng thụt vào một nấc bằng đúng bề ngang tay nắm cộng mũi
+            // tên, nên tên module của tầng con rơi thẳng hàng dưới tên cha.
+            const indent = depth * INDENT
+            const over = dropAt?.id === m.id && dragModule !== null && dragModule !== m.id
+            const into = over && dropAt?.where === 'inside'
             return (
               <div
                 key={m.id}
@@ -1157,16 +1259,24 @@ export function Cms() {
                 onDragStart={() => setDragModule(m.id)}
                 onDragOver={(e) => {
                   e.preventDefault()
-                  if (dragModule && !sameBand(dragModule, m.id)) return
-                  if (overModule !== m.id) setOverModule(m.id)
+                  if (!dragModule) return
+                  const where = whereIn(e)
+                  if (!canDropHere(dragModule, m.id, where)) {
+                    if (dropAt !== null) setDropAt(null)
+                    return
+                  }
+                  if (dropAt?.id !== m.id || dropAt.where !== where) setDropAt({ id: m.id, where })
+                }}
+                onDragLeave={() => {
+                  if (dropAt?.id === m.id) setDropAt(null)
                 }}
                 onDrop={(e) => {
                   e.preventDefault()
-                  void dropModule(m.id)
+                  void dropModule(m.id, whereIn(e))
                 }}
                 onDragEnd={() => {
                   setDragModule(null)
-                  setOverModule(null)
+                  setDropAt(null)
                 }}
                 style={{
                   borderBottom: '1px solid #F0EBDB',
@@ -1174,12 +1284,38 @@ export function Cms() {
                   opacity: dragModule === m.id ? 0.45 : 1,
                 }}
               >
-                {overModule === m.id && dragModule !== m.id && (
-                  <div style={{ height: 2, background: ink.base, margin: '-13px 0 11px' }} />
+                {/*
+                  Ba vùng thả, ba dấu hiệu khác nhau — vì thả sai chỗ trong một
+                  cây không chỉ là đổi thứ tự, nó đổi cả chỗ bài nằm và địa chỉ
+                  của chúng. Vạch ngang thụt vào đúng tầng thẻ sẽ hạ xuống, còn
+                  "nằm trong" viền cả thẻ đích lại vì cái sắp đổi là **thẻ kia**
+                  chứ không phải khe giữa hai thẻ.
+                */}
+                {over && dropAt?.where === 'before' && (
+                  <div style={{ ...dropBar, marginLeft: indent, marginTop: -13, marginBottom: 11 }} />
                 )}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 13,
+                    // Viền của "nằm trong" ăn ra ngoài 8px mỗi bên để chữ
+                    // không dính vào nét, nên lề trái lùi lại đúng chừng ấy và
+                    // hàng không nhích sang khi viền hiện ra.
+                    marginLeft: into ? indent - 8 : indent,
+                    marginTop: into ? -5 : 0,
+                    marginBottom: into ? -5 : 0,
+                    ...(into
+                      ? {
+                          boxShadow: `inset 0 0 0 1px ${ink.base}`,
+                          borderRadius: radius,
+                          padding: '5px 8px',
+                        }
+                      : null),
+                  }}
+                >
                   <Hover
-                    title="Kéo để đổi thứ tự"
+                    title="Kéo lên mép thẻ khác để đổi thứ tự, vào giữa thẻ để nằm trong nó"
                     style={{
                       fontFamily: sans,
                       lineHeight: 0,
@@ -1208,7 +1344,7 @@ export function Cms() {
                   <div
                     style={{ fontFamily: sans, fontSize: 10.5, letterSpacing: '.16em', color: ink.faint, width: 26, flex: 'none' }}
                   >
-                    {String(mi + 1).padStart(2, '0')}
+                    {String(siblingIndex.get(m.id) ?? 1).padStart(2, '0')}
                   </div>
                   <button
                     type="button"
@@ -1217,12 +1353,15 @@ export function Cms() {
                     onClick={() => setOpenModule(open ? null : m.id)}
                     style={{
                       fontFamily: serif,
-                      fontSize: 24,
+                      // Mỗi tầng nhỏ đi một nấc, dừng ở 17px: chỉ thụt lề thôi
+                      // thì liếc qua vẫn phải dò xem hàng nào là cha hàng nào.
+                      fontSize: Math.max(24 - depth * 3.5, 17),
                       lineHeight: 1.1,
                       letterSpacing: '-.025em',
                       color: ink.base,
                       flex: 1,
                       minWidth: 0,
+                      textAlign: 'left',
                     }}
                   >
                     {m.title}
@@ -1251,8 +1390,12 @@ export function Cms() {
                   </IconButton>
                 </div>
 
+                {over && dropAt?.where === 'after' && (
+                  <div style={{ ...dropBar, marginLeft: indent, marginTop: 11, marginBottom: -13 }} />
+                )}
+
                 {open && (
-                  <div style={{ padding: '16px 0 6px 39px' }}>
+                  <div style={{ padding: '16px 0 6px', paddingLeft: 39 + indent }}>
                     <div style={grid(shape.concept ? nameRow : nameRowPlain)}>
                       <Field label="Tên module">
                         <input
