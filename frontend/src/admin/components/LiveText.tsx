@@ -80,6 +80,35 @@ function CommitOnBlur({ onCommit }: { onCommit: (markdown: string) => void }) {
 }
 
 /**
+ * Chữ đổi từ **bên ngoài** thì dựng lại mặt soạn.
+ *
+ * Lexical đọc `text` đúng **một lần**, lúc dựng (`initialConfig.editorState`).
+ * Chừng nào chữ chỉ đổi do người viết gõ thì thế là đủ — và đến 2026-09-21
+ * thì đúng là thế thật.
+ *
+ * Nhưng nút `+` nay cắt dải chữ làm đôi: chèn một cái bảng vào giữa thì dải
+ * trên còn lại một nửa. React giữ nguyên component (cùng `key`), nên Lexical
+ * không đọc lại và **mặt soạn vẫn bày nguyên cả dải cũ** — trên màn hình là
+ * hai bản của cùng đoạn văn, một ở trên bảng một ở dưới. Đo trong Chrome, xem
+ * `docs/inbox/template/`.
+ *
+ * So bằng chính markdown chứ không bằng một cờ: dựng lại một mặt soạn đang có
+ * con trỏ là làm mất chỗ đang gõ, nên chỉ dựng lại khi chữ thật sự khác.
+ */
+function SyncOutside({ text }: { text: string }) {
+  const [editor] = useLexicalComposerContext()
+  useEffect(() => {
+    let current = ''
+    editor.getEditorState().read(() => {
+      current = unescapeSite($convertToMarkdownString(SITE_TRANSFORMERS))
+    })
+    if (current === text) return
+    editor.update(() => $convertFromMarkdownString(text, SITE_TRANSFORMERS))
+  }, [editor, text])
+  return null
+}
+
+/**
  * `Tab` trong danh sách, `Cmd+K`, `Cmd+\`, và hai mép — xem `liveKeys.ts`.
  *
  * Hai hàm ở mép đi qua một `ref` chứ không vào mảng phụ thuộc: chỗ gọi dựng
@@ -136,6 +165,7 @@ export function LiveText({
         {/* Gõ `- ` ra danh sách thì `Enter`, `Tab` trong danh sách phải chạy theo. */}
         <ListPlugin />
         <HistoryPlugin />
+        <SyncOutside text={text} />
         <LiveKeys edges={{ onBackspaceAtStart, onDeleteAtEnd }} />
         <CommitOnBlur onCommit={onCommit} />
       </div>

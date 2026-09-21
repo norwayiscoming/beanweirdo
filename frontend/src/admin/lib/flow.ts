@@ -18,6 +18,7 @@
  * Cách lưu **không đổi một chữ**. Đây thuần tuý là cách bày ra để sửa.
  */
 import { bodyToMarkdown, markdownToBlocks, type ReportBlock } from 'post-renderer'
+import { splitAfterBlock } from './mdBlocks'
 
 /**
  * Khối nào là **chữ**, tức nhập chung một ô với đoạn văn bên cạnh.
@@ -94,38 +95,31 @@ export function writeRun(blocks: ReportBlock[], at: [number, number], text: stri
 }
 
 /**
- * Chèn một thứ vào **giữa** một dải chữ, tại đúng chỗ con trỏ đang đứng.
+ * Chèn một thứ vào **giữa** một dải chữ, ngay sau khối con trỏ đang đứng.
  *
- * Chữ trước con trỏ ở lại thành một dải, thứ vừa chèn đứng sau nó, chữ còn
- * lại thành dải tiếp theo. Đó là nghĩa của "ở dòng nào ở đâu cũng tạo được".
+ * Trước 2026-09-21 chỗ gọi tự cộng: `run.at[0] + khối thứ mấy + 1`. Phép cộng
+ * ấy giả định mỗi khối trong kho vẽ ra đúng một khối trên mặt soạn, và giả
+ * định ấy sai ở article lẫn longform — xem `mdBlocks.ts`. Nên nay không cộng
+ * nữa: cắt chính chuỗi markdown của dải, rồi dựng lại cả hai nửa.
+ *
+ * `thing` giữ `id` mới của nó. Mấy khối chữ thì nhận lại `id` cũ theo thứ tự,
+ * cùng lý do với `writeRun`: ghi chú cạnh bài neo vào `id`.
  */
-export function splitForThing(
+export function insertThing(
   blocks: ReportBlock[],
   at: [number, number],
   text: string,
-  caret: number,
+  blockIndex: number,
   thing: ReportBlock,
-): { blocks: ReportBlock[]; thingAt: number } {
-  /*
-   * Con trỏ ở **đầu** một dòng thì thứ chèn vào đứng trước dòng ấy; ở bất kỳ
-   * đâu khác trong dòng thì đứng **sau** cả dòng.
-   *
-   * Không bao giờ cắt giữa câu: một cái bảng chen vào giữa một câu làm câu ấy
-   * gãy làm đôi, mà người viết không hề ra lệnh cho việc đó.
-   */
-  const lineStart = text.lastIndexOf('\n', Math.max(0, caret - 1)) + 1
-  const lineEnd = text.indexOf('\n', caret)
-  const cut = caret === lineStart ? lineStart : lineEnd === -1 ? text.length : lineEnd
-  const before = text.slice(0, cut).replace(/\s+$/, '')
-  const after = text.slice(cut)
-
+): ReportBlock[] {
+  const [before, after] = splitAfterBlock(text, blockIndex)
   const head = before.trim() === '' ? [] : (markdownToBlocks(before) as unknown as ReportBlock[])
   const tail = after.trim() === '' ? [] : (markdownToBlocks(after) as unknown as ReportBlock[])
 
   const keep = blocks.slice(at[0], at[1] + 1).map((b) => b.id)
-  const named = [...head, thing, ...tail].map((b, k) => (keep[k] ? { ...b, id: keep[k] } : b))
+  const named = [...head, ...tail].map((b, k) => (keep[k] ? { ...b, id: keep[k] } : b))
 
   const next = [...blocks]
-  next.splice(at[0], at[1] - at[0] + 1, ...named)
-  return { blocks: next, thingAt: at[0] + head.length }
+  next.splice(at[0], at[1] - at[0] + 1, ...named.slice(0, head.length), thing, ...named.slice(head.length))
+  return next
 }

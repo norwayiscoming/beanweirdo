@@ -14,6 +14,7 @@
  * đang chạy trên trang thật, và đây thuần tuý là cách bày ra để sửa.
  */
 import { longformRunsToText, longformTextToRuns, type LongformBlock } from 'post-renderer'
+import { splitAfterBlock } from './mdBlocks'
 
 /** Khối nào markdown viết ra rồi đọc lại được mà không mất gì. */
 const FLOWING = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'li'])
@@ -102,6 +103,31 @@ export function writeLongformRun(
 ): LongformBlock[] {
   const next = markdownToRun(markdown)
   return [...blocks.slice(0, at[0]), ...next, ...blocks.slice(at[1] + 1)]
+}
+
+/**
+ * Chèn một thứ vào giữa một dải, ngay sau khối con trỏ đang đứng.
+ *
+ * Ở đây `runToMarkdown` nối cả dải bằng **một** dấu xuống dòng, nên năm đoạn
+ * văn liền nhau vẽ ra *một* khối trên mặt soạn. Phép cộng chỉ số cũ vì thế
+ * luôn ra `run.at[0] + 1`, tức khối chèn vào luôn rơi ngay sau đoạn đầu dải
+ * bất kể con trỏ ở đâu.
+ */
+export function insertLongformThing(
+  blocks: LongformBlock[],
+  at: [number, number],
+  text: string,
+  blockIndex: number,
+  thing: LongformBlock,
+): LongformBlock[] {
+  const [before, after] = splitAfterBlock(text, blockIndex)
+  return [
+    ...blocks.slice(0, at[0]),
+    ...markdownToRun(before),
+    thing,
+    ...markdownToRun(after),
+    ...blocks.slice(at[1] + 1),
+  ]
 }
 
 /** Dải nào chứa khối thứ `i`, để `wrapBlock` biết vẽ gì ở chỗ ấy. */

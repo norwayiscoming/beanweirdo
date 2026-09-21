@@ -9,8 +9,33 @@ const els = [
   { type: 'table', id: 't1', table: { columns: ['Ngày'], rows: [{ cells: ['01'] }] } },
   { type: 'paragraph', id: 'b4', text: 'Đoạn sau bảng.' },
 ]
-const tpl = (new URLSearchParams(location.search).get('t') ?? 'report') as 'report' | 'memo' | 'bitesize'
-const body = tpl === 'report' ? els : { len: 'ngắn', subtitle: 'phụ đề', elements: els }
+type Tpl = 'report' | 'memo' | 'bitesize' | 'article' | 'longform' | 'cards'
+const tpl = (new URLSearchParams(location.search).get('t') ?? 'report') as Tpl
+
+/*
+ * Article và longform có từ vựng thân bài riêng, và **chính hai cái ấy** là
+ * chỗ nút `+` chèn sai vị trí (xem `mdBlocks.ts`). Trang thử mà chỉ dựng ba
+ * khuôn element thì không bao giờ chạm tới lỗi đó, nên nay nó dựng cả sáu.
+ */
+const sections = [
+  { h: 'Phần một', p: 'Một đoạn văn của phần một, dài vừa đủ để xuống dòng.' },
+  { h: 'Phần hai', p: 'Đoạn của phần hai.' },
+  { h: 'Phần ba', p: 'Đoạn của phần ba.' },
+]
+const longform = [
+  { k: 'h2', runs: [{ t: 'Tiêu đề longform' }] },
+  { k: 'p', runs: [{ t: 'Đoạn một.' }] },
+  { k: 'p', runs: [{ t: 'Đoạn hai.' }] },
+  { k: 'li', runs: [{ t: 'mục một' }], lvl: 1 },
+  { k: 'p', runs: [{ t: 'Đoạn ba.' }] },
+]
+const cards = [{ t: 'Thẻ một', d: 'mô tả' }, { t: 'Thẻ hai', d: 'mô tả' }]
+const body =
+  tpl === 'report' ? els
+  : tpl === 'article' ? sections
+  : tpl === 'longform' ? longform
+  : tpl === 'cards' ? cards
+  : { len: 'ngắn', subtitle: 'phụ đề', elements: els }
 function Harness() {
   const [b, setB] = useState<unknown>(body)
   return (
