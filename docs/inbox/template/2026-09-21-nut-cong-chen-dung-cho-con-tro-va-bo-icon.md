@@ -1,7 +1,7 @@
 # Nút `+` chèn đúng chỗ con trỏ, và bộ icon của menu
 
 - Nhánh: `claude/project-thread-ey2sz1`
-- PR: (điền khi mở)
+- PR: #27
 - Lane: template / mặt soạn
 
 Chủ site báo hai việc trong một tin: *"cái [+] đang ấn thêm khối nó không thêm
