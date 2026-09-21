@@ -87,11 +87,12 @@ import {
 import { AddRow, RowShell } from '../components/RowShell'
 import { duplicateAt, insertAt, move, removeAt } from '../lib/listOps'
 import { withPastedBlocks } from '../lib/pasteBlocks'
-import { toRuns, writeRun } from '../lib/flow'
+import { insertThing, toRuns, writeRun } from '../lib/flow'
 import { emptyHistory, historyKey, inverseOf, record, redo, undo, type History } from '../lib/editHistory'
 import { blockKey, neighbour, type BlockFocus } from '../lib/blockKeys'
-import { runAtIndex, toLongformRuns, writeLongformRun } from '../lib/longformFlow'
-import { isStoredElement, runAtSection, toSectionRuns, writeSectionRun } from '../lib/articleFlow'
+import { insertLongformThing, runAtIndex, toLongformRuns, writeLongformRun } from '../lib/longformFlow'
+import { insertSectionThing, isStoredElement, runAtSection, toSectionRuns, writeSectionRun } from '../lib/articleFlow'
+import { BlockIcon } from '../components/BlockIcon'
 import { LiveText } from '../components/LiveText'
 import type { LiveEdges } from '../components/liveKeys'
 import { applyMark, markFor } from '../lib/marks'
@@ -595,7 +596,8 @@ function EditorStyles() {
       .awc-plus-btn:hover{ border-color: #8C8674; color: #3B3729; }
       .awc-insert-menu{ display: flex; flex-direction: column; gap: 10px; }
       .awc-insert-group{ display: flex; flex-direction: column; gap: 1px; }
-      .awc-insert-glyph{ flex: 0 0 24px; height: 24px; display: flex; align-items: center; justify-content: center; border: 1px solid #EBE5D3; border-radius: 4px; font-size: 12px; color: #6E6858; background: #FDFBF2; }
+      .awc-insert-glyph{ flex: 0 0 26px; height: 26px; display: flex; align-items: center; justify-content: center; border: 1px solid #EBE5D3; border-radius: 6px; color: #5C5647; background: #FDFBF2; }
+      .awc-insert-menu button:hover .awc-insert-glyph{ border-color: #DCD5C0; background: #FFFDF6; color: #23211A; }
       .awc-insert-cat{ font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: #8C8674; padding: 2px 6px; }
       .awc-insert-menu button{ display: flex; align-items: center; gap: 10px; font-family: 'Be Vietnam Pro', system-ui, sans-serif; font-size: 14px; text-align: left; padding: 8px 10px; width: 100%; border: none; border-radius: 4px; background: transparent; cursor: pointer; color: #23211A; }
       .awc-insert-menu button:hover{ background: #F1ECDC; }
@@ -1336,7 +1338,9 @@ function ArticleEditor({
               onToggleMenu={() => setMenuAt(menuAt === i ? null : i)}
               onCommit={(md) => setSections(writeSectionRun(sections, run.at, md))}
               onInsertAfterLine={(lineIndex, t) => {
-                setSections(insertAt(sections, run.at[0] + lineIndex + 1, blankReportBlock(t) as never))
+                setSections(
+                  insertSectionThing(sections, run.at, run.text, lineIndex, blankReportBlock(t) as never),
+                )
                 setMenuAt(null)
               }}
               drop={{
@@ -1526,7 +1530,7 @@ function LongformEditor({
               onToggleMenu={() => setMenuAt(menuAt === i ? null : i)}
               onCommit={(md) => write(writeLongformRun(blocks, run.at, md))}
               onInsertAfterLine={(lineIndex, t) => {
-                write(insertAt(blocks, run.at[0] + lineIndex + 1, blankReportBlock(t) as never))
+                write(insertLongformThing(blocks, run.at, run.text, lineIndex, blankReportBlock(t) as never))
                 setMenuAt(null)
               }}
               drop={{
@@ -1957,12 +1961,14 @@ function useElementBody({
           onToggleMenu={() => setMenuAt(menuAt === i ? null : i)}
           onCommit={(md) => write(writeRun(elements, run.at, md))}
           /*
-           * Chèn vào **sau dòng con trỏ đang ở**, không phải cuối dải. Dải chữ
-           * và element trong kho khớp nhau một-một theo thứ tự, nên dòng thứ
-           * `line` của dải là element `run.at[0] + line`.
+           * Chèn vào **sau khối con trỏ đang ở**, không phải cuối dải.
+           *
+           * Đừng cộng `run.at[0] + line`: `line` đếm khối trên mặt soạn, còn
+           * `run.at[0]` đếm khối trong kho, và hai thứ ấy không khớp một-một —
+           * xem `mdBlocks.ts`. `insertThing` cắt thẳng markdown của dải.
            */
           onInsertAfterLine={(lineIndex, t) => {
-            write(insertAt(elements, run.at[0] + lineIndex + 1, blankReportBlock(t)))
+            write(insertThing(elements, run.at, run.text, lineIndex, blankReportBlock(t)))
             setMenuAt(null)
           }}
           /*
@@ -2767,7 +2773,9 @@ function ReportEditor({
                       menuOpen={menuAt === run.at[0]}
                       onToggleMenu={() => setMenuAt(menuAt === run.at[0] ? null : run.at[0])}
                       onCommit={(md) => setBlocks(writeRun(blocks, run.at, md))}
-                      onInsertAfterLine={(lineIndex, t) => insertBlock(run.at[0] + lineIndex, t)}
+                      onInsertAfterLine={(lineIndex, t) =>
+                        setBlocks(insertThing(blocks, run.at, run.text, lineIndex, blankReportBlock(t)))
+                      }
                       drop={{
                         active: dragFrom !== null,
                         onDrop: (lineIndex) => drop(run.at[0] + lineIndex),
@@ -3272,24 +3280,6 @@ function BlockMenu({
  * `ordered: true`. Nhưng trong menu thì nó **phải** là một mục riêng: người
  * viết chọn loại danh sách lúc tạo, không đi tìm một ô tick sau đó.
  */
-/**
- * Một ký hiệu nhỏ cho mỗi loại, thay cho một cột chữ thuần.
- *
- * Chủ site chỉ sang Lark: menu ở đó đọc bằng mắt trong một nhịp vì mỗi dòng có
- * một hình. Cột chữ thuần thì phải đọc từng dòng mới biết cái nào là cái nào.
- */
-const GLYPH: Record<string, string> = {
-  heading: 'H',
-  list: '\u2022',
-  quote: '\u275D',
-  meta: '\u2014',
-  callout: '\u258A',
-  table: '\u229E',
-  metrics: '\u22EE',
-  chart: '\u2583',
-  image: '\u25A3',
-  paragraph: '\u00B6',
-}
 
 /**
  * Loại nào **gõ ra được** thì không nằm trong menu của dấu `+`.
@@ -3353,7 +3343,7 @@ function InsertMenu({
               {items.map((e) => (
                 <button key={e.name} type="button" title={e.description} onClick={() => onInsert(e.name)}>
                   <span className="awc-insert-glyph" aria-hidden>
-                    {e.name === ORDERED_LIST ? '1.' : (GLYPH[e.name] ?? '\u25A2')}
+                    <BlockIcon name={e.name} />
                   </span>
                   {e.title}
                 </button>

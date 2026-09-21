@@ -12,6 +12,7 @@
  * Cách lưu không đổi: vẫn là `SectionData[]`, `Article.tsx` không phải biết gì.
  */
 import type { SectionData } from 'post-renderer'
+import { splitAfterBlock } from './mdBlocks'
 
 /**
  * A body entry taken from the shared element store, not article's own
@@ -94,6 +95,32 @@ export function writeSectionRun(
   markdown: string,
 ): SectionData[] {
   return [...sections.slice(0, at[0]), ...markdownToRun(markdown), ...sections.slice(at[1] + 1)]
+}
+
+/**
+ * Chèn một thứ vào giữa một dải, ngay sau khối con trỏ đang đứng.
+ *
+ * Đây là chỗ lỗi nặng nhất của phép cộng chỉ số cũ: một `section` vẽ ra **hai**
+ * khối trên mặt soạn (`## tiêu đề` rồi đoạn văn), nên con trỏ ở khối thứ ba
+ * của một dải hai phần cho ra chỉ số 4 — rơi ra ngoài dải, xuống tận cuối bài.
+ * Chủ site: *"nó không thêm vào vị trí con trỏ edit mà lại thêm ở tít các vị
+ * trí nào bên dưới"*.
+ */
+export function insertSectionThing(
+  sections: SectionData[],
+  at: [number, number],
+  text: string,
+  blockIndex: number,
+  thing: SectionData,
+): SectionData[] {
+  const [before, after] = splitAfterBlock(text, blockIndex)
+  return [
+    ...sections.slice(0, at[0]),
+    ...markdownToRun(before),
+    thing,
+    ...markdownToRun(after),
+    ...sections.slice(at[1] + 1),
+  ]
 }
 
 export function runAtSection(runs: SectionRun[], i: number): SectionRun | undefined {
