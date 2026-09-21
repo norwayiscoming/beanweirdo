@@ -227,3 +227,62 @@ describe('PATCH /api/posts/:id — ảnh đại diện đi theo thân bài', () 
     expect(written).not.toHaveProperty('thumbnail_url')
   })
 })
+
+/*
+ * `sort_order` đánh 1..N **trong một module** (xem `handleReorder`), nên nó
+ * không mang sang nhà mới được: số 3 của module cũ là số 3 của một dãy khác.
+ */
+describe('PATCH /api/posts/:id — chuyển bài sang module khác', () => {
+  it('ghi module mới và bỏ vị trí tự chọn', async () => {
+    const builder = queryBuilder({ data: { id: 'p1', module_id: 'roastery' }, error: null })
+    fromMock.mockReturnValue(builder)
+
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { module_id: 'roastery' },
+    })
+    const res = mockRes()
+    await handler(req, res)
+
+    expect(res.statusCode).toBe(200)
+    const written = builder.update.mock.calls[0][0] as Record<string, unknown>
+    expect(written.module_id).toBe('roastery')
+    expect(written.sort_order).toBeNull()
+  })
+
+  it('nhường lại nếu chính lượt vá ấy tự đặt vị trí', async () => {
+    const builder = queryBuilder({ data: { id: 'p1' }, error: null })
+    fromMock.mockReturnValue(builder)
+
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { module_id: 'roastery', sort_order: 2 },
+    })
+    const res = mockRes()
+    await handler(req, res)
+
+    const written = builder.update.mock.calls[0][0] as Record<string, unknown>
+    expect(written.sort_order).toBe(2)
+  })
+
+  it('không đụng vị trí khi lần sửa này không chuyển module', async () => {
+    const builder = queryBuilder({ data: { id: 'p1' }, error: null })
+    fromMock.mockReturnValue(builder)
+
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { en: 'Tên mới' },
+    })
+    const res = mockRes()
+    await handler(req, res)
+
+    const written = builder.update.mock.calls[0][0] as Record<string, unknown>
+    expect(written).not.toHaveProperty('sort_order')
+  })
+})

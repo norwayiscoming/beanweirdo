@@ -41,6 +41,13 @@ vi.mock('../lib/apiClient', () => ({
   transitionStatus: (...args: unknown[]) => transitionStatus(...args),
 }))
 
+// `MovePostDialog` kéo theo `lib/lists`, thứ đọc `listModules` ngay lúc nạp
+// chứ không đợi ai gọi. File này kiểm cái danh sách bài, không kiểm hộp thoại
+// ấy — hộp thoại có bài kiểm riêng ở `MovePostDialog.test.tsx`.
+vi.mock('../lib/lists', () => ({
+  listModulesCached: () => Promise.resolve([]),
+}))
+
 const { PostsPanel } = await import('./PostsPanel')
 
 /**

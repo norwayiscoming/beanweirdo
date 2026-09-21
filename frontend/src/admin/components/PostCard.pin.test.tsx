@@ -33,7 +33,7 @@ describe('ghim bài', () => {
   it('ghim được từ danh sách, ở mọi module — không riêng Ghi 01', () => {
     const onPin = vi.fn()
     render(
-      <PostCard post={post({ module_id: 'biochem' })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={onPin} />,
+      <PostCard post={post({ module_id: 'biochem' })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onMove={vi.fn()} onPin={onPin} />,
     )
     fireEvent.click(pin())
     expect(onPin).toHaveBeenCalledWith('p1', true)
@@ -41,7 +41,7 @@ describe('ghim bài', () => {
 
   it('bài đang ghim thì bấm lại là bỏ ghim', () => {
     const onPin = vi.fn()
-    render(<PostCard post={post({ pinned: true })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={onPin} />)
+    render(<PostCard post={post({ pinned: true })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onMove={vi.fn()} onPin={onPin} />)
     expect(pin()).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(pin())
     expect(onPin).toHaveBeenCalledWith('p1', false)
@@ -49,14 +49,14 @@ describe('ghim bài', () => {
 
   it('nhìn là biết bài nào đang ghim, và thấy nó cả khi chưa rê chuột', () => {
     const { rerender } = render(
-      <PostCard post={post({ pinned: false })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />,
+      <PostCard post={post({ pinned: false })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onMove={vi.fn()} onPin={vi.fn()} />,
     )
     // Không ghim: nút vẫn vẽ đủ viền, chỉ là nền trắng.
     expect(pin().className).toContain('ab-ghost')
     expect(pin()).toHaveAttribute('aria-pressed', 'false')
 
     rerender(
-      <PostCard post={post({ pinned: true })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />,
+      <PostCard post={post({ pinned: true })} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onMove={vi.fn()} onPin={vi.fn()} />,
     )
     // Ghim rồi: nền đặc, khác hẳn phần còn lại của hàng.
     expect(pin().className).toContain('ab-primary')
@@ -68,7 +68,7 @@ describe('hành động của một dòng', () => {
   const menuButton = () => screen.getByRole('button', { name: 'Hành động khác' })
 
   it('dòng không còn bày nút hành động nào; chúng nằm sau nút ba chấm', async () => {
-    render(<PostCard post={post()} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />)
+    render(<PostCard post={post()} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onMove={vi.fn()} onPin={vi.fn()} />)
     // Nút "Sửa" bỏ hẳn — bấm vào dòng là vào màn sửa.
     expect(screen.queryByRole('button', { name: 'Sửa' })).toBeNull()
     expect(screen.queryByText('Nhân bản')).toBeNull()
@@ -82,7 +82,7 @@ describe('hành động của một dòng', () => {
 
   it('bấm vào dòng là vào màn sửa; bấm vào tiêu đề cũng vậy', async () => {
     const onEdit = vi.fn()
-    render(<PostCard post={post()} onAction={vi.fn()} onEdit={onEdit} onCopy={vi.fn()} onPin={vi.fn()} />)
+    render(<PostCard post={post()} onAction={vi.fn()} onEdit={onEdit} onCopy={vi.fn()} onMove={vi.fn()} onPin={vi.fn()} />)
 
     await userEvent.click(screen.getByText('mô tả'))
     expect(onEdit).toHaveBeenCalledWith('p1')
@@ -96,7 +96,7 @@ describe('hành động của một dòng', () => {
   it('bấm nút ghim hay nút ba chấm thì KHÔNG vào màn sửa', async () => {
     const onEdit = vi.fn()
     const onPin = vi.fn()
-    render(<PostCard post={post()} onAction={vi.fn()} onEdit={onEdit} onCopy={vi.fn()} onPin={onPin} />)
+    render(<PostCard post={post()} onAction={vi.fn()} onEdit={onEdit} onCopy={vi.fn()} onMove={vi.fn()} onPin={onPin} />)
 
     await userEvent.click(screen.getByRole('button', { name: /ghim/i }))
     expect(onPin).toHaveBeenCalled()
@@ -109,7 +109,7 @@ describe('hành động của một dòng', () => {
   it('“Nhân bản” gọi onCopy, không phải một phép đổi trạng thái', async () => {
     const onCopy = vi.fn()
     const onAction = vi.fn()
-    render(<PostCard post={post()} onAction={onAction} onEdit={vi.fn()} onCopy={onCopy} onPin={vi.fn()} />)
+    render(<PostCard post={post()} onAction={onAction} onEdit={vi.fn()} onCopy={onCopy} onMove={vi.fn()} onPin={vi.fn()} />)
 
     await userEvent.click(menuButton())
     await userEvent.click(screen.getByRole('menuitem', { name: 'Nhân bản' }))
@@ -117,8 +117,23 @@ describe('hành động của một dòng', () => {
     expect(onAction).not.toHaveBeenCalled()
   })
 
+  /*
+   * Chủ site: *"đang không có nút nào giúp tôi làm điều đó cả"* — trước đây
+   * chuyển bài sang module khác là xoá đi rồi tạo lại và chép tay nội dung.
+   */
+  it('“Chuyển sang module…” gọi onMove, không phải một phép đổi trạng thái', async () => {
+    const onMove = vi.fn()
+    const onAction = vi.fn()
+    render(<PostCard post={post()} onAction={onAction} onEdit={vi.fn()} onCopy={vi.fn()} onMove={onMove} onPin={vi.fn()} />)
+
+    await userEvent.click(menuButton())
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Chuyển sang module…' }))
+    expect(onMove).toHaveBeenCalledWith('p1')
+    expect(onAction).not.toHaveBeenCalled()
+  })
+
   it('chọn xong thì menu đóng lại, và Esc cũng đóng', async () => {
-    render(<PostCard post={post()} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />)
+    render(<PostCard post={post()} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onMove={vi.fn()} onPin={vi.fn()} />)
 
     await userEvent.click(menuButton())
     await userEvent.click(screen.getByRole('menuitem', { name: 'Lưu trữ' }))
@@ -133,7 +148,7 @@ describe('hành động của một dòng', () => {
 
 describe('dòng preview dưới tiêu đề', () => {
   const render1 = (over: Partial<PostSummary>) =>
-    render(<PostCard post={post(over)} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onPin={vi.fn()} />)
+    render(<PostCard post={post(over)} onAction={vi.fn()} onEdit={vi.fn()} onCopy={vi.fn()} onMove={vi.fn()} onPin={vi.fn()} />)
 
   it('lấy câu mở đầu bài khi bài có', () => {
     render1({ lead: 'Vị giác nhận ra nhiều thứ hơn cái lưỡi gọi tên được.', vi: 'mô tả tay' })

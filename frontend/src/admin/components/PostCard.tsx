@@ -54,7 +54,11 @@ function thumbColor(id: string) {
  * the choices nobody makes most of the time, while the thing people actually
  * do, open the post, was one small button among them.
  */
-type MenuItem = { label: string; danger?: true } & ({ kind: 'copy' } | { kind: 'status'; action: StatusAction })
+type MenuItem = { label: string; danger?: true } & (
+  | { kind: 'copy' }
+  | { kind: 'move' }
+  | { kind: 'status'; action: StatusAction }
+)
 
 function RowMenu({ items, onPick }: { items: MenuItem[]; onPick: (item: MenuItem) => void }) {
   const [open, setOpen] = useState(false)
@@ -120,6 +124,7 @@ export function PostCard({
   onAction,
   onEdit,
   onCopy,
+  onMove,
   onPin,
 }: {
   post: PostSummary
@@ -127,6 +132,8 @@ export function PostCard({
   onEdit: (id: string) => void
   /** Start a new draft from this one's content. */
   onCopy: (id: string) => void
+  /** Mở hộp thoại chọn module đích; việc ghi là của nơi gọi. */
+  onMove: (id: string) => void
   /** Ghim bài lên đầu module của nó. Mọi module đều ghim được, không riêng Ghi 01. */
   onPin: (id: string, pinned: boolean) => void
 }) {
@@ -139,6 +146,13 @@ export function PostCard({
    */
   const items: MenuItem[] = [
     { kind: 'copy', label: 'Nhân bản' },
+    /*
+     * Chuyển module cũng không phải một bước trạng thái, và nó đứng cạnh
+     * "Nhân bản" vì cùng là việc làm với chính bài chứ không phải với việc
+     * đăng nó. Chủ site: *"đang không có nút nào giúp tôi làm điều đó cả"* —
+     * trước đây cách duy nhất là xoá bài rồi tạo lại và chép tay nội dung.
+     */
+    { kind: 'move', label: 'Chuyển sang module…' },
     ...ACTIONS_BY_STATUS[post.status].map((a) => ({ kind: 'status' as const, ...a })),
   ]
 
@@ -251,7 +265,11 @@ export function PostCard({
         </IconButton>
         <RowMenu
           items={items}
-          onPick={(it) => (it.kind === 'copy' ? onCopy(post.id) : onAction(post.id, it.action))}
+          onPick={(it) => {
+            if (it.kind === 'copy') onCopy(post.id)
+            else if (it.kind === 'move') onMove(post.id)
+            else onAction(post.id, it.action)
+          }}
         />
       </div>
     </div>
