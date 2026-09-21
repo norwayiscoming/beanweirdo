@@ -1,7 +1,7 @@
 # Chuyển bài sang module khác
 
 - Nhánh: `claude/project-thread-ey2sz1`
-- PR: (điền khi mở)
+- PR: #29
 - Lane: template / khu quản trị
 
 Chủ site: *"thêm giúp tôi 1 option là chuyển bài sang các module khác được
