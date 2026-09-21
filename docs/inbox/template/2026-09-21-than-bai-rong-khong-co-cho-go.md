@@ -1,7 +1,7 @@
 # Thân bài rỗng không có chỗ gõ
 
 - Nhánh: `claude/project-thread-ey2sz1`
-- PR: (điền khi mở)
+- PR: #28
 - Lane: template / mặt soạn
 
 Chủ site: *"sao cái longform với bitesize không gõ được mà cứ ở headlines mãi
