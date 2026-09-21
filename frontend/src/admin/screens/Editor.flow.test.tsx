@@ -23,7 +23,7 @@ const list = (id: string, ...lines: string[]) =>
 const table = (id: string) =>
   ({ type: 'table', id, table: { columns: ['Ngày'], rows: [{ cells: ['01'] }], widths: [100] } }) as unknown as ReportBlock
 
-function draw(template: 'report' | 'memo' | 'bitesize', body: unknown) {
+function draw(template: 'report' | 'memo' | 'bitesize' | 'article' | 'longform', body: unknown) {
   const onChange = vi.fn()
   render(
     <EditorCanvas
@@ -101,6 +101,31 @@ describe('cả ba màn cùng một lối soạn', () => {
     expect(text).toContain('Một')
     expect(text).toContain('mục')
   })
+})
+
+describe('bài chưa có gì trong thân', () => {
+  /*
+   * Bốn khuôn từng vẽ ra **một cái nút `+` và không gì khác** khi thân bài
+   * rỗng, nên bấm vào giữa trang không ra con trỏ và thứ duy nhất gõ được là
+   * dòng tiêu đề. Chủ site: *"longform với bitesize không gõ được mà cứ ở
+   * headlines mãi, click vào không ra con trỏ"*.
+   *
+   * `toRuns([])` vốn đã hứa một dải rỗng để gõ vào — thiếu sót nằm ở chỗ vẽ.
+   * jsdom không dựng `contenteditable` nên bài kiểm này không gõ được chữ
+   * nào; nó kiểm đúng cái đã thiếu: **có** một mặt soạn trên màn.
+   */
+  for (const [template, body] of [
+    ['report', []],
+    ['memo', { subtitle: '', elements: [] }],
+    ['bitesize', { len: 'ngắn', elements: [] }],
+    ['article', []],
+    ['longform', []],
+  ] as const) {
+    it(`${template}: thân rỗng vẫn có một mặt soạn để gõ vào`, () => {
+      draw(template, body)
+      expect(document.querySelectorAll('.awc-live-input')).toHaveLength(1)
+    })
+  }
 })
 
 describe('menu `+` bên máng', () => {
