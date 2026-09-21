@@ -1,7 +1,7 @@
 # Cây module nhiều tầng, kéo thả lồng vào nhau
 
 - Nhánh: `claude/project-thread-ey2sz1`
-- PR: (điền khi mở)
+- PR: #30
 - Lane: template / khu quản trị
 
 Chủ site, hai việc trong một tin: *"xoá đi"* (nói về
