@@ -13,7 +13,7 @@
  *   node tools/spec-numbers.mjs           số thật
  *   node tools/spec-numbers.mjs --check   thoát 1 nếu SPEC.html ghi khác
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -40,27 +40,44 @@ const collisions = Object.entries(
   }, {}),
 ).filter(([, fs]) => fs.length > 1)
 
-const logic = read('frontend/src/content/logic.ts')
+/*
+ * Bộ luật đánh số từng nằm ở `frontend/src/content/logic.ts`. Chủ site cho xoá
+ * ngày 2026-09-21 — tệp ấy đã không còn trang nào dựng ra từ trước đó. Ba con
+ * số dưới đây vì thế không còn đếm được từ mã, nên chúng **rụng khỏi bản đếm**
+ * thay vì báo 0: báo 0 thì `--check` sẽ bảo SPEC.html sai ở ba dòng mà thật ra
+ * SPEC mới là chỗ duy nhất còn giữ con số.
+ *
+ * Nếu bộ luật quay lại ở một tệp khác, trỏ `LOGIC` sang tệp ấy là bản đếm chạy
+ * lại như cũ.
+ */
+const LOGIC = 'frontend/src/content/logic.ts'
+const logic = existsSync(join(root, LOGIC)) ? read(LOGIC) : null
 /*
  * A rule is `{ s: <scope>, r: <rule>, e: <example> }`. Matching on `{ s: '`
  * alone also catches the three SCOPE_KEY entries, which is how the count came
  * out as 67 once — the `r:` is what tells a rule from a legend entry.
  */
-const rules = logic.match(/\{ s: '[^']*', r: '/g) ?? []
-const groups = logic.match(/n: '\d+', g: '/g) ?? []
-const parts = logic.match(/p: '[A-Z]', part:/g) ?? []
+const fromLogic = (re) => (logic === null ? null : (logic.match(re) ?? []).length)
+const rules = fromLogic(/\{ s: '[^']*', r: '/g)
+const groups = fromLogic(/n: '\d+', g: '/g)
+const parts = fromLogic(/p: '[A-Z]', part:/g)
 
 const tables = [
   ...new Set((read('docs/SPEC.html').match(/\b(posts|modules|notes|hour_logs|activity_kinds|site_settings|templates)\b/g) ?? [])),
 ]
 
-const counted = {
-  migration: migrations.length,
-  luật: rules.length,
-  nhóm: groups.length,
-  phần: parts.length,
-  bảng: tables.length,
-}
+/** Bỏ đi mọi con số không đếm được, để `--check` không so với một số bịa. */
+const counted = Object.fromEntries(
+  Object.entries({
+    migration: migrations.length,
+    luật: rules,
+    nhóm: groups,
+    phần: parts,
+    bảng: tables.length,
+  }).filter(([, v]) => v !== null),
+)
+
+if (logic === null) console.log(`(bỏ qua luật/nhóm/phần — không còn ${LOGIC})`)
 
 for (const [k, v] of Object.entries(counted)) console.log(`${String(v).padStart(4)}  ${k}`)
 
