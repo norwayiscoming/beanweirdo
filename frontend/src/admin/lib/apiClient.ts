@@ -280,6 +280,14 @@ export async function updatePost(
   patch: Partial<{
     en: string
     vi: string
+    /**
+     * Chuyển bài sang module khác.
+     *
+     * Máy chủ tự xoá `sort_order` kèm theo: vị trí tự chọn là 1..N **trong
+     * một module**, nên mang nó sang nhà mới là chen vào giữa một dãy chẳng
+     * liên quan.
+     */
+    module_id: string
     body: SectionData[]
     hero_image_url: string
     hero_caption: string

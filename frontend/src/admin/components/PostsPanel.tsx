@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PostCard } from './PostCard'
+import { MovePostDialog } from './MovePostDialog'
 import {
   createPost,
   listPosts,
@@ -68,6 +69,8 @@ export function PostsPanel({
    * never came back.
    */
   const [failed, setFailed] = useState(false)
+  /** Bài đang mở hộp thoại chuyển module; `null` là không có. */
+  const [moving, setMoving] = useState<PostSummary | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -141,6 +144,25 @@ export function PostsPanel({
       })
       onChanged?.()
       nav.editPost(created)
+    } catch (e) {
+      toast.fromError(e)
+    }
+  }
+
+  /**
+   * Chuyển một bài sang module khác.
+   *
+   * Nạp lại **cả hai** danh sách: bài đổi module là đổi cả mô tả trên thẻ lẫn
+   * số đếm của module ở màn khác, nên `onChanged` phải kêu lên như mọi lượt
+   * ghi khác. Máy chủ tự bỏ `sort_order` kèm theo — xem `updatePost`.
+   */
+  async function handleMove(id: string, module_id: string) {
+    try {
+      await updatePost(id, { module_id })
+      setMoving(null)
+      await Promise.all([load(), loadCounts()])
+      onChanged?.()
+      toast.ok('Đã chuyển bài sang module mới')
     } catch (e) {
       toast.fromError(e)
     }
@@ -275,6 +297,7 @@ export function PostsPanel({
             onAction={handleAction}
             onEdit={(id) => nav.editPost(id)}
             onCopy={handleCopy}
+            onMove={(id) => setMoving(posts.find((x) => x.id === id) ?? null)}
             onPin={handlePin}
           />
         ))}
@@ -285,6 +308,11 @@ export function PostsPanel({
           {failed ? 'Không tải được danh sách bài.' : 'Chưa có bài nào.'}
         </div>
       )}
+      <MovePostDialog
+        post={moving}
+        onClose={() => setMoving(null)}
+        onMoved={(module_id) => (moving ? handleMove(moving.id, module_id) : undefined)}
+      />
     </div>
   )
 }

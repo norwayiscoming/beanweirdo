@@ -28,6 +28,8 @@ async function handleGet(req: VercelRequest, res: VercelResponse, id: string): P
 
 interface PatchPostBody {
   en?: unknown
+  /** Chuyển bài sang module khác — xem `handlePatch`. */
+  module_id?: unknown
   vi?: unknown
   body?: unknown
   /** Màu riêng của bài; null trả nó về theo màu module. */
@@ -52,6 +54,7 @@ interface PatchPostBody {
  */
 const PATCHABLE = [
   'en',
+  'module_id',
   'vi',
   'body',
   'theme_color',
@@ -82,6 +85,21 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
   }
 
   patch.updated_at = new Date().toISOString()
+
+  /*
+   * Chuyển module thì bỏ vị trí tự chọn, trừ khi lượt vá này tự đặt lại nó.
+   *
+   * `sort_order` là 1..N **trong một module** (xem `handleReorder`), nên mang
+   * số 3 của module cũ sang module mới là chen vào giữa một dãy chẳng liên
+   * quan, và đụng đúng bài đang giữ số 3 ở đó. Trả về null là trả bài về xếp
+   * theo ngày ở nhà mới, rồi chủ site kéo nếu muốn.
+   */
+  if (
+    Object.prototype.hasOwnProperty.call(patch, 'module_id') &&
+    !Object.prototype.hasOwnProperty.call(patch, 'sort_order')
+  ) {
+    patch.sort_order = null
+  }
 
   /*
    * `thumbnail_url` is derived, so it is written here and nowhere else.
