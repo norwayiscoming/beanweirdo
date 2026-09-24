@@ -923,10 +923,6 @@ export function Cms() {
   const quoteText =
     withOverrides([QUOTE_CELL], ghi01?.feature_cells as FeatureOverride[] | null)[0]?.t ?? QUOTE_CELL.t
 
-  const ghi01 = modules.find((m) => m.id === 'ghi01')
-  const quoteText =
-    withOverrides([QUOTE_CELL], ghi01?.feature_cells as FeatureOverride[] | null)[0]?.t ?? QUOTE_CELL.t
-
   /*
    * Ghi 01 may stand anywhere in the order now (owner, 2026-09-24), but a
    * journal still does not go *inside* a reading module, nor the other way
