@@ -4332,7 +4332,9 @@ function ImageBlockEditor({
   }
 
   return (
-    <div>
+    // The picture is a CSS background, not an <img>, so the keyboard rules in
+    // flowFocus read this mark to know the block holds something worth keeping.
+    <div data-has-image={imageUrl ? 'true' : undefined}>
       <div
         className="awc-image-drop"
         data-testid="image-block-drop"

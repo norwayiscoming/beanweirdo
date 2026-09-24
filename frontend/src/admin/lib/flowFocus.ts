@@ -217,6 +217,7 @@ const isText = (el: EventTarget | null): el is HTMLInputElement | HTMLTextAreaEl
  * - `Esc` ở bất cứ đâu trong khối: **chọn cả khối** — con trỏ lên tay nắm, nơi
  *   `Delete` xoá, mũi tên dời, `Enter` quay vào. Khối ảnh, khối bảng đầy chữ
  *   không có ô nào trống, nên trước đây không có phím nào xoá được chúng.
+ * - Khối đã có ảnh, chú thích trống: `Backspace` lần đầu chọn khối, lần hai xoá.
  * - `Delete` / `Backspace` khi con trỏ đứng trên một nút của khối (khối ảnh chưa
  *   có ảnh chỉ có nút): xoá khối.
  *
@@ -316,14 +317,20 @@ export function thingKeyDown(
     const fields = Array.from(stop.querySelectorAll('input, textarea, [role=textbox]')).filter(
       (f) => !f.closest('.awc-gutter'),
     )
-    // Ô chọn tệp không mang chữ nào; ảnh đã tải thì hiện ra thành `img`, và
-    // một khối có ảnh không bao giờ là khối trống — xoá chú thích không được
-    // kéo cả tấm ảnh đi theo.
-    const empty =
-      !stop.querySelector('img, video') &&
-      fields.every((f) => (f instanceof HTMLInputElement && f.type === 'file') || (isText(f) && f.value === ''))
-    if (!empty) return
+    // Ô chọn tệp không mang chữ nào, nên không tính.
+    const noText = fields.every(
+      (f) => (f instanceof HTMLInputElement && f.type === 'file') || (isText(f) && f.value === ''),
+    )
+    if (!noText) return
     e.preventDefault()
+    // Khối đã có ảnh: lần bấm đầu chỉ chọn cả khối (khung sáng, con trỏ lên tay
+    // nắm), lần bấm thứ hai — trên tay nắm — mới xoá. Một phím lỡ tay khi xoá
+    // hết chú thích không được mang cả tấm ảnh đi.
+    const grip = stop.querySelector<HTMLElement>('.awc-grip')
+    if (stop.querySelector('img, video, [data-has-image]') && grip) {
+      grip.focus()
+      return
+    }
     removeThing(stop, remove)
   }
 }
