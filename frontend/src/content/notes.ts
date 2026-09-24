@@ -23,33 +23,34 @@ export const noteBlock: Record<string, string> = {
 /**
  * Ghi 01 holds two kinds of thing, and they are not the same kind of thing.
  *
- *   POSTS          are what the owner publishes into the module. They fill a
- *                  plain grid, every card the same size.
- *   FEATURE CELLS  are the page's decoration — photos and a quotation, F1…F7.
- *                  They are set up with the page, not with any post, and they
- *                  sit small at the foot of the page, never among the posts.
- *
- * Until 2026-09-24 both were woven into one twelve-column grid with offsets
- * and negative margins, and the decoration ended up over the posts' words.
+ *   POSTS          are what the owner publishes into the module. They fill
+ *                  fixed blocks of eight slots — see `lib/notesBlocks.ts`.
+ *   FEATURE CELLS  are the page's decoration — photos and a quotation. They
+ *                  are set up with the page, not with any post; each block
+ *                  shows at most one photo and the page one quotation, in
+ *                  places of their own that no post uses.
  */
 export type FeatureCell = {
   /** F1…F7 — this cell's own number, independent of the posts. */
   n: number
   /** The width it was drawn at, as a span of the design's twelve columns. */
   col: string
-  kind: 'slot' | 'quote' | 'count'
+  kind: 'slot' | 'quote'
   bg: string
   /** The height it was drawn at. With `col`, fixes the photo's proportions. */
   h: string
   t: string
 }
 
-/** The page's decoration — photo slots, a quote, a tally. */
+/**
+ * The page's decoration — photo slots and a quote. The numbers are stored
+ * with the owner's photos (`modules.feature_cells`), so F4, once a post
+ * tally, stays unused rather than renumbering the cells after it.
+ */
 export const featureCells: FeatureCell[] = [
   { n: 1, col: 'span 3', kind: 'slot', bg: '#9DBBD4', h: '330px', t: 'ảnh dọc — bàn làm việc, dụng cụ bày ra' },
   { n: 2, col: 'span 3', kind: 'quote', bg: '', h: '', t: 'Ghi lại thì mới thấy mình đã nghĩ gì.' },
   { n: 3, col: 'span 3', kind: 'slot', bg: '#E9B79C', h: '210px', t: 'ảnh vụn — mảnh cắt nhỏ, chèn đè lên bài bên cạnh' },
-  { n: 4, col: 'span 3', kind: 'count', bg: '', h: '', t: '' },
   { n: 5, col: 'span 4', kind: 'slot', bg: '#AFC8BC', h: '268px', t: 'ảnh cận cảnh — kết cấu, bề mặt, chất liệu' },
   { n: 6, col: 'span 3', kind: 'slot', bg: '#9DBBD4', h: '242px', t: 'ảnh dọc hẹp — một vật thể đơn lẻ' },
   { n: 7, col: 'span 3', kind: 'slot', bg: '#E9B79C', h: '176px', t: 'ảnh vụn — chi tiết nhỏ lặp lại' },
