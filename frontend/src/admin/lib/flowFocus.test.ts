@@ -88,7 +88,7 @@ describe('thingKeyDown', () => {
   function image(withPicture: boolean) {
     document.body.innerHTML = `<div data-flow-root><div data-flow="thing" data-flow-at="0">
       <div class="awc-gutter"><button class="awc-grip">⠿</button></div>
-      ${withPicture ? '<img src="a.jpg" />' : ''}
+      ${withPicture ? '<div data-has-image="true"></div>' : ''}
       <input type="file" /><button>tải ảnh lên</button><input value="" placeholder="chú thích ảnh" />
     </div></div>`
     const stop = document.querySelector<HTMLElement>('[data-flow=thing]')!
@@ -119,10 +119,21 @@ describe('thingKeyDown', () => {
     expect(remove).toHaveBeenCalledTimes(1)
   })
 
-  it('khối ảnh đã có ảnh: xoá hết chú thích không kéo tấm ảnh đi theo', () => {
-    const { stop, caption } = image(true)
-    const { remove } = press(stop, caption, 'Backspace')
+  it('khối ảnh đã có ảnh, chú thích trống: Backspace lần đầu chọn khối, chưa xoá', () => {
+    const { stop, caption, grip } = image(true)
+    const { remove, prevented } = press(stop, caption, 'Backspace')
     expect(remove).not.toHaveBeenCalled()
+    expect(prevented).toBe(true)
+    expect(document.activeElement).toBe(grip)
+  })
+
+  it('khối ảnh có chú thích: Backspace chỉ xoá chữ', () => {
+    const { stop, caption, grip } = image(true)
+    caption.value = 'chú thích'
+    const { remove, prevented } = press(stop, caption, 'Backspace')
+    expect(remove).not.toHaveBeenCalled()
+    expect(prevented).toBe(false)
+    expect(document.activeElement).not.toBe(grip)
   })
 
   it('Delete trong ô chữ còn chữ là xoá chữ, không đụng tới khối', () => {
