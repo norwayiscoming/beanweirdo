@@ -147,12 +147,18 @@ export function usePublishedPosts(options: UsePostsOptions = {}): UsePostsResult
     //      còn phân biệt chúng là cái ngày người đọc nhìn thấy.
     // Người gọi truyền `orderBy` thì mới đi đường khác.
     // Giữ khớp với `lib/postOrder.ts`, nơi CMS sắp cùng một danh sách.
+    //
+    // Every date column says `nullsFirst: false` because Postgres puts NULL
+    // FIRST in a descending sort. A post published without a `published_at`
+    // (seeded rows, e.g. "taste modality: sơn la") therefore led Ghi 01 as if
+    // pinned, whatever the pin said. `comparePosts` in the CMS already sorts
+    // a missing date last; this makes the site agree.
     const ordered = orderBy
-      ? query.order(orderBy, { ascending })
+      ? query.order(orderBy, { ascending, nullsFirst: false })
       : query
           .order('pinned', { ascending: false })
           .order('sort_order', { ascending: true, nullsFirst: false })
-          .order('published_at', { ascending: false })
+          .order('published_at', { ascending: false, nullsFirst: false })
           .order('date_label', { ascending: false })
 
     ordered.then(({ data, error }) => {
