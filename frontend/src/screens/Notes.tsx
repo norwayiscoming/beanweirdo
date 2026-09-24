@@ -5,7 +5,7 @@ import { noteFilterBar } from '../lib/notesFilter'
 import { useTags } from '../data/useTags'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useNarrow } from '../lib/useNarrow'
-import { byTimeNewestFirst, placePosts } from '../lib/notesBlocks'
+import { BLOCK_SIZE, byTimeNewestFirst, placePosts, type Placement } from '../lib/notesBlocks'
 import {
   cellRatio,
   featureCells,
@@ -298,25 +298,27 @@ type LayoutItem =
   | { kind: 'deco'; cell: FeatureCell & { img?: string | null }; block: number }
 
 /**
- * Posts in their slots, top block first, with the decoration slipped in where
- * the sketch puts it — in the order a phone stacks them. Each block gets its
- * own photo, in F-order, while photos last; the quotation appears once, in the
- * first block whose slot 2 is filled. Decoration beside an empty slot is left
- * out, or a young block would open on a photo with nothing next to it.
+ * Posts in their slots, top block first, with the decoration in the places
+ * the sketch gives it — in the order a phone stacks them. Each block gets its
+ * own photo, in F-order, while photos last; the quotation appears once, in
+ * the top block. The decoration is drawn whether or not the slots beside it
+ * hold a post yet: the posts fill a block from the bottom, so with only a few
+ * posts slots 1 and 2 are empty, and tying the decoration to them hid it
+ * entirely.
  */
 function blockLayout(posts: readonly PostRow[], decos: ReturnType<typeof decorations>): LayoutItem[] {
   const photos = decos.filter((c) => c.kind === 'slot')
   const quote = decos.find((c) => c.kind === 'quote')
-  let quoteUsed = false
-  const placed = placePosts(posts.length).sort((a, b) => a.block - b.block || a.slot - b.slot)
+  const placed = placePosts(posts.length)
+  const blocks = Math.ceil(posts.length / BLOCK_SIZE)
   const out: LayoutItem[] = []
-  for (const at of placed) {
-    if (at.slot === 2 && quote && !quoteUsed) {
-      out.push({ kind: 'deco', cell: quote, block: at.block })
-      quoteUsed = true
-    }
-    out.push({ kind: 'post', post: posts[at.i], ...at })
-    if (at.slot === 1 && photos[at.block]) out.push({ kind: 'deco', cell: photos[at.block], block: at.block })
+  for (let block = 0; block < blocks; block++) {
+    const here = placed.filter((at) => at.block === block).sort((a, b) => a.slot - b.slot)
+    const post = (at: Placement): LayoutItem => ({ kind: 'post', post: posts[at.i], ...at })
+    out.push(...here.filter((at) => at.slot < 2).map(post))
+    if (photos[block]) out.push({ kind: 'deco', cell: photos[block], block })
+    if (block === 0 && quote) out.push({ kind: 'deco', cell: quote, block })
+    out.push(...here.filter((at) => at.slot >= 2).map(post))
   }
   return out
 }
