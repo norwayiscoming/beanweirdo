@@ -42,7 +42,7 @@ import { planModuleMove, type DropWhere } from '../lib/moduleMove'
 import { MODULE_LAYOUTS } from '../content/layouts'
 import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
-import type { FeatureOverride } from '../content/notes'
+import { patchOverride, QUOTE_CELL, withOverrides, type FeatureOverride } from '../content/notes'
 import { ink, paper, sans, serif } from '../design/tokens'
 import { Button, IconButton } from '../design/Button'
 import { radius, sizes } from '../design/controls'
@@ -176,7 +176,7 @@ export const CONFIG_BOXES = [
   { id: 'modules', t: 'Cây module', d: 'Thêm module, đặt nó nằm trong module khác, dàn trang và ảnh' },
   { id: 'index', t: 'Trang mục lục', d: 'Tiêu đề, hai đoạn dẫn và ba ảnh khay' },
   { id: 'tag', t: 'Tag', d: 'Danh sách tag, dùng chung cho ghi chép và bài đăng' },
-  { id: 'notes', t: 'Trang Ghi chép', d: 'Tiêu đề, đoạn dẫn, dòng hướng dẫn, lời kết' },
+  { id: 'notes', t: 'Trang Ghi chép', d: 'Tiêu đề, đoạn dẫn, dòng hướng dẫn, câu trích, lời kết' },
 ] as const
 
 export type ConfigBox = (typeof CONFIG_BOXES)[number]['id']
@@ -920,6 +920,10 @@ export function Cms() {
   const shownModules = useMemo(() => [...modules].sort(byBandThenOrder), [modules])
 
   const kindOf = (id: string) => modules.find((m) => m.id === id)?.kind
+
+  const ghi01 = modules.find((m) => m.id === 'ghi01')
+  const quoteText =
+    withOverrides([QUOTE_CELL], ghi01?.feature_cells as FeatureOverride[] | null)[0]?.t ?? QUOTE_CELL.t
 
   /*
    * A journal cannot be dragged in among the reading modules. The site sorts
@@ -1906,6 +1910,32 @@ export function Cms() {
               <input {...field('notesEndNote')} style={boxed} />
             </Field>
           </div>
+          {ghi01 && (
+            /*
+             * The quotation woven between the posts. It is stored with Ghi 01's
+             * feature cells, so the only place to edit it used to be deep in
+             * that module's form under Cây module — and the owner, looking for
+             * it here with the rest of the page's words, concluded it could not
+             * be edited at all.
+             */
+            <div style={grid(one, 18)}>
+              <Field label="Câu trích giữa trang — dòng in nghiêng xen giữa các bài">
+                <input
+                  key={quoteText}
+                  defaultValue={quoteText}
+                  onBlur={(e) => {
+                    if (e.target.value === quoteText) return
+                    void patchModule(ghi01.id, {
+                      feature_cells: patchOverride(ghi01.feature_cells as FeatureOverride[] | null, QUOTE_CELL.n, {
+                        t: e.target.value,
+                      }),
+                    })
+                  }}
+                  style={serifItalicInput}
+                />
+              </Field>
+            </div>
+          )}
 
           </Section>
 
