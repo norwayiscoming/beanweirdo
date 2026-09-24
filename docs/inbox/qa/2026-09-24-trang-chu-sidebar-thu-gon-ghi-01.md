@@ -1,4 +1,4 @@
-# PR #(chưa có số) · nhánh `claude/project-thread-ecgg8y`
+# PR #44 · nhánh `claude/project-thread-ecgg8y`
 
 Bốn lỗi chủ site liệt kê ở trang công khai, phần trang chủ và sidebar.
 
