@@ -110,11 +110,11 @@ describe('màn sửa bài', () => {
     expect(coverBand(container)).not.toContain('đặt vào khung')
   })
 
-  it('ảnh bìa chỉ hiện ở băng, không vẽ lại ở ô của template', async () => {
+  it('ô ảnh của template vẽ đúng ảnh bìa, cạnh băng trang bìa', async () => {
     /*
-     * Chủ site, khi thấy bản đầu bày cả hai: *"hiện 1 chỗ thôi chứ?"*. Nên ô
-     * ảnh bìa của memo đứng giữ chỗ chứ không vẽ ảnh — muốn biết nó trông ra
-     * sao thì bấm "xem trước".
+     * Đổi 2026-09-24. Trước đây ô ảnh bìa của memo đứng giữ chỗ (*"hiện 1 chỗ
+     * thôi chứ?"*). Nay ô ấy có nút tải lên, mà ô có nút tải lên thì phải thấy
+     * được ảnh vừa tải — cùng lý do Article và Bitesize đã đổi.
      */
     getPost.mockReturnValue(Promise.resolve({ ...post, hero_image_url: 'https://x/a.jpg' }))
     listModules.mockReturnValue(Promise.resolve([{ id: 'ghi01', title: 'Ghi 01', accent: '#6FA8C0' }]))
@@ -124,8 +124,8 @@ describe('màn sửa bài', () => {
     const drawn = Array.from(container.querySelectorAll<HTMLElement>('*')).filter((el) =>
       el.style.backgroundImage.includes('a.jpg'),
     )
-    expect(drawn).toHaveLength(1)
-    expect(drawn[0].hasAttribute('data-cover-band')).toBe(true)
+    expect(drawn).toHaveLength(2)
+    expect(drawn.some((el) => el.hasAttribute('data-cover-band'))).toBe(true)
   })
 
   it('ảnh thì vẫn mời căn khung', async () => {

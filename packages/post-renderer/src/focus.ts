@@ -106,7 +106,13 @@ export function cropStyle(url: string | null | undefined): CSSProperties | null 
   return {
     aspectRatio: String(c.ratio),
     backgroundImage: `url(${stripFocus(url)})`,
-    backgroundSize: `${round(10000 / c.w, 3)}% ${round(10000 / c.h, 3)}%`,
+    /*
+     * Width only, height `auto`: when the cell has the crop's shape the two are
+     * the same thing, and when a layout pins the cell to another shape (the
+     * article hero is as tall as its band) the photo keeps its proportions
+     * instead of being squashed to fit.
+     */
+    backgroundSize: `${round(10000 / c.w, 3)}% auto`,
     backgroundPosition: `${at(c.x, c.w)}% ${at(c.y, c.h)}%`,
     backgroundRepeat: 'no-repeat',
   }
@@ -147,5 +153,14 @@ export function coverStyle(url: string): {
  * photo would still pass its test.
  */
 export function fillStyle(url: string | null | undefined, tint: string): CSSProperties {
-  return url ? coverStyle(url) : { backgroundColor: tint }
+  if (!url) return { backgroundColor: tint }
+  /*
+   * A photo cut by hand gives the cell its shape. The owner asked for every
+   * picture cell to take "freesize, 16:9 …" like the body image, so the crop's
+   * ratio wins over the height the template set — `height: 'auto'` is what lets
+   * `aspectRatio` apply, since callers spread this after their own height.
+   * The tint stays underneath for a cell the layout still pins.
+   */
+  const cropped = cropStyle(url)
+  return cropped ? { ...cropped, height: 'auto', backgroundColor: tint } : coverStyle(url)
 }

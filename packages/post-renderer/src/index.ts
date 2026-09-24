@@ -55,6 +55,7 @@ export {
   ElementList,
   registerElement,
   Runs,
+  safeHref,
   runsToText,
   textToRuns,
   toElements,

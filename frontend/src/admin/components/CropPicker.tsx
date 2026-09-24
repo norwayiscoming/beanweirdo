@@ -25,6 +25,9 @@ export const SHAPES: { label: string; ratio: number | null | 'photo' }[] = [
   { label: '2:3', ratio: 2 / 3 },
 ]
 
+/** Hình dạng đúng bằng ô ảnh đang đứng trên trang. */
+export const FIT = 'Vừa ô'
+
 /** Smallest side a crop can shrink to, so a slip cannot collapse it to nothing. */
 const MIN = 8
 
@@ -144,26 +147,42 @@ const corner = (h: Handle): CSSProperties => ({
 export function CropPicker({
   url,
   name,
+  cell,
   onCancel,
   onSave,
 }: {
   url: string
   name: string
+  /**
+   * Hình dạng hiện tại của ô ảnh trên trang, khi ô ấy có một hình do khuôn
+   * đặt. Có thì thêm lựa chọn "Vừa ô" đứng đầu và chọn sẵn: bấm Xong ngay là
+   * ra đúng bố cục cũ, còn chọn hình khác thì ô đổi theo.
+   */
+  cell?: number
   onCancel: () => void
   onSave: (url: string) => void
 }) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null)
   const saved = readCrop(url)
   const [rect, setRect] = useState<Rect>(saved ? { x: saved.x, y: saved.y, w: saved.w, h: saved.h } : { x: 0, y: 0, w: 100, h: 100 })
-  const [shape, setShape] = useState<string>(saved ? 'Tự do' : 'Gốc')
+  const shapes = cell ? [{ label: FIT, ratio: cell }, ...SHAPES] : SHAPES
+  const [shape, setShape] = useState<string>(saved ? 'Tự do' : cell ? FIT : 'Gốc')
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   const drag = useRef<{ handle: Handle; x: number; y: number; from: Rect } | null>(null)
 
   useEffect(() => {
     const img = new Image()
-    img.onload = () => setNatural({ w: img.naturalWidth, h: img.naturalHeight })
+    img.onload = () => {
+      setNatural({ w: img.naturalWidth, h: img.naturalHeight })
+      // "Vừa ô" chỉ dựng được khung khi đã biết hình tấm ảnh.
+      if (!saved && cell && img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setRect(fitRect(cell, img.naturalWidth / img.naturalHeight))
+      }
+    }
     img.src = stripFocus(url)
+    // Chỉ theo tấm ảnh: `saved` và `cell` là giá trị lúc mở hộp, đổi chúng giữa chừng không được dựng lại khung người dùng đang kéo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url])
 
   useEffect(() => {
@@ -188,11 +207,11 @@ export function CropPicker({
   }, [])
 
   const photo = natural ? natural.w / natural.h : 1.5
-  const picked = SHAPES.find((s) => s.label === shape)
+  const picked = shapes.find((s) => s.label === shape)
   const lock = picked?.ratio === 'photo' ? photo : picked?.ratio ?? null
 
   function choose(label: string) {
-    const s = SHAPES.find((x) => x.label === label)
+    const s = shapes.find((x) => x.label === label)
     setShape(label)
     if (!s || s.ratio === null) return
     if (s.ratio === 'photo') return setRect({ x: 0, y: 0, w: 100, h: 100 })
@@ -250,7 +269,7 @@ export function CropPicker({
         <div style={{ fontFamily: serif, fontSize: 22, color: ink.base, marginBottom: 10 }}>Cắt ảnh</div>
 
         <div role="radiogroup" aria-label="hình dạng khung" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {SHAPES.map((s) => {
+          {shapes.map((s) => {
             const on = s.label === shape
             return (
               <button
