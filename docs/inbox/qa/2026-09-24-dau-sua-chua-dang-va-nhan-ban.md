@@ -1,6 +1,6 @@
 # Dấu "Có sửa chưa đăng" trên thẻ bài, nhân bản lấy bản nháp
 
-PR: #(điền khi mở) · nhánh `claude/project-thread-1onmw2`
+PR: #41 · nhánh `claude/project-thread-1onmw2`
 
 Nối tiếp PR #40 (bảng `post_drafts`, ghi chú `2026-09-24-sua-bai-da-dang-chi-luu-nhap.md`).
 
