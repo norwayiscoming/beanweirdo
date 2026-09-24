@@ -38,16 +38,30 @@ function blockToMarkdown(b: LongformBlock): string {
   // chúng gần như nhau, và mất một mức nhẹ hơn mất cả dòng tiêu đề.
   if (b.k === 'h3' || b.k === 'h4') return `### ${text}`
   if (b.k === 'li') return `${STEP.repeat(Math.max(0, (b.lvl ?? 1) - 1))}- ${text}`
+  if (b.quote) return `> ${text}`
   return text
 }
 
-/** Cả một dải khối thành một chuỗi markdown. */
+/**
+ * Cả một dải khối thành một chuỗi markdown.
+ *
+ * Sau một trích dẫn phải có dòng trống: Lexical cho trích dẫn **nuốt** dòng chữ
+ * thường ngay sau nó (đo trong `longformMarks.test.ts`), nên `> câu\nđoạn` ghi
+ * lại thành hai dòng trích dẫn — đoạn văn phía dưới tự dưng bị gạch lề.
+ */
 export function runToMarkdown(blocks: LongformBlock[]): string {
-  return blocks.map(blockToMarkdown).join('\n')
+  return blocks
+    .map((b, i) => {
+      const md = blockToMarkdown(b)
+      const next = blocks[i + 1]
+      return b.quote && next && !next.quote ? `${md}\n` : md
+    })
+    .join('\n')
 }
 
 const HEADING = /^(#{1,3})\s+(.*)$/
 const ITEM = /^(\s*)-\s+(.*)$/
+const QUOTE = /^>\s?(.*)$/
 
 function lineToBlock(line: string): LongformBlock {
   const heading = HEADING.exec(line)
@@ -55,6 +69,8 @@ function lineToBlock(line: string): LongformBlock {
     const k = (['h1', 'h2', 'h3'] as const)[heading[1].length - 1]
     return { k, runs: longformTextToRuns(heading[2]) }
   }
+  const quote = QUOTE.exec(line)
+  if (quote) return { k: 'p', quote: true, runs: longformTextToRuns(quote[1]) }
   const item = ITEM.exec(line)
   if (item) {
     // Ba tầng là hết, như `stepIndent` vẫn giữ.
