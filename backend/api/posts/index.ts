@@ -14,6 +14,7 @@ import {
   type PostTemplate,
 } from '../../lib/posts.js'
 import { slug } from '../../lib/tags.js'
+import { isMissingDraftTable, readDraft } from '../../lib/drafts.js'
 
 const LIST_FILTERS = [...POST_STATUSES, 'all'] as const
 
@@ -39,7 +40,22 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
     return
   }
 
-  res.status(200).json({ posts: (data as PostRow[]).map(toPostSummary) })
+  /*
+   * Which posts have edits waiting for Publish, so the list can say so. One
+   * extra read of a table that holds a row only per published post being
+   * edited — cheaper than a join PostgREST cannot express without a foreign
+   * key embed on every summary. A missing table (0028 not run) means none.
+   */
+  const { data: drafts, error: draftError } = await supabase.from('post_drafts').select('post_id')
+  if (draftError && !isMissingDraftTable(draftError)) {
+    res.status(500).json({ error: draftError.message })
+    return
+  }
+  const pending = new Set(((drafts ?? []) as { post_id: string }[]).map((d) => d.post_id))
+
+  res.status(200).json({
+    posts: (data as PostRow[]).map((row) => ({ ...toPostSummary(row), has_draft: pending.has(row.id) })),
+  })
 }
 
 interface CreatePostBody {
@@ -185,11 +201,25 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
       res.status(400).json({ error: `Post '${fromPostId}' does not exist` })
       return
     }
-    const row = src as { template: string; body: unknown }
+    /*
+     * The copy starts from what the owner last wrote, not what readers see:
+     * a published post's unpublished edits live in `post_drafts`, and copying
+     * it is how the owner starts a sibling from their newest text.
+     */
+    const pendingEdits = await readDraft(supabase, fromPostId)
+    if (pendingEdits.error) {
+      res.status(500).json({ error: (pendingEdits.error as { message?: string }).message ?? 'Draft read failed' })
+      return
+    }
+    const merged: Record<string, unknown> = { ...(src as Record<string, unknown>) }
+    for (const key of ['body', 'lead', 'pull_quote', 'further_reading'] as const) {
+      if (pendingEdits.data && Object.prototype.hasOwnProperty.call(pendingEdits.data, key)) merged[key] = pendingEdits.data[key]
+    }
+    const row = merged as { template: string; body: unknown }
     template = row.template
     // Pictures stay with the original — see `withoutImages`.
     startingBody = withoutImages(row.body ?? null)
-    copied = src as Record<string, unknown>
+    copied = merged
   }
 
   if (templateId) {

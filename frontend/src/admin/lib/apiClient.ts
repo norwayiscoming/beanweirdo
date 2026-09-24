@@ -58,6 +58,8 @@ export type PostSummary = {
   created_at: string
   updated_at: string
   published_at: string | null
+  /** Bài đã đăng có chỗ sửa đang chờ bấm "Đăng thay đổi" — xem migration 0028. */
+  has_draft?: boolean
 }
 
 export type PostDetail = PostSummary & {

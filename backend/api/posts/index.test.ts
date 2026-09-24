@@ -70,6 +70,26 @@ describe('GET /api/posts', () => {
     }
   })
 
+  it('flags posts with edits waiting for Publish', async () => {
+    fromMock
+      .mockReturnValueOnce(queryBuilder({ data: [SAMPLE_ROW, { ...SAMPLE_ROW, id: 'p2' }], error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: [{ post_id: 'p2' }], error: null }))
+    const res = mockRes()
+    await handler(mockReq({ method: 'GET', headers: authHeaders(token), query: {} }), res)
+    expect(fromMock).toHaveBeenNthCalledWith(2, 'post_drafts')
+    expect(res.body.posts.map((p: { has_draft: boolean }) => p.has_draft)).toEqual([false, true])
+  })
+
+  it('still lists posts before migration 0028 has run', async () => {
+    fromMock
+      .mockReturnValueOnce(queryBuilder({ data: [SAMPLE_ROW], error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: null, error: { code: 'PGRST205', message: 'post_drafts not found' } }))
+    const res = mockRes()
+    await handler(mockReq({ method: 'GET', headers: authHeaders(token), query: {} }), res)
+    expect(res.statusCode).toBe(200)
+    expect(res.body.posts[0].has_draft).toBe(false)
+  })
+
   it('rejects an invalid status filter with 400', async () => {
     const req = mockReq({ method: 'GET', headers: authHeaders(token), query: { status: 'bogus' } })
     const res = mockRes()
@@ -356,6 +376,7 @@ describe('POST /api/posts — starting from a template', () => {
           error: null,
         }),
       )
+      .mockReturnValueOnce(queryBuilder({ data: null, error: null }))
       .mockReturnValueOnce(insert)
 
     await handler(
@@ -380,6 +401,36 @@ describe('POST /api/posts — starting from a template', () => {
     expect(row).not.toHaveProperty('status')
     expect(row).not.toHaveProperty('pinned')
     expect(row).not.toHaveProperty('published_at')
+  })
+
+  it('copies the unpublished edits of a published post, not its live text', async () => {
+    const insert = queryBuilder({ data: { id: 'copy' }, error: null })
+    fromMock
+      .mockReturnValueOnce(
+        queryBuilder({
+          data: { template: 'memo', body: [{ k: 'p', t: 'cũ' }], lead: 'dẫn cũ', pull_quote: 'trích', further_reading: null },
+          error: null,
+        }),
+      )
+      .mockReturnValueOnce(queryBuilder({ data: { data: { body: [{ k: 'p', t: 'mới' }], lead: 'dẫn mới', en: 'Tên mới' } }, error: null }))
+      .mockReturnValueOnce(insert)
+
+    await handler(
+      mockReq({
+        method: 'POST',
+        body: { module_id: 'biochem', kind: 'note', en: 'Bản sao', vi: 'y', fromPostId: 'p1' },
+        headers: authHeaders(signToken()),
+      }),
+      mockRes(),
+    )
+
+    expect(fromMock).toHaveBeenNthCalledWith(2, 'post_drafts')
+    const row = insert.insert.mock.calls[0][0] as Record<string, unknown>
+    expect(row.body).toEqual([{ k: 'p', t: 'mới' }])
+    expect(row.lead).toBe('dẫn mới')
+    expect(row.pull_quote).toBe('trích')
+    // The copy's own title is the one typed in the dialog, never the draft's.
+    expect(row.en).toBe('Bản sao')
   })
 
   it('rejects a post id that does not exist', async () => {
