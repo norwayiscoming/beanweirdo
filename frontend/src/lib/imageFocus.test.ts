@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { CENTRE, coverStyle, cropStyle, readCrop, readFocus, stripFocus, withCrop, withFocus } from './imageFocus'
+import { fillStyle } from 'post-renderer'
 
 describe('imageFocus', () => {
   it('reads the centre from a plain URL', () => {
@@ -84,9 +85,17 @@ describe('crop', () => {
     const s = cropStyle('/a.jpg#crop=25,0,50,100,1')!
     expect(s.aspectRatio).toBe('1')
     expect(s.backgroundImage).toBe('url(/a.jpg)')
-    expect(s.backgroundSize).toBe('200% 100%')
+    expect(s.backgroundSize).toBe('200% auto')
     // 25 of the 50 spare points: halfway.
     expect(s.backgroundPosition).toBe('50% 0%')
+  })
+
+  it('a template cell takes the shape the photo was cut to', () => {
+    const s = fillStyle('/a.jpg#crop=0,0,100,100,1.7778', '#eee')
+    expect(s.aspectRatio).toBe('1.7778')
+    // Cells spread this after their own fixed height, so it must undo it.
+    expect(s.height).toBe('auto')
+    expect(fillStyle('/a.jpg', '#eee').aspectRatio).toBeUndefined()
   })
 
   it('draws nothing special for a photo that was never cropped', () => {

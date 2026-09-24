@@ -78,13 +78,13 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
   })
 
   /*
-   * Memo chỉ có đúng một ô ảnh và nó là ảnh bìa, mà ảnh bìa nay đặt ở băng
-   * "trang bìa". Nên trong màn sửa memo không còn ô ảnh nào mang nút — khẳng
-   * định ra đây để "không có nút" đọc là cố ý chứ không phải một chỗ quên nối.
+   * Đổi 2026-09-24: ô features của memo là ảnh bìa nhưng từng không có nút
+   * nào, nên chưa có bìa thì nó chỉ là một mảng xám. Chủ site: *"rà tất cả
+   * các chỗ ảnh"* — nay nó có nút ở góc như mọi ô khác.
    */
-  it('memo: ô ảnh duy nhất là ảnh bìa, nên không còn nút ở ô nào', () => {
+  it('memo: ô ảnh features có nút ở góc', () => {
     const { container } = draw('memo')
-    expect(corners(container)).toEqual([])
+    expect(corners(container)).toEqual(['hero'])
   })
 
   /*

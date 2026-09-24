@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { FramingProvider } from './framing'
 import { PlateImageUpload } from './PlateUpload'
+import { readCrop } from '../../lib/imageFocus'
 
 /*
  * "Tải ảnh lên ở đâu cũng ra cùng một khung cắt."
@@ -57,12 +58,12 @@ describe('mọi chỗ đăng ảnh mở cùng một khung cắt', () => {
       </FramingProvider>,
     )
     pick()
-    expect(await screen.findByText('Chọn phần ảnh giữ lại')).toBeInTheDocument()
+    expect(await screen.findByText('Cắt ảnh')).toBeInTheDocument()
     // Tên ô đi theo, để biết đang căn cho chỗ nào.
     expect(screen.getByText('Ảnh chính')).toBeInTheDocument()
   })
 
-  it('bấm Xong thì địa chỉ kèm điểm căn mới về tới ô', async () => {
+  it('bấm Xong thì địa chỉ kèm khung cắt mới về tới ô', async () => {
     const onUrl = vi.fn()
     render(
       <FramingProvider>
@@ -70,11 +71,17 @@ describe('mọi chỗ đăng ảnh mở cùng một khung cắt', () => {
       </FramingProvider>,
     )
     pick()
-    await screen.findByText('Chọn phần ảnh giữ lại')
+    await screen.findByText('Cắt ảnh')
 
-    fireEvent.click(screen.getByLabelText('Sát trái'))
-    fireEvent.click(screen.getByText('Xong'))
-    await waitFor(() => expect(onUrl).toHaveBeenCalledWith('https://x/moi.jpg#focus=0,50'))
+    // "Vừa ô" chọn sẵn: bấm Xong ngay là đúng hình ô (jsdom không đo được ô, nên 3:2).
+    expect(screen.getByRole('radio', { name: 'Vừa ô' })).toHaveAttribute('aria-checked', 'true')
+    const done = screen.getByText('Xong')
+    await waitFor(() => expect(done).toBeEnabled())
+    fireEvent.click(done)
+    await waitFor(() => expect(onUrl).toHaveBeenCalled())
+    const c = readCrop(onUrl.mock.calls[0][0])!
+    expect(c.ratio).toBeCloseTo(1.5)
+    expect(c.x).toBeCloseTo(12.5)
   })
 
   it('bấm Huỷ là huỷ việc căn, không phải huỷ tấm ảnh', async () => {
@@ -85,11 +92,11 @@ describe('mọi chỗ đăng ảnh mở cùng một khung cắt', () => {
       </FramingProvider>,
     )
     pick()
-    await screen.findByText('Chọn phần ảnh giữ lại')
+    await screen.findByText('Cắt ảnh')
 
     fireEvent.click(screen.getByText('Huỷ'))
     await waitFor(() => expect(onUrl).toHaveBeenCalledWith('https://x/moi.jpg'))
-    expect(screen.queryByText('Chọn phần ảnh giữ lại')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cắt ảnh')).not.toBeInTheDocument()
   })
 
   it('clip thì không mở khung cắt — căn tâm một hình đang chạy là vô nghĩa', async () => {
@@ -102,6 +109,6 @@ describe('mọi chỗ đăng ảnh mở cùng một khung cắt', () => {
     )
     pick(new File(['x'], 'a.mp4', { type: 'video/mp4' }))
     await waitFor(() => expect(onUrl).toHaveBeenCalledWith('https://x/clip.mp4'))
-    expect(screen.queryByText('Chọn phần ảnh giữ lại')).not.toBeInTheDocument()
+    expect(screen.queryByText('Cắt ảnh')).not.toBeInTheDocument()
   })
 })

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, Fragment, useContext, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { stripFocus } from './focus'
+import { cropStyle, stripFocus } from './focus'
 import { ElementList } from './elements'
 import { paletteFrom, type Palette } from './palette'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
@@ -341,6 +341,8 @@ function AsideBlock({ items, palette, at }: { items: LongformBlock[]; palette: P
                 backgroundSize: 'contain',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',
+                // Cắt tay thì khung lấy đúng hình đã cắt thay cho `contain`.
+                ...cropStyle(a.src),
               }}
             >
               <PlateCorner
@@ -881,6 +883,8 @@ export function Longform({
                       backgroundSize: 'contain',
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
+                      // Cắt tay thì khung lấy đúng hình đã cắt thay cho `contain`.
+                      ...cropStyle(b.src),
                     }}
                   >
                     <PlateCorner

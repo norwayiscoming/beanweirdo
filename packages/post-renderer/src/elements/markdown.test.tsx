@@ -209,6 +209,11 @@ describe('dán cả một trang vào canvas', () => {
     expect(blocks?.[0].text).toBe('câu đầu câu sau')
   })
 
+  it('ảnh bọc trong link thành khối ảnh bấm được', () => {
+    const blocks = pastedToBlocks('[![bìa](https://a.com/x.jpg)](https://b.com)')
+    expect(blocks?.[0]).toMatchObject({ type: 'image', caption: 'bìa', imageUrl: 'https://a.com/x.jpg', href: 'https://b.com' })
+  })
+
   it('ảnh markdown thành khối ảnh, giữ cả chú thích', () => {
     const blocks = pastedToBlocks('![cận cảnh chủ thể](https://a.com/x.jpg)\n\nsau ảnh')
     expect(blocks?.[0]).toMatchObject({ type: 'image', caption: 'cận cảnh chủ thể', imageUrl: 'https://a.com/x.jpg' })

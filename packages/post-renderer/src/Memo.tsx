@@ -2,6 +2,7 @@ import { getElement } from './elements'
 import { TableScroll } from './elements/data'
 import { flatElements } from './memoElements'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
+import { fillStyle } from './focus'
 import { paletteFrom, type Palette } from './palette'
 import { Fragment } from 'react'
 import type { ReactNode } from 'react'
@@ -293,10 +294,12 @@ export function Memo({
 
       {(post.img || renderPlateAction) && (
         <div style={{ padding: '30px 56px 0' }}>
-          <div style={{ ...plateHost, aspectRatio: '21/9', overflow: 'hidden', background: '#EDE8DD' }}>
-            {post.img && (
-              <img src={post.img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            )}
+          {/*
+            Nền chứ không phải `<img>`: thẻ ảnh bỏ qua cả điểm căn lẫn khung cắt
+            ghi trên địa chỉ, nên ô này là ô duy nhất cắt đâu cũng ra giữa ảnh.
+            `fillStyle` là đường chung của mọi ô ảnh khuôn bài.
+          */}
+          <div style={{ ...plateHost, aspectRatio: '21/9', overflow: 'hidden', ...fillStyle(post.img, '#EDE8DD') }}>
             <PlateCorner action={renderPlateAction} slot={{ key: 'hero', imageUrl: post.img ?? null }} />
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', marginTop: 10, fontSize: 11, color: '#A2A296' }}>
