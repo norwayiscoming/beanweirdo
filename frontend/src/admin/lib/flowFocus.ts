@@ -153,7 +153,7 @@ function fieldsOf(stop: HTMLElement): HTMLElement[] {
  * khối nhấn có một dòng nhãn tuỳ chọn đứng trước phần chữ, và chèn xong mà con
  * trỏ rơi vào nhãn là gõ nhầm chỗ ngay chữ đầu tiên.
  */
-function fieldOf(stop: HTMLElement, edge: 'start' | 'end'): HTMLElement | null {
+export function fieldOf(stop: HTMLElement, edge: 'start' | 'end'): HTMLElement | null {
   if (stop.dataset.flow === 'run') return stop.querySelector<HTMLElement>('.awc-live-input')
   const fields = fieldsOf(stop)
   const body = fields.find((f) => f instanceof HTMLTextAreaElement || f.getAttribute('role') === 'textbox')
@@ -213,7 +213,12 @@ const isText = (el: EventTarget | null): el is HTMLInputElement | HTMLTextAreaEl
  *   trống ở cuối thì bỏ dòng trống ấy và thoát khối — như Lark, như Notion.
  *   `Cmd/Ctrl+Enter` thoát ngay ở bất cứ đâu.
  * - Mũi tên ở mép ô: sang ô kế bên, xuyên qua ranh giới khối và dải chữ.
- * - `Backspace` trong một khối trống trơn: bỏ khối, con trỏ về dòng phía trên.
+ * - `Backspace` / `Delete` trong một khối trống trơn: bỏ khối, con trỏ về dòng phía trên.
+ * - `Esc` ở bất cứ đâu trong khối: **chọn cả khối** — con trỏ lên tay nắm, nơi
+ *   `Delete` xoá, mũi tên dời, `Enter` quay vào. Khối ảnh, khối bảng đầy chữ
+ *   không có ô nào trống, nên trước đây không có phím nào xoá được chúng.
+ * - `Delete` / `Backspace` khi con trỏ đứng trên một nút của khối (khối ảnh chưa
+ *   có ảnh chỉ có nút): xoá khối.
  *
  * Gắn vào vỏ ngoài của khối, nên ô nào đã tự dùng phím (`preventDefault`) thì
  * nó thắng: dán, `/`, hay luật riêng của từng khối không bị giành mất.
@@ -236,7 +241,30 @@ export function thingKeyDown(
   if (e.defaultPrevented || e.nativeEvent.isComposing) return
   const field = e.target
   const stop = e.currentTarget as HTMLElement | null
-  if (!stop || !isText(field) || (field as HTMLElement).closest('.awc-gutter')) return
+  if (!stop || !(field instanceof HTMLElement) || field.closest('.awc-gutter')) return
+
+  if (e.key === 'Escape' && !document.querySelector('.awc-menu-pop')) {
+    const grip = stop.querySelector<HTMLElement>('.awc-grip')
+    if (grip) {
+      e.preventDefault()
+      grip.focus()
+    }
+    return
+  }
+  const editable =
+    isText(field) ||
+    field.isContentEditable ||
+    field instanceof HTMLSelectElement ||
+    field.getAttribute('role') === 'textbox' ||
+    field.closest('[contenteditable=true]')
+  if (!editable) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault()
+      removeThing(stop, remove)
+    }
+    return
+  }
+  if (!isText(field)) return
 
   const value = field.value
   const from = field.selectionStart
@@ -284,20 +312,57 @@ export function thingKeyDown(
     return
   }
 
-  if (e.key === 'Backspace' && value === '') {
+  if ((e.key === 'Backspace' || e.key === 'Delete') && value === '') {
     const fields = Array.from(stop.querySelectorAll('input, textarea, [role=textbox]')).filter(
       (f) => !f.closest('.awc-gutter'),
     )
-    const empty = fields.every((f) => isText(f) && (f.type === 'file' || f.value === ''))
+    // Ô chọn tệp không mang chữ nào; ảnh đã tải thì hiện ra thành `img`, và
+    // một khối có ảnh không bao giờ là khối trống — xoá chú thích không được
+    // kéo cả tấm ảnh đi theo.
+    const empty =
+      !stop.querySelector('img, video') &&
+      fields.every((f) => (f instanceof HTMLInputElement && f.type === 'file') || (isText(f) && f.value === ''))
     if (!empty) return
-    const root = flowRoot(stop)
-    if (!root) return
-    const all = flowFields(root)
-    const here = all.indexOf(fields[0] as HTMLElement)
     e.preventDefault()
-    remove()
-    if (here > 0) focusLater(root, (r) => flowFields(r)[here - 1], (el) => focusField(el, 'end'))
+    removeThing(stop, remove)
   }
+}
+
+/**
+ * Bỏ một khối mà con trỏ không rơi mất.
+ *
+ * Xoá xong thì phần tử đang giữ focus biến mất, và trình duyệt thả con trỏ về
+ * `body` — người đang dùng bàn phím mất chỗ đứng, phải cầm chuột bấm lại. Nên
+ * con trỏ sang ô ngay trên khối (cuối ô), hoặc ô ngay dưới nếu khối đứng đầu.
+ *
+ * Report hỏi trước khi xoá một khối có ghi chú cạnh bài: khi ấy khối còn nguyên
+ * và hộp hỏi nhận phím, nên chỉ dời con trỏ khi số chỗ dừng thật sự giảm.
+ */
+export function removeThing(stop: HTMLElement, remove: () => void): void {
+  const root = flowRoot(stop)
+  if (!root) {
+    remove()
+    return
+  }
+  const count = () => root.querySelectorAll('[data-flow]').length
+  const before = count()
+  // Đếm theo vị trí trong trang, không theo ô của khối: khối ảnh chưa có ảnh
+  // không có ô gõ nào để làm mốc.
+  const above = flowFields(root).filter(
+    (f) => !stop.contains(f) && stop.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_PRECEDING,
+  ).length
+  remove()
+  focusLater(
+    root,
+    (r) => {
+      if (count() === before) return null
+      const now = flowFields(r)
+      // Dải chữ hai bên khối gộp lại sau khi xoá, nhưng ô phía trên vẫn giữ
+      // chỉ số của nó; khối đứng đầu thì ô đầu tiên là ô ngay dưới nó.
+      return above > 0 ? now[above - 1] : now[0]
+    },
+    (el) => focusField(el, above > 0 ? 'end' : 'start'),
+  )
 }
 
 /** Sau khi chèn hay dời một khối tới chỉ số `at`: đặt con trỏ vào ô đầu của nó. */
