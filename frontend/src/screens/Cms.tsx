@@ -1087,7 +1087,12 @@ export function Cms() {
   async function patchPost(id: string, patch: { en?: string; vi?: string; date_label?: string }) {
     setPosts((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)))
     try {
-      await updatePost(id, patch)
+      const saved = await updatePost(id, patch)
+      // Bài đã đăng: chữ sửa ở đây cũng chỉ vào bản nháp (migration 0028), mà
+      // danh sách này không có nút Đăng — nên phải nói ra chỗ để đăng nó.
+      if ((saved as { has_draft?: boolean }).has_draft) {
+        toast.info('Đã lưu nháp — mở bài và bấm "Đăng thay đổi" để lên trang')
+      }
     } catch (e) {
       toast.fromError(e)
     }

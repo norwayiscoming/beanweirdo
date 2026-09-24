@@ -78,6 +78,11 @@ export type PostDetail = PostSummary & {
   further_reading: string[] | null
   deleted_at: string | null
   previous_status: PostStatus | null
+  /**
+   * Bài đã đăng mà có chỗ sửa chưa đăng — migration 0028. Khi đó các cột ở
+   * trên là **bản nháp**, không phải bản trên trang. Vắng khi API cũ trả lời.
+   */
+  has_draft?: boolean
 }
 
 export type Module = {

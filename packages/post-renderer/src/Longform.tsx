@@ -829,7 +829,13 @@ export function Longform({
                       // phải mấy đoạn văn rời rạc.
                       margin: `0 0 ${indentOf(b) > 0 ? 8 : 14}px`,
                       paddingLeft: pad,
+                      // Trích dẫn: một gạch lề mảnh màu của bài, chữ giữ
+                      // nguyên cỡ — nó vẫn là một đoạn trong mạch bài.
+                      ...(b.quote
+                        ? { borderLeft: `2px solid ${palette.accent}`, paddingLeft: pad + 14, color: '#4A4536' }
+                        : null),
                     }}
+                    data-quote={b.quote ? '' : undefined}
                   >
                     <Runs runs={b.runs} at={at} />
                   </div>

@@ -184,3 +184,25 @@ describe('Longform title spacing', () => {
     expect(frame?.style.background).not.toBe('')
   })
 })
+
+describe('dấu bị lưu thành chữ trên trang đăng', () => {
+  it('không hiện dấu sao và dấu >, trích dẫn có gạch lề', () => {
+    const { container } = render(
+      <Longform
+        post={{ ...post, blocks: [
+          {
+            k: 'p',
+            runs: [
+              { t: '> *', w: '300', s: 'normal' },
+              { t: 'Câu hỏi lõi:', w: '600', s: 'normal' },
+              { t: '* Thứ gì?', w: '300', s: 'normal' },
+            ],
+          },
+        ] }}
+      />,
+    )
+    const quote = container.querySelector('[data-quote]') as HTMLElement
+    expect(quote.textContent).toBe('Câu hỏi lõi: Thứ gì?')
+    expect(quote.style.borderLeft).toMatch(/2px solid/)
+  })
+})

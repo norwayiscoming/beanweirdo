@@ -46,6 +46,7 @@ import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { IconLink } from '../../design/icons'
+import { useToast } from '../../design/Toaster'
 import { ThemePicker } from '../components/ThemePicker'
 import { CoverBand } from '../components/CoverBand'
 import { FramingProvider, useCropping, useFraming } from '../components/framing'
@@ -208,6 +209,7 @@ function EditorContent({ postId }: { postId: string }) {
    * bấm "Sửa" bài nào cũng trắng, không riêng bài nào.
    */
   const frame = useFraming()
+  const toast = useToast()
 
   /**
    * Khung cắt cho ảnh bìa.
@@ -243,6 +245,25 @@ function EditorContent({ postId }: { postId: string }) {
    */
   const history = useRef<History>(emptyHistory)
 
+  /*
+   * Mọi lượt lưu của màn này đi qua `save`, để nút Publish đợi được chúng.
+   *
+   * Bấm Publish ngay sau khi gõ thì ô soạn rời tiêu điểm, lượt lưu cuối bắt
+   * đầu, và lệnh đăng chạy song song với nó — trước kia vô hại vì chữ nào cũng
+   * lên trang thẳng, nay thì lệnh đăng có thể chép bản nháp **trước** khi dòng
+   * vừa gõ tới nơi. `dirty` là "đã sửa trong phiên này": máy chủ chỉ báo
+   * `has_draft` lúc tải bài.
+   */
+  const inFlight = useRef(new Set<Promise<unknown>>())
+  const [dirty, setDirty] = useState(false)
+  function save(patch: Parameters<typeof updatePost>[1]) {
+    const p = Promise.resolve(updatePost(postId, patch))
+    inFlight.current.add(p)
+    void p.finally(() => inFlight.current.delete(p)).catch(() => {})
+    queueMicrotask(() => setDirty(true))
+    return p
+  }
+
   useEffect(() => {
     Promise.all([getPost(postId), listModulesCached()]).then(([p, mods]) => {
       setPost(p)
@@ -277,6 +298,14 @@ function EditorContent({ postId }: { postId: string }) {
     ? post.body.length > 0
     : Object.keys((post.body ?? {}) as Record<string, unknown>).length > 0
   const activeModule = modules.find((m) => m.id === post.module_id)
+  const published = post.status === 'published'
+  /** Bài đã đăng có chỗ sửa chưa lên trang — từ máy chủ lúc tải, hoặc vừa sửa. */
+  const pending = published && (Boolean(post.has_draft) || dirty)
+  const saveNote = published
+    ? pending
+      ? 'Đã đăng · có thay đổi đang lưu nháp, chưa lên trang — bấm "Đăng thay đổi"'
+      : 'Đã đăng · sửa gì cũng chỉ lưu nháp cho tới khi bấm Đăng'
+    : `Tự lưu nháp khi rời khỏi ô soạn · trạng thái hiện tại: ${post.status}`
 
   // Optimistic local update + fire-and-forget remote save. Functional
   // setState keeps this safe against the stale-closure bug this screen used
@@ -295,7 +324,7 @@ function EditorContent({ postId }: { postId: string }) {
 
   function saveHero(url: string) {
     setPost((prev) => (prev ? { ...prev, hero_image_url: url } : prev))
-    updatePost(postId, { hero_image_url: url })
+    void save({ hero_image_url: url })
     void reshapeForMedia(url)
     if (looksLikeVideo(url)) void autoPoster(url)
   }
@@ -322,7 +351,7 @@ function EditorContent({ postId }: { postId: string }) {
        * đối tượng ở đây. Xem chú thích cùng ý ở `Editor.test.tsx`.
        */
       const body = { ...((prev.body ?? {}) as object), media: shape.kind, portrait: shape.portrait }
-      void updatePost(postId, { body } as unknown as Parameters<typeof updatePost>[1])
+      void save({ body } as unknown as Parameters<typeof updatePost>[1])
       return { ...prev, body: body as unknown as PostDetail['body'] }
     })
   }
@@ -348,7 +377,7 @@ function EditorContent({ postId }: { postId: string }) {
     setPost((prev) => {
       if (!prev) return prev
       const body = { ...((prev.body ?? {}) as object), ...patch }
-      void updatePost(postId, { body } as unknown as Parameters<typeof updatePost>[1])
+      void save({ body } as unknown as Parameters<typeof updatePost>[1])
       return { ...prev, body: body as unknown as PostDetail['body'] }
     })
   }
@@ -365,7 +394,7 @@ function EditorContent({ postId }: { postId: string }) {
       )
       return { ...prev, ...(patch as Partial<PostDetail>) }
     })
-    updatePost(postId, patch as Parameters<typeof updatePost>[1])
+    void save(patch as Parameters<typeof updatePost>[1])
   }
 
   /**
@@ -380,7 +409,7 @@ function EditorContent({ postId }: { postId: string }) {
       const done = pick(history.current, prev as unknown as Record<string, unknown>)
       if (!done) return prev
       history.current = done.history
-      updatePost(postId, done.patch as Parameters<typeof updatePost>[1])
+      void save(done.patch as Parameters<typeof updatePost>[1])
       return { ...prev, ...(done.patch as Partial<PostDetail>) }
     })
   }
@@ -485,7 +514,7 @@ function EditorContent({ postId }: { postId: string }) {
         hero={heroActions}
       />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, maxWidth: 1320 }}>
-        <span style={{ fontSize: 11, color: ink.muted }}>Tự lưu khi rời khỏi ô soạn · trạng thái hiện tại: {post.status}</span>
+        <span style={{ fontSize: 11, color: ink.muted }}>{saveNote}</span>
         <div>
           {/* A real link because it opens a second tab, where a nav() call
               cannot reach. Every screen has an address of its own now, so this
@@ -496,15 +525,33 @@ function EditorContent({ postId }: { postId: string }) {
           <button onClick={() => nav.goCms()} className="admin-btn-ghost" style={{ marginLeft: 8 }}>
             Lưu nháp
           </button>
+          {/*
+            * Publish là việc duy nhất đưa chữ lên trang (migration 0028).
+            *
+            * Bài đã đăng thì mọi ô soạn chỉ lưu vào bản nháp của nó; nút này
+            * chép bản nháp ấy lên. Nên nó đợi các lượt lưu đang chạy trước —
+            * xem `save` — rồi mới đăng, và luôn nói ra kết quả: một lần bấm
+            * không có hồi âm từng là lý do chủ site không biết bài đã lên chưa.
+            */}
           <button
             onClick={async () => {
-              await transitionStatus(postId, 'publish')
-              nav.goCms()
+              if (published && !pending) {
+                toast.info('Không có thay đổi nào chưa đăng')
+                return
+              }
+              try {
+                await Promise.allSettled([...inFlight.current])
+                await transitionStatus(postId, 'publish')
+                toast.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
+                nav.goCms()
+              } catch (e) {
+                toast.fromError(e)
+              }
             }}
             className="admin-btn"
             style={{ marginLeft: 8 }}
           >
-            Publish
+            {published ? (pending ? 'Đăng thay đổi' : 'Đã đăng') : 'Publish'}
           </button>
         </div>
       </div>

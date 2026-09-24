@@ -95,7 +95,11 @@ describe('POST /api/posts/:id/status', () => {
       data: { id: 'p1', status: 'published', published_at: 'now', updated_at: 'now' },
       error: null,
     })
-    fromMock.mockReturnValue(builder)
+    fromMock
+      // No pending edits (migration 0028), and the post is still a draft.
+      .mockReturnValueOnce(queryBuilder({ data: null, error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: { id: 'p1', status: 'draft' }, error: null }))
+      .mockReturnValue(builder)
 
     const req = mockReq({
       method: 'POST',
@@ -108,7 +112,7 @@ describe('POST /api/posts/:id/status', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body.post.status).toBe('published')
 
-    expect(fromMock).toHaveBeenCalledTimes(1)
+    expect(fromMock).toHaveBeenCalledTimes(3)
     expect(builder.in).toHaveBeenCalledWith('status', ['draft'])
     // Và câu trả lời không kéo cả bài về: chỉ những cột vừa ghi.
     expect(builder.select.mock.calls[0][0]).not.toContain('body')
@@ -211,5 +215,26 @@ describe('POST /api/posts/:id/status', () => {
     await handler(req, res)
     expect(res.statusCode).toBe(400)
     expect(res.body.error).toMatch(/published/)
+  })
+})
+
+describe('Publish on a published post publishes its pending edits (migration 0028)', () => {
+  it('copies the draft into posts, drops it, and keeps published_at', async () => {
+    const read = queryBuilder({ data: { data: { en: 'Mới', body: [{ k: 'fig', src: '/a.png' }] } }, error: null })
+    const write = queryBuilder({ data: null, error: null })
+    const drop = queryBuilder({ data: null, error: null })
+    const status = queryBuilder({ data: { id: 'p1', status: 'published' }, error: null })
+    fromMock.mockReturnValueOnce(read).mockReturnValueOnce(write).mockReturnValueOnce(drop).mockReturnValueOnce(status)
+    const req = mockReq({ method: 'POST', headers: authHeaders(token), query: { id: 'p1' }, body: { action: 'publish' } })
+    const res = mockRes()
+    await handler(req, res)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toMatchObject({ post: { id: 'p1', status: 'published' }, applied: true })
+    const patch = write.update.mock.calls[0][0]
+    expect(patch).toMatchObject({ en: 'Mới', thumbnail_url: '/a.png' })
+    expect(patch).not.toHaveProperty('published_at')
+    expect(drop.delete).toHaveBeenCalled()
+    expect(drop.eq).toHaveBeenCalledWith('post_id', 'p1')
   })
 })

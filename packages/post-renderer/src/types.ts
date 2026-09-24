@@ -230,6 +230,13 @@ export type LongformBlock = {
    * as `p` with a step (see normalizeBlocks); `true` still reads as step 1.
    */
   ind?: number | boolean
+  /**
+   * A `p` the writer marked as a quote with `> ` — a hairline down its left
+   * edge. A flag on `p` rather than a kind of its own: it is still a paragraph,
+   * and every place that walks `p` (indent, fold, the flow editor) keeps
+   * working on it unchanged.
+   */
+  quote?: boolean
   /** fig */
   src?: string
   ar?: string
