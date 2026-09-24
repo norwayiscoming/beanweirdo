@@ -92,14 +92,51 @@ export function mdBlocks(text: string): string[] {
   return out.length === 0 ? [''] : out
 }
 
+/** Dòng có chữ của một chuỗi markdown — dòng trống chỉ là chỗ ngăn khối. */
+const filled = (text: string) => text.split('\n').filter((line) => line.trim() !== '')
+
 /**
- * Cắt dải làm đôi ngay **sau** khối thứ `index`.
+ * Chỗ con trỏ trên mặt soạn, đổi ra **số dòng có chữ đứng trước chỗ cắt**.
  *
- * `index` ngoài khoảng thì kẹp vào hai đầu: con trỏ chưa từng đặt vào dải nào
- * thì chèn vào đầu dải còn hơn là ném xuống cuối bài.
+ * Chủ site: *"nó là quản lý theo line text"*. Cắt theo khối thì năm đoạn văn
+ * liền nhau của long-form — Lexical gộp chúng làm một đoạn có ngắt dòng — chỉ
+ * có một chỗ chèn: sau cả năm. Đếm theo dòng thì chèn được giữa bất cứ hai
+ * dòng nào.
+ *
+ * `block` là khối thứ mấy trên mặt soạn, `line` là dòng thứ mấy trong khối ấy
+ * (mỗi `<br>` và mỗi mục danh sách là một dòng — đúng cách `mdBlocks` gom dòng
+ * nguồn thành khối). Trả về số dòng phía trên chỗ cắt, **tính cả dòng ấy**.
  */
-export function splitAfterBlock(text: string, index: number): [string, string] {
+export function linesThrough(text: string, block: number, line: number): number {
   const parts = mdBlocks(text)
-  const cut = Math.min(Math.max(index + 1, 0), parts.length)
-  return [parts.slice(0, cut).join('\n\n'), parts.slice(cut).join('\n\n')]
+  if (block < 0) return 0
+  const k = Math.min(block, parts.length - 1)
+  const before = parts.slice(0, k).reduce((n, part) => n + filled(part).length, 0)
+  const own = filled(parts[k] ?? '').length
+  return before + Math.min(Math.max(line + 1, 0), own)
+}
+
+/**
+ * Cắt dải làm đôi sau `count` dòng có chữ.
+ *
+ * Cắt ở dòng chứ không ở khối, nên một đoạn gộp từ nhiều dòng nguồn tách
+ * được ở giữa. Cắt trúng giữa một khối mã thì lùi ra sau dấu đóng: nửa khối
+ * mã ở mỗi bên là hai khối hỏng.
+ */
+export function splitAtLine(text: string, count: number): [string, string] {
+  const lines = text.split('\n')
+  let seen = 0
+  let cut = count <= 0 ? 0 : lines.length
+  let fenced = false
+  for (let i = 0; i < lines.length; i++) {
+    if (FENCE.test(lines[i])) fenced = !fenced
+    if (lines[i].trim() === '') continue
+    seen += 1
+    if (seen >= count && !fenced && count > 0) {
+      cut = i + 1
+      break
+    }
+  }
+  const trim = (s: string[]) => s.join('\n').replace(/^\n+|\n+$/g, '')
+  return [trim(lines.slice(0, cut)), trim(lines.slice(cut))]
 }

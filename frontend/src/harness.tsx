@@ -1,3 +1,4 @@
+import './admin/admin.css'
 import { useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { EditorCanvas } from './admin/screens/Editor'
@@ -50,11 +51,12 @@ const pick = <T,>(normal: T, empty: T, headings: T): T =>
 const body =
   tpl === 'report' ? pick(els, [] as unknown as typeof els, heads as unknown as typeof els)
   : tpl === 'article' ? pick(sections, [] as unknown as typeof sections, sections.map((x) => ({ h: x.h, p: '' })))
-  : tpl === 'longform' ? pick(longform, [] as unknown as typeof longform, lfHeads as unknown as typeof longform)
+  : tpl === 'longform' ? (variant === 'aside' ? [...longform, { k: 'aside', items: [{ k: 'p', runs: [{ t: 'trong hộp' }] }] }, { k: 'p', runs: [{ t: 'sau hộp' }] }] as unknown as typeof longform : pick(longform, [] as unknown as typeof longform, lfHeads as unknown as typeof longform))
   : tpl === 'cards' ? cards
   : { len: 'ngắn', subtitle: 'phụ đề', elements: pick(els, [] as unknown as typeof els, heads as unknown as typeof els) }
 function Harness() {
   const [b, setB] = useState<unknown>(body)
+  ;(window as unknown as { __body: unknown }).__body = b
   return (
     <div style={{ maxWidth: 900, margin: '0 auto' }}>
       <EditorCanvas template={tpl}

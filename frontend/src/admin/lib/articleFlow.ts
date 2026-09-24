@@ -12,7 +12,7 @@
  * Cách lưu không đổi: vẫn là `SectionData[]`, `Article.tsx` không phải biết gì.
  */
 import type { SectionData } from 'post-renderer'
-import { splitAfterBlock } from './mdBlocks'
+import { splitAtLine } from './mdBlocks'
 
 /**
  * A body entry taken from the shared element store, not article's own
@@ -110,10 +110,11 @@ export function insertSectionThing(
   sections: SectionData[],
   at: [number, number],
   text: string,
-  blockIndex: number,
+  /** Số dòng có chữ của dải đứng trên chỗ chèn — xem `linesThrough`. */
+  lines: number,
   thing: SectionData,
 ): SectionData[] {
-  const [before, after] = splitAfterBlock(text, blockIndex)
+  const [before, after] = splitAtLine(text, lines)
   return [
     ...sections.slice(0, at[0]),
     ...markdownToRun(before),
