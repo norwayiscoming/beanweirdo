@@ -126,7 +126,8 @@ describe('PATCH /api/posts/:id', () => {
     await handler(req, res)
 
     expect(res.statusCode).toBe(200)
-    const selected = builder.select.mock.calls[0][0] as string
+    // The first select reads the status (drafts, migration 0028); the answer is the last.
+    const selected = builder.select.mock.calls.at(-1)![0] as string
     const columns = selected.split(',').map((c: string) => c.trim())
     expect(columns).toContain('id')
     expect(columns).toContain('en')
@@ -284,5 +285,68 @@ describe('PATCH /api/posts/:id — chuyển bài sang module khác', () => {
 
     const written = builder.update.mock.calls[0][0] as Record<string, unknown>
     expect(written).not.toHaveProperty('sort_order')
+  })
+})
+
+describe('PATCH a published post — edits wait for Publish (migration 0028)', () => {
+  it('stages content in post_drafts and leaves posts alone', async () => {
+    const status = queryBuilder({ data: { status: 'published' }, error: null })
+    const read = queryBuilder({ data: { data: { en: 'Cũ hơn' } }, error: null })
+    const upsert = queryBuilder({ data: null, error: null })
+    fromMock.mockReturnValueOnce(status).mockReturnValueOnce(read).mockReturnValueOnce(upsert)
+    const req = mockReq({
+      method: 'PATCH',
+      headers: authHeaders(token),
+      query: { id: 'p1' },
+      body: { lead: 'Mới', body: [{ k: 'p' }] },
+    })
+    const res = mockRes()
+    await handler(req, res)
+
+    expect(res.statusCode).toBe(200)
+    expect(res.body.post).toEqual({ id: 'p1', has_draft: true })
+    expect(fromMock.mock.calls.map((c) => c[0])).toEqual(['posts', 'post_drafts', 'post_drafts'])
+    // Merged over what was already pending, and nothing written to posts.
+    expect(upsert.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ post_id: 'p1', data: { en: 'Cũ hơn', lead: 'Mới', body: [{ k: 'p' }] } }),
+      { onConflict: 'post_id' },
+    )
+    expect(status.update).not.toHaveBeenCalled()
+  })
+
+  it('still applies filing at once — a pin is not content', async () => {
+    const builder = queryBuilder({ data: { id: 'p1', pinned: true }, error: null })
+    fromMock.mockReturnValue(builder)
+    const req = mockReq({ method: 'PATCH', headers: authHeaders(token), query: { id: 'p1' }, body: { pinned: true } })
+    const res = mockRes()
+    await handler(req, res)
+    expect(res.statusCode).toBe(200)
+    expect(fromMock.mock.calls.map((c) => c[0])).toEqual(['posts'])
+    expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ pinned: true }))
+  })
+
+  it('writes live when post_drafts does not exist yet', async () => {
+    const status = queryBuilder({ data: { status: 'published' }, error: null })
+    const missing = queryBuilder({ data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.post_drafts'" } })
+    const live = queryBuilder({ data: { id: 'p1', lead: 'Mới' }, error: null })
+    fromMock.mockReturnValueOnce(status).mockReturnValueOnce(missing).mockReturnValueOnce(missing).mockReturnValueOnce(live)
+    const req = mockReq({ method: 'PATCH', headers: authHeaders(token), query: { id: 'p1' }, body: { lead: 'Mới' } })
+    const res = mockRes()
+    await handler(req, res)
+    expect(res.statusCode).toBe(200)
+    expect(live.update).toHaveBeenCalledWith(expect.objectContaining({ lead: 'Mới' }))
+  })
+})
+
+describe('GET shows the editor the unpublished version', () => {
+  it('lays pending edits over the published row', async () => {
+    fromMock
+      .mockReturnValueOnce(queryBuilder({ data: { ...SAMPLE_ROW, status: 'published' }, error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: { data: { en: 'Tiêu đề mới' } }, error: null }))
+    const req = mockReq({ method: 'GET', headers: authHeaders(token), query: { id: 'p1' } })
+    const res = mockRes()
+    await handler(req, res)
+    expect(res.statusCode).toBe(200)
+    expect(res.body.post).toMatchObject({ en: 'Tiêu đề mới', has_draft: true })
   })
 })
