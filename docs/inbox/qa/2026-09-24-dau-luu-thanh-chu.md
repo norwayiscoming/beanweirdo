@@ -1,6 +1,6 @@
 # Dấu `*` và `>` đã lưu thành chữ trong bài long-form
 
-- **PR:** (số PR ghi ở commit kế tiếp của cùng nhánh)
+- **PR:** #39
 - **Nhánh:** `claude/project-thread-7yatkf`
 - **Lane:** QA hot-fix
 - **Ngày:** 2026-09-24
