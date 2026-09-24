@@ -179,7 +179,7 @@ export const CONFIG_BOXES = [
   { id: 'notes', t: 'Trang Ghi chép', d: 'Tiêu đề, đoạn dẫn, dòng hướng dẫn, câu trích, lời kết' },
 ] as const
 
-export type ConfigBox = (typeof CONFIG_BOXES)[number]['id']
+type ConfigBox = (typeof CONFIG_BOXES)[number]['id']
 
 /**
  * The index names itself, so a test — and a screen reader — can tell an index

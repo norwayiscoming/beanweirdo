@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { rootsOf } from '../lib/contentTree'
 import { watchModules } from './modulesChanged'
 import { bySiteOrder } from '../lib/moduleOrder'
-export { bySiteOrder } from '../lib/moduleOrder'
 import type { ModuleLayout } from '../content/layouts'
 export type { ModuleLayout }
 import { supabase } from '../lib/supabaseClient'
@@ -68,7 +67,7 @@ export type ModuleRow = {
   visibility: 'public' | 'private'
 }
 
-export type UseModulesResult = {
+type UseModulesResult = {
   data: ModuleRow[]
   loading: boolean
   error: string | null
@@ -179,15 +178,7 @@ const isPublic = (m: ModuleRow) => m.visibility !== 'private'
 export const landingModules = (modules: ModuleRow[]) =>
   rootsOf(modules.filter((m) => m.kind !== 'special' && isPublic(m))).sort(bySiteOrder)
 
-/** Mục lục — everything public, the journals included, in sidebar order. */
+/** Mục lục and the sidebar — everything public, the journals included, in site order. */
 export const indexModules = (modules: ModuleRow[]) =>
   modules.filter(isPublic).sort(bySiteOrder)
 
-/** The sidebar lists exactly what the index does. */
-export const sidebarModules = indexModules
-
-/**
- * @deprecated Names a distinction that no longer exists — say which surface
- * you mean. Kept so nothing breaks mid-migration.
- */
-export const readingModules = landingModules

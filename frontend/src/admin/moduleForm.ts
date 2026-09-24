@@ -36,7 +36,7 @@ export function captionColumn(group: Pick<ImageGroup, 'columns'>, slot: number):
 }
 
 /** Just enough to decide a module's form shape. */
-export type ModuleIdentity = { id: string; kind: 'normal' | 'special'; layout?: string }
+type ModuleIdentity = { id: string; kind: 'normal' | 'special'; layout?: string }
 
 /**
  * Which fields the Sửa nội dung editor shows for one module.
@@ -51,7 +51,7 @@ export type ModuleIdentity = { id: string; kind: 'normal' | 'special'; layout?: 
  * its own screens reads that field. Adding a module kind means adding a row
  * here, not editing the editor.
  */
-export type ModuleFormShape = {
+type ModuleFormShape = {
   /** Presentation copy — only modules that appear as a card need these. */
   concept: boolean
   blurb: boolean

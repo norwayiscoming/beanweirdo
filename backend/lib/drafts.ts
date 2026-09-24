@@ -16,7 +16,7 @@ type Supabase = ReturnType<typeof getSupabase>
  * still apply at once, because holding a drag back until the next Publish
  * would look to the owner like the drag had failed.
  */
-export const DRAFT_FIELDS = [
+const DRAFT_FIELDS = [
   'en',
   'vi',
   'body',

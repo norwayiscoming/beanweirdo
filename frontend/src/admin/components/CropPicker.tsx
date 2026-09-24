@@ -5,7 +5,7 @@ import { Button } from '../../design/Button'
 import { radius } from '../../design/controls'
 
 /** A rectangle on the photo, in percentages of the photo's width and height. */
-export type Rect = { x: number; y: number; w: number; h: number }
+type Rect = { x: number; y: number; w: number; h: number }
 
 /**
  * Hình dạng khung đưa sẵn. `null` là tự do, `'photo'` là đúng hình tấm ảnh.
@@ -14,7 +14,7 @@ export type Rect = { x: number; y: number; w: number; h: number }
  * muốn tự cắt, nên hình dạng thành một lựa chọn — và "gốc" đứng đầu vì đa số
  * ảnh chụp đã đúng khuôn người chụp muốn.
  */
-export const SHAPES: { label: string; ratio: number | null | 'photo' }[] = [
+const SHAPES: { label: string; ratio: number | null | 'photo' }[] = [
   { label: 'Gốc', ratio: 'photo' },
   { label: 'Tự do', ratio: null },
   { label: '16:9', ratio: 16 / 9 },
@@ -26,7 +26,7 @@ export const SHAPES: { label: string; ratio: number | null | 'photo' }[] = [
 ]
 
 /** Hình dạng đúng bằng ô ảnh đang đứng trên trang. */
-export const FIT = 'Vừa ô'
+const FIT = 'Vừa ô'
 
 /** Smallest side a crop can shrink to, so a slip cannot collapse it to nothing. */
 const MIN = 8

@@ -13,7 +13,7 @@
  *   node tools/spec-numbers.mjs           số thật
  *   node tools/spec-numbers.mjs --check   thoát 1 nếu SPEC.html ghi khác
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -41,43 +41,17 @@ const collisions = Object.entries(
 ).filter(([, fs]) => fs.length > 1)
 
 /*
- * Bộ luật đánh số từng nằm ở `frontend/src/content/logic.ts`. Chủ site cho xoá
- * ngày 2026-09-21 — tệp ấy đã không còn trang nào dựng ra từ trước đó. Ba con
- * số dưới đây vì thế không còn đếm được từ mã, nên chúng **rụng khỏi bản đếm**
- * thay vì báo 0: báo 0 thì `--check` sẽ bảo SPEC.html sai ở ba dòng mà thật ra
- * SPEC mới là chỗ duy nhất còn giữ con số.
- *
- * Nếu bộ luật quay lại ở một tệp khác, trỏ `LOGIC` sang tệp ấy là bản đếm chạy
- * lại như cũ.
+ * Bộ luật đánh số (`logic.ts`) bị xoá ngày 2026-09-21, nên luật/nhóm/phần không
+ * còn đếm được từ mã. SPEC.html là chỗ duy nhất còn giữ ba con số ấy.
  */
-const LOGIC = 'frontend/src/content/logic.ts'
-const logic = existsSync(join(root, LOGIC)) ? read(LOGIC) : null
-/*
- * A rule is `{ s: <scope>, r: <rule>, e: <example> }`. Matching on `{ s: '`
- * alone also catches the three SCOPE_KEY entries, which is how the count came
- * out as 67 once — the `r:` is what tells a rule from a legend entry.
- */
-const fromLogic = (re) => (logic === null ? null : (logic.match(re) ?? []).length)
-const rules = fromLogic(/\{ s: '[^']*', r: '/g)
-const groups = fromLogic(/n: '\d+', g: '/g)
-const parts = fromLogic(/p: '[A-Z]', part:/g)
-
 const tables = [
   ...new Set((read('docs/SPEC.html').match(/\b(posts|modules|notes|hour_logs|activity_kinds|site_settings|templates)\b/g) ?? [])),
 ]
 
-/** Bỏ đi mọi con số không đếm được, để `--check` không so với một số bịa. */
-const counted = Object.fromEntries(
-  Object.entries({
-    migration: migrations.length,
-    luật: rules,
-    nhóm: groups,
-    phần: parts,
-    bảng: tables.length,
-  }).filter(([, v]) => v !== null),
-)
-
-if (logic === null) console.log(`(bỏ qua luật/nhóm/phần — không còn ${LOGIC})`)
+const counted = {
+  migration: migrations.length,
+  bảng: tables.length,
+}
 
 for (const [k, v] of Object.entries(counted)) console.log(`${String(v).padStart(4)}  ${k}`)
 
@@ -114,19 +88,7 @@ function checkWord(key, v) {
     if (Number(m[1]) !== v) stale.push(`${key}: SPEC ghi ${m[1]}, thật là ${v}`)
   }
 }
-/** SPEC says "quy tắc" where logic.ts says "luật"; both name the same thing. */
-const ALIASES = { luật: ['luật', 'quy tắc'] }
-
-for (const [k, v] of Object.entries(counted)) {
-  for (const k2 of ALIASES[k] ?? [k]) checkWord(k2, v)
-  const digits = [...spec.matchAll(new RegExp(`(\\d+)\\s*(?:</span>\\s*<span[^>]*>)?\\s*${k}`, 'gi'))]
-  for (const m of digits) if (Number(m[1]) !== v) stale.push(`${k}: SPEC ghi ${m[1]}, thật là ${v}`)
-  for (const [n, w] of Object.entries(WORDS)) {
-    if (Number(n) === v) continue
-    const re = new RegExp(`${w}\\s+${k}`, 'i')
-    if (re.test(spec)) stale.push(`${k}: SPEC ghi "${w}", thật là ${v}`)
-  }
-}
+for (const [k, v] of Object.entries(counted)) checkWord(k, v)
 
 /*
  * The four files already sharing 0017 and 0018 have run; renaming them now

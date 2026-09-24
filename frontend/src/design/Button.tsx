@@ -22,7 +22,7 @@ type Common = {
   size?: Size
 }
 
-export type ButtonProps = Common &
+type ButtonProps = Common &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> & {
     /** Drawn before the label, at the size the button's own size implies. */
     icon?: ReactNode
@@ -43,7 +43,7 @@ export function Button({ level = 'ghost', size = 'md', icon, children, type = 'b
   )
 }
 
-export type IconButtonProps = Common &
+type IconButtonProps = Common &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'aria-label'> & {
     /**
      * Required. A button whose whole content is a drawing says nothing to a

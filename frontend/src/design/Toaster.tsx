@@ -33,12 +33,12 @@ type Tone = 'ok' | 'error' | 'info' | 'busy'
 type Toast = { id: number; tone: Tone; text: string }
 
 /** A card that says work is running, then turns into its outcome in place. */
-export type Pending = {
+type Pending = {
   ok: (text: string) => void
   fail: (e: unknown) => void
 }
 
-export type Toaster = {
+type Toaster = {
   ok: (text: string) => void
   error: (text: string) => void
   info: (text: string) => void

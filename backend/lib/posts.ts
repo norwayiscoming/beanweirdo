@@ -10,12 +10,6 @@ export type PostTemplate = 'article' | 'cards' | 'report' | 'longform' | 'memo' 
 export type PostStatus = 'draft' | 'published' | 'archived' | 'deleted'
 
 /**
- * @deprecated The four words `kind` used to be fenced to. Migration 0020 moved
- * that vocabulary into the `tags` table, where the owner writes their own.
- * Kept only so the seeded four still typecheck where they appear.
- */
-export const POST_KINDS: PostKind[] = ['note', 'essay', 'ref', 'log']
-/**
  * Every template a post may be stored as.
  *
  * This list, the database's check constraint and the renderer's dispatcher all
@@ -190,7 +184,7 @@ export function withoutImages(value: unknown, depth = 0): unknown {
  * names depending on which door you came through — and the two sides grew two
  * adapters that then drifted apart. One shape, one set of names, end to end.
  */
-export interface PostSummary {
+interface PostSummary {
   id: string
   module_id: string
   en: string
@@ -222,7 +216,7 @@ export interface PostSummary {
   published_at: string | null
 }
 
-export interface PostDetail extends PostSummary {
+interface PostDetail extends PostSummary {
   slug: string | null
   body: unknown | null
   hero_caption: string | null
@@ -343,7 +337,7 @@ export function fixedStatusPatch(action: StatusAction, nowIso: string): Partial<
   }
 }
 
-export interface StatusTransitionResult {
+interface StatusTransitionResult {
   /** Column patch to apply with `.update()`. Absent for permanently-delete (hard delete instead). */
   patch: Partial<PostRow> | null
   hardDelete: boolean

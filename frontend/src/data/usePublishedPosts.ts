@@ -47,7 +47,7 @@ export type PostRow = {
   updated_at: string
 }
 
-export type UsePostsOptions = {
+type UsePostsOptions = {
   /** Restrict to one module's posts. Omit to fetch across every module. */
   moduleId?: string
   /**
@@ -80,7 +80,7 @@ export type UsePostsOptions = {
   withBody?: boolean
 }
 
-export type UsePostsResult = {
+type UsePostsResult = {
   data: PostRow[]
   loading: boolean
   error: string | null

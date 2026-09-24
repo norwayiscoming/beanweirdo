@@ -19,7 +19,7 @@ import { buildTree, canReparent, descendantIds, flattenTree, type TreeRow } from
 /** Chỗ con trỏ đang chỉ tới, so với thẻ nó đang nằm trên. */
 export type DropWhere = 'before' | 'after' | 'inside'
 
-export type MovePlan = {
+type MovePlan = {
   /** Cha mới của module vừa kéo; `null` là đưa nó lên tầng trên cùng. */
   parentId: string | null
   /**
@@ -33,7 +33,7 @@ export type MovePlan = {
   order: string[]
 }
 
-export type MoveResult = MovePlan | { error: string }
+type MoveResult = MovePlan | { error: string }
 
 /** Cha thật của một hàng: một `parent_id` trỏ ra ngoài mảng đọc như không có cha. */
 const parentOf = <T extends TreeRow>(rows: readonly T[], id: string): string | null => {

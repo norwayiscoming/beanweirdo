@@ -10,10 +10,10 @@
  * trôi ra khỏi đường thứ nhất.
  */
 
-export type Mark = 'bold' | 'italic' | 'reading' | 'link'
+type Mark = 'bold' | 'italic' | 'reading' | 'link'
 
 /** Chữ, và vùng chọn sau khi đã đặt dấu. */
-export type Marked = { text: string; start: number; end: number }
+type Marked = { text: string; start: number; end: number }
 
 /**
  * Dấu của từng mức, đúng ký hiệu markdown chuẩn.

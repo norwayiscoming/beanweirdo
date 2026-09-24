@@ -13,15 +13,14 @@
  * Hình dạng giữ đúng như `Longform.tsx` vẫn vẽ: công thức có vạch bên trái
  * trên nền trắng, khung ghi chú nằm trên nền cát.
  */
-import { ink, sans } from '../tokens'
-import { Inline } from './inline'
+import { sans } from '../tokens'
 import { registerElement, type ElementViewProps } from './registry'
 import { ElementList } from './view'
 
-export type FormulaAttrs = { type: 'formula'; id?: string; text: string }
-export type AsideAttrs = { type: 'aside'; id?: string; items: unknown[] }
+type FormulaAttrs = { type: 'formula'; id?: string; text: string }
+type AsideAttrs = { type: 'aside'; id?: string; items: unknown[] }
 
-export const formula = registerElement<FormulaAttrs>({
+registerElement<FormulaAttrs>({
   name: 'formula',
   title: 'Công thức',
   category: 'data',
@@ -47,7 +46,7 @@ export const formula = registerElement<FormulaAttrs>({
   ),
 })
 
-export const aside = registerElement<AsideAttrs>({
+registerElement<AsideAttrs>({
   name: 'aside',
   title: 'Khung ghi chú',
   category: 'text',
@@ -78,13 +77,4 @@ function isEmptyAside(items: unknown[] | undefined): boolean {
     const el = x as { type?: unknown; text?: unknown } | null
     return el?.type === 'paragraph' && String(el.text ?? '').trim() === ''
   })
-}
-
-/** Chữ trơn trong khung, khi chỗ gọi chưa dựng element con. */
-export function AsideLine({ text, accentInk }: { text: string; accentInk: string }) {
-  return (
-    <div style={{ fontFamily: sans, fontWeight: 300, fontSize: 14.5, lineHeight: 1.66, color: ink.strong, margin: '0 0 10px' }}>
-      <Inline text={text} accentInk={accentInk} />
-    </div>
-  )
 }

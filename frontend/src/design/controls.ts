@@ -25,17 +25,8 @@ export type Size = 'lg' | 'md' | 'sm'
  */
 export const radius = 8
 
-/** One border width, at every level and every state, so hover never shifts layout by a pixel. */
-export const borderWidth = 1
-
 export const sizes: Record<Size, { height: number; padding: number; font: number }> = {
   lg: { height: 40, padding: 20, font: 12.5 },
   md: { height: 34, padding: 16, font: 12 },
   sm: { height: 28, padding: 12, font: 11.5 },
 }
-
-/** Icon buttons are square at the md height, so they sit on a toolbar row without nudging it. */
-export const iconSize = sizes.md.height
-
-/** The glyph inside a control, by the size of the control around it. */
-export const glyph: Record<Size, number> = { lg: 17, md: 16, sm: 14 }

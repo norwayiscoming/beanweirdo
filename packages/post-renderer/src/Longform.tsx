@@ -10,7 +10,7 @@ import type { LongformBlock, LongformPostData, LongformRun } from './types'
 import { indentOf, normalizeBlocks } from './longformBlocks'
 import { runsToText } from './longformText'
 
-export type LongformProps = LongformEdit & {
+type LongformProps = LongformEdit & {
   /**
    * Bố cục điện thoại. Chỗ gọi quyết định, không phải khuôn tự đo — xem
    * `PostRenderer`.

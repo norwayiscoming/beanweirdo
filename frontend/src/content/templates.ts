@@ -23,7 +23,7 @@
  * A layout is interchangeable markup over one shape; a template is not.
  */
 
-export type TemplateSpec = {
+type TemplateSpec = {
   key: string
   /** What the CMS calls it — the editor's dropdown and the post card's badge. */
   label: string

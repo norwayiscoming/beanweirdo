@@ -48,7 +48,7 @@ const label: CSSProperties = {
   marginBottom: 6,
 }
 
-export type CoverBandProps = {
+type CoverBandProps = {
   imageUrl: string | null
   /** `ratio` là hình dạng thật của băng, đo lúc bấm. */
   onPick: (file: File, ratio: number | null) => void

@@ -56,7 +56,7 @@ export type MemoOverrides = {
   renderPlateAction?: PlateAction
 }
 
-export type MemoProps = MemoOverrides & {
+type MemoProps = MemoOverrides & {
   /**
    * Bố cục điện thoại. Chỗ gọi quyết định, không phải khuôn tự đo — xem
    * `PostRenderer`.

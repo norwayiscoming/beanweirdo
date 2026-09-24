@@ -8,7 +8,6 @@ import {
   useState,
   type ClipboardEvent,
   type CSSProperties,
-  type DragEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react'
@@ -90,14 +89,14 @@ import {
   rawIndexFor,
   type Palette,
 } from 'post-renderer'
-import { AddRow, RowShell, followGrip, useFlowThing } from '../components/RowShell'
+import { AddRow, FlowThing, Grip, RowShell } from '../components/RowShell'
 import { duplicateAt, insertAt, move, removeAt } from '../lib/listOps'
 import { withPastedBlocks } from '../lib/pasteBlocks'
 import { insertThing, moveIntoRun, toRuns, writeRun } from '../lib/flow'
 import { linesThrough } from '../lib/mdBlocks'
-import { focusThingLater, lineOfPoint, thingKeyDown } from '../lib/flowFocus'
+import { focusThingLater, lineOfPoint } from '../lib/flowFocus'
 import { emptyHistory, historyKey, inverseOf, record, redo, undo, type History } from '../lib/editHistory'
-import { blockKey, type BlockFocus } from '../lib/blockKeys'
+import { spaceBlock, type BlockFocus } from '../lib/blockKeys'
 import { insertLongformThing, runAtIndex, toLongformRuns, writeLongformRun } from '../lib/longformFlow'
 import { insertSectionThing, isStoredElement, runAtSection, toSectionRuns, writeSectionRun } from '../lib/articleFlow'
 import { BlockIcon } from '../components/BlockIcon'
@@ -123,7 +122,7 @@ import { toReportBlocks, toReportNotes } from '../../lib/reportBlocks'
  * than the API client's convenience `SectionData[]` narrowing) because it
  * holds a different real shape per template; see lib/postData.ts.
  */
-export type EditPatch = Partial<{
+type EditPatch = Partial<{
   en: string
   lead: string
   pull_quote: string
@@ -153,7 +152,7 @@ export type EditPatch = Partial<{
  * vắng nó thì góc ô ảnh bìa chỉ còn nút tải tệp, đúng với việc chỗ dựng ấy
  * thật sự không nối gì.
  */
-export type HeroActions = {
+type HeroActions = {
   /** Dán một địa chỉ ảnh thay vì tải tệp lên. */
   link: (url: string, ratio: number | null) => void
   /**
@@ -723,8 +722,6 @@ function EditorStyles() {
       .awc-note-x{ position: absolute; right: 0; top: 2px; font-size: 10px; color: #8C8674; background: transparent; border: none; cursor: pointer; padding: 2px; opacity: 0; transition: opacity .12s; }
       .awc-note-row:hover .awc-note-x, .awc-note-x:focus-visible{ opacity: 1; }
       .awc-note-add{ font-family: 'Be Vietnam Pro', system-ui, sans-serif; font-size: 11.5px; background: transparent; border: none; cursor: pointer; padding: 2px 0; }
-      .awc-note-slot{ opacity: .45; transition: opacity .12s; }
-      .awc-note-slot:hover, .awc-note-slot:focus-visible{ opacity: 1; }
 
       /* asked when a block with notes is being deleted */
       .awc-dialog{ position: relative; z-index: 6; border: 1px solid #E4DECB; background: #fff; padding: 14px 16px; max-width: 340px; margin: 10px 0; box-shadow: 0 6px 18px rgba(0,0,0,.1); }
@@ -775,12 +772,6 @@ function EditorStyles() {
       .awc-quote > span{ font-family: 'Playfair Display', Georgia, serif; font-size: 38px; line-height: .8; }
       .awc-quote > div{ flex: 1; min-width: 0; }
       .awc-callout{ border-left: 2px solid; padding: 14px 16px; margin: 10px 0; max-width: 620px; }
-      .awc-list-edit{ margin: 10px 0; }
-      .awc-list-flag{ display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8C8674; margin-bottom: 10px; }
-      .awc-list-flag span{ margin-left: 6px; }
-      .awc-list-line{ display: block; position: relative; }
-      .awc-list-tools{ position: absolute; right: 0; top: -2px; display: flex; gap: 10px; opacity: 0; transition: opacity .12s; background: rgba(253,251,242,.92); padding-left: 8px; }
-      .awc-list-line:hover .awc-list-tools, .awc-list-line:focus-within .awc-list-tools{ opacity: 1; }
     `}</style>
   )
 }
@@ -853,7 +844,6 @@ function EditableField({
   onKeyDown,
   onPasteText,
   onType,
-  onArrowOut,
   pasteAsText = false,
   markdown = false,
   accentInk = ink.base,
@@ -900,13 +890,6 @@ function EditableField({
    * đợi tới đó thì menu chỉ hiện ra sau khi người viết đã bỏ đi.
    */
   onType?: (text: string, caret: number) => void
-  /**
-   * Con trỏ chạm mép ô và còn muốn đi tiếp.
-   *
-   * Trả `true` nghĩa là đã có chỗ để đi. `false` thì con trỏ ở lại — khối đầu
-   * bài không có gì phía trên, và nuốt phím ở đó là làm mũi tên chết cứng.
-   */
-  onArrowOut?: (dir: -1 | 1) => boolean
   /**
    * Dán vào ô này là **chèn chữ**, không phải sinh khối mới.
    *
@@ -1053,26 +1036,6 @@ function EditableField({
     node.setSelectionRange(want.start, want.end)
   }, [local])
 
-  /**
-   * Mũi tên ở mép ô thì đi sang khối bên cạnh.
-   *
-   * Chỉ ở **mép**: giữa chữ thì mũi tên là của trình duyệt, và cướp nó đi là
-   * làm hỏng cách đi lại trong chính đoạn đang viết.
-   */
-  function arrows(e: KeyboardEvent<HTMLElement>): boolean {
-    const node = el.current
-    if (!onArrowOut || !node) return false
-    const at = node.selectionStart ?? 0
-    if (node.selectionEnd !== at) return false
-
-    const up = (e.key === 'ArrowUp' || e.key === 'ArrowLeft') && at === 0
-    const down = (e.key === 'ArrowDown' || e.key === 'ArrowRight') && at === node.value.length
-    if (!up && !down) return false
-    if (!onArrowOut(up ? -1 : 1)) return false
-    e.preventDefault()
-    return true
-  }
-
   /** `Cmd+B` · `Cmd+U` · `Cmd+K`. Trả `true` nghĩa là đã nhận phím. */
   function format(e: KeyboardEvent<HTMLElement>): boolean {
     /*
@@ -1192,7 +1155,7 @@ function EditableField({
         }}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (format(e) || arrows(e)) return
+          if (format(e)) return
           onKeyDown?.(e, local)
         }}
         onPaste={paste}
@@ -1215,7 +1178,7 @@ function EditableField({
         }}
       onBlur={commit}
       onKeyDown={(e) => {
-          if (format(e) || arrows(e)) return
+          if (format(e)) return
           onKeyDown?.(e, local)
         }}
       onPaste={paste}
@@ -1857,7 +1820,6 @@ function StoredBlockFields({
       onPasteBlocks={() => false}
       onTextKey={() => {}}
       onSlash={() => {}}
-      onArrowOut={() => false}
     />
   )
 }
@@ -2263,15 +2225,13 @@ function useElementBody({
             onFocused={() => setSpot(null)}
             onChange={(next) => write(elements.map((x, k) => (k === i ? next : x)))}
             // Mũi tên ở mép ô do vỏ khối lo (`thingKeyDown`), đi xuyên cả dải chữ.
-            onArrowOut={() => false}
             onSlash={(query) => setSlash(query === null ? null : { at: i, query })}
             onTextKey={(e, current) => {
-              // Enter và Backspace do vỏ khối lo: khối con này đứng giữa các
-              // dải chữ, và luật cũ đưa con trỏ tới một khối không còn ô nào.
-              if (e.key !== ' ') return
+              // Chỉ dấu cách đổi loại khối; Enter, Backspace, mũi tên do `FlowThing` lo.
               const field = e.target as HTMLTextAreaElement
               const caret = field.selectionStart ?? 0
-              const out = blockKey(elements, i, e, current, caret, field.selectionEnd !== caret)
+              if (e.key !== ' ' || field.selectionEnd !== caret) return
+              const out = spaceBlock(elements, i, current, caret)
               if (!out) return
               e.preventDefault()
               write(out.blocks)
@@ -2388,7 +2348,7 @@ function BitesizeEditor({
    * Chủ site: "trong template này thì người dùng cũng được thêm thắt tất cả
    * các element kiểu heading.. giống các template khác đấy nhé". Nên phần
    * kéo–thả–chèn–xoá ở đây là ĐÚNG bộ máy memo dùng, không phải một bản riêng:
-   * `RowShell` cho tay nắm, `InsertRow` cho menu chèn, `blankReportBlock` cho
+   * `RowShell` cho tay nắm, `InsertPlus` cho menu chèn, `blankReportBlock` cho
    * khối trắng. Một cái heading ở đây và một cái heading ở memo là cùng một
    * thứ.
    */
@@ -3139,7 +3099,7 @@ function ReportEditor({
                       }}
                     />
                   ) : (
-                    <ReportThing
+                    <FlowThing
                       at={run.at}
                       onAddLine={() => setBlocks(insertAt(blocks, run.at + 1, blankReportBlock('paragraph')))}
                       onRemove={() => requestRemove(run.at)}
@@ -3160,7 +3120,7 @@ function ReportEditor({
                             onToggle={() => setMenuAt(menuAt === run.at ? null : run.at)}
                             onInsert={(t) => insertBlock(run.at, t)}
                           />
-                          <BlockGrip
+                          <Grip
                             onLift={() => setDragFrom(run.at)}
                             onDone={() => {
                               setDragFrom(null)
@@ -3190,14 +3150,13 @@ function ReportEditor({
                           onFocused={() => setSpot(null)}
                           onChange={(next) => updateBlock(run.at, next)}
                           onEmptied={() => requestRemove(run.at, mergeTarget(blocks, run.at))}
-                          // Mũi tên, Enter, Backspace ở mép ô do vỏ khối lo — xem `ReportThing`.
-                          onArrowOut={() => false}
+                          // Mũi tên, Enter, Backspace ở mép ô do vỏ khối lo — xem `FlowThing`.
                           onSlash={(query) => setSlash(query === null ? null : { at: run.at, query })}
                           onTextKey={(e, current) => {
-                            if (e.key !== ' ') return
                             const field = e.target as HTMLTextAreaElement
                             const caret = field.selectionStart ?? 0
-                            const out = blockKey(blocks, run.at, e, current, caret, field.selectionEnd !== caret)
+                            if (e.key !== ' ' || field.selectionEnd !== caret) return
+                            const out = spaceBlock(blocks, run.at, current, caret)
                             if (!out) return
                             e.preventDefault()
                             setBlocks(out.blocks)
@@ -3231,7 +3190,7 @@ function ReportEditor({
                           />
                         )}
                       </div>
-                    </ReportThing>
+                    </FlowThing>
                   )}
                 </div>
 
@@ -3313,91 +3272,6 @@ function ColumnSplit({ width, onWidth, rows }: { width: number; onWidth: (w: num
         from.current = null
       }}
     />
-  )
-}
-
-/**
- * Vỏ của một khối report đứng giữa các dải chữ — cùng luật bàn phím với
- * `RowShell` của năm khuôn kia (`thingKeyDown`).
- */
-function ReportThing({
-  at,
-  onAddLine,
-  onRemove,
-  onDragOver,
-  onDrop,
-  children,
-}: {
-  at: number
-  onAddLine: () => void
-  onRemove: () => void
-  onDragOver: (e: DragEvent<HTMLDivElement>) => void
-  onDrop: () => void
-  children: ReactNode
-}) {
-  const box = useFlowThing(onAddLine)
-  return (
-    <div
-      ref={box}
-      data-flow="thing"
-      data-flow-at={at}
-      onKeyDown={(e) => thingKeyDown(e, onRemove)}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-    >
-      {children}
-    </div>
-  )
-}
-
-/**
- * The handle in the left margin.
- *
- * One control, and hovering it says so: drag to reorder, Delete to remove.
- * The same two things work from the keyboard — arrows move, Delete removes —
- * because a handle that can only be dragged is a handle half the people using
- * it cannot reach.
- */
-function BlockGrip({
-  onLift,
-  onDone,
-  onMove,
-  onRemove,
-  at,
-}: {
-  onLift: () => void
-  onDone: () => void
-  onMove: (dir: -1 | 1) => void
-  onRemove: () => void
-  /** Chỉ số của khối, để focus đi theo nó sau khi dời bằng mũi tên. */
-  at: number
-}) {
-  return (
-    <button
-      type="button"
-      className="awc-grip"
-      draggable
-      onDragStart={onLift}
-      onDragEnd={onDone}
-      aria-label="Kéo thả để đổi thứ tự · Delete để xoá"
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowUp') {
-          e.preventDefault()
-          onMove(-1)
-          followGrip(e.currentTarget, at - 1)
-        } else if (e.key === 'ArrowDown') {
-          e.preventDefault()
-          onMove(1)
-          followGrip(e.currentTarget, at + 1)
-        } else if (e.key === 'Delete' || e.key === 'Backspace') {
-          e.preventDefault()
-          onRemove()
-        }
-      }}
-    >
-      ⠿
-      <span className="awc-grip-tip">Kéo thả để đổi thứ tự · Delete để xoá</span>
-    </button>
   )
 }
 
@@ -3878,7 +3752,6 @@ function ReportBlockFields({
   focusCaret,
   onTextKey,
   onSlash,
-  onArrowOut,
 }: {
   block: ReportBlock
   palette: Palette
@@ -3898,7 +3771,7 @@ function ReportBlockFields({
   /** Chỗ đặt con trỏ trong ô chữ của khối; vắng nghĩa là cuối chữ. */
   focusCaret?: number
   /**
-   * Một phím trong ô chữ của khối — Enter mở khối, Backspace nhập lên.
+   * Một phím trong ô chữ của khối — dấu cách sau `#`, `-`, `>` đổi loại khối.
    *
    * Bắt buộc, cùng lý do với `onPasteBlocks`: ba màn dùng chung component
    * này, và một prop tuỳ chọn là cái bẫy để dành cho màn thứ tư.
@@ -3910,12 +3783,6 @@ function ReportBlockFields({
    * `null` là đóng lại. Chuỗi là mấy chữ gõ sau dấu `/`, để lọc.
    */
   onSlash: (query: string | null) => void
-  /**
-   * Con trỏ chạm mép khối và còn muốn đi tiếp — sang khối có ô chữ gần nhất.
-   *
-   * Bắt buộc, cùng lý do với `onPasteBlocks` và `onTextKey`.
-   */
-  onArrowOut: (dir: -1 | 1) => boolean
 }) {
   /*
    * Emptying the words out of a paragraph is the writer saying there is no
@@ -3942,7 +3809,6 @@ function ReportBlockFields({
           value={stored.text ?? ''}
           placeholder="công thức"
           onCommit={(v) => onChange({ ...stored, text: v } as unknown as ReportBlock)}
-          onArrowOut={onArrowOut}
           style={{ fontSize: 14, letterSpacing: '.02em', color: palette.ink }}
         />
       </div>
@@ -3968,7 +3834,6 @@ function ReportBlockFields({
           onFocused={onFocused}
           onCommit={(v) => commitText(v, { ...block, text: v })}
           onPasteText={onPasteBlocks}
-          onArrowOut={onArrowOut}
           onKeyDown={onTextKey}
           onType={(text) => onSlash(text.startsWith('/') ? text.slice(1) : null)}
           focusCaret={focusCaret}
@@ -3986,7 +3851,6 @@ function ReportBlockFields({
             onFocused={onFocused}
             onCommit={(v) => commitText(v, { ...block, text: v })}
             onPasteText={onPasteBlocks}
-            onArrowOut={onArrowOut}
             onKeyDown={onTextKey}
             onType={(text) => onSlash(text.startsWith('/') ? text.slice(1) : null)}
             focusCaret={focusCaret}
@@ -4023,7 +3887,6 @@ function ReportBlockFields({
               placeholder="trích dẫn"
               onCommit={(v) => onChange({ ...block, text: v })}
               onPasteText={onPasteBlocks}
-              onArrowOut={onArrowOut}
               onKeyDown={onTextKey}
               onType={(text) => onSlash(text.startsWith('/') ? text.slice(1) : null)}
               focusCaret={focusCaret}
@@ -4063,7 +3926,6 @@ function ReportBlockFields({
             placeholder="nội dung khối nhấn"
             onCommit={(v) => onChange({ ...block, text: v })}
             onPasteText={onPasteBlocks}
-            onArrowOut={onArrowOut}
             onKeyDown={onTextKey}
             onType={(text) => onSlash(text.startsWith('/') ? text.slice(1) : null)}
             focusCaret={focusCaret}
@@ -4084,7 +3946,6 @@ function ReportBlockFields({
           onFocused={onFocused}
           onCommit={(v) => commitText(v, { ...block, text: v })}
           onPasteText={onPasteBlocks}
-          onArrowOut={onArrowOut}
           onKeyDown={onTextKey}
           onType={(text) => onSlash(text.startsWith('/') ? text.slice(1) : null)}
           focusCaret={focusCaret}
