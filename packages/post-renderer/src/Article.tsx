@@ -99,7 +99,13 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
           // sample under Admin › Templates, which belongs to no module.
           background: post.band?.bg ?? garden.leaf,
           color: post.band?.fg ?? '#1F3323',
-          padding: mobile ? '28px 20px 26px' : '46px 56px 124px',
+          /*
+           * The band ends where its words end. It used to keep 124px under the
+           * lead whatever the lead held, so a post with no description opened
+           * on a tall empty block; 72px is the design system's bottom padding
+           * for any section (`gridRules` → padding).
+           */
+          padding: mobile ? '28px 20px 26px' : '46px 56px 72px',
           position: 'relative',
         }}
       >
@@ -138,17 +144,21 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
             </>
           )}
         </h1>
-        <div
-          style={{
-            fontFamily: serif,
-            fontStyle: 'italic',
-            fontSize: mobile ? 19 : 24,
-            lineHeight: 1.4,
-            maxWidth: mobile ? undefined : 'min(520px, 100% - 300px)',
-          }}
-        >
-          {overrides.renderLead ? overrides.renderLead(post.lead) : post.lead}
-        </div>
+        {/* No description, no line for it — the editor still gets its field. */}
+        {(overrides.renderLead || post.lead.trim() !== '') && (
+          <div
+            data-testid="article-lead"
+            style={{
+              fontFamily: serif,
+              fontStyle: 'italic',
+              fontSize: mobile ? 19 : 24,
+              lineHeight: 1.4,
+              maxWidth: mobile ? undefined : 'min(520px, 100% - 300px)',
+            }}
+          >
+            {overrides.renderLead ? overrides.renderLead(post.lead) : post.lead}
+          </div>
+        )}
 
         <div
           data-testid="article-hero-plate"
