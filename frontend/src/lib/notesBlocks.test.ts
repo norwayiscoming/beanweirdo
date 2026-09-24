@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { placePosts } from './notesBlocks'
+import { byTimeNewestFirst, placePosts } from './notesBlocks'
 
 describe('placePosts — khối 8 ô cố định của Ghi 01', () => {
   it('bài cũ nhất vào ô 7, bài mới nhất lấp dần lên ô 0', () => {
@@ -27,5 +27,24 @@ describe('placePosts — khối 8 ô cố định của Ghi 01', () => {
     const after = placePosts(6)
     // Bài cũ là bài i trong danh sách 5, và là bài i+1 trong danh sách 6.
     for (const p of before) expect(after[p.i + 1].slot).toBe(p.slot)
+  })
+})
+
+describe('byTimeNewestFirst — xếp đúng thời gian, bỏ qua ghim và thứ tự tay', () => {
+  it('bài ghim hay có sort_order vẫn đứng theo ngày đăng', () => {
+    const posts = [
+      { id: 'ghim', pinned: true, sort_order: 1, published_at: '2026-08-01T00:00:00Z' },
+      { id: 'moi', pinned: false, sort_order: null, published_at: '2026-09-20T00:00:00Z' },
+      { id: 'giua', pinned: false, sort_order: 2, published_at: '2026-09-01T00:00:00Z' },
+    ]
+    expect(byTimeNewestFirst(posts).map((p) => p.id)).toEqual(['moi', 'giua', 'ghim'])
+  })
+
+  it('bài thiếu ngày đăng lấy ngày tạo', () => {
+    const posts = [
+      { id: 'a', published_at: '2026-09-01T00:00:00Z' },
+      { id: 'b', published_at: null, created_at: '2026-09-10T00:00:00Z' },
+    ]
+    expect(byTimeNewestFirst(posts).map((p) => p.id)).toEqual(['b', 'a'])
   })
 })

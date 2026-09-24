@@ -14,8 +14,9 @@ const { Notes } = await import('./Notes')
  * the others. Opening is only half the behaviour; the half worth testing is
  * what happens to everything else.
  */
-const post = (id: string, en: string) => ({
+const post = (id: string, en: string, published_at = '2026-08-01T00:00:00Z') => ({
   id,
+  published_at,
   module_id: 'ghi01',
   en,
   vi: 'mô tả',
@@ -49,7 +50,11 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
       data: [{ id: 'ghi01', title: 'Ghi 01', accent: '#6FA8C0', on_color: '#123' }],
     })
     usePublishedPosts.mockReturnValue({
-      data: [post('a', 'Bài A'), post('b', 'Bài B'), post('c', 'Bài C')],
+      data: [
+        post('a', 'Bài A', '2026-08-03T00:00:00Z'),
+        post('b', 'Bài B', '2026-08-02T00:00:00Z'),
+        post('c', 'Bài C', '2026-08-01T00:00:00Z'),
+      ],
       loading: false,
       error: null,
     })

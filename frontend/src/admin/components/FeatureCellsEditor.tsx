@@ -56,8 +56,8 @@ const cellName: CSSProperties = {
 }
 
 /**
- * Ghi 01's feature cells — the decoration at the foot of the page: photos and
- * a quotation, numbered F1…F7 independently of the posts.
+ * Ghi 01's feature cells — the page's decoration: photos and a quotation,
+ * numbered independently of the posts.
  *
  * Only the picture and the words are editable; each photo's proportion belongs
  * to `content/notes.ts` (`cellRatio`), since the crop is cut to it. A slot with
@@ -73,9 +73,7 @@ export function FeatureCellsEditor({
   /** Uploads and returns the stored URL, so the frame can be set straight away. */
   onUpload: (n: number, f: File) => Promise<string | null>
 }) {
-  // The count cell is no longer drawn on the page (the filter row already
-  // prints the number), so it has no row here either.
-  const drawn = withOverrides(featureCells, overrides).filter((c) => c.kind !== 'count')
+  const drawn = withOverrides(featureCells, overrides)
   const [placing, setPlacing] = useState<{ n: number; url: string; ratio: number; name: string } | null>(null)
 
   const ratioOf = (col: string, h: string): number => cellRatio({ col, h })
@@ -99,7 +97,7 @@ export function FeatureCellsEditor({
 
   return (
     <div style={{ marginTop: 22 }}>
-      <div style={groupLabel}>Ảnh trang trí ở chân trang</div>
+      <div style={groupLabel}>Ảnh trang trí</div>
       <div
         style={{
           display: 'grid',

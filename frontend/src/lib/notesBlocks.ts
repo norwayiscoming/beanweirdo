@@ -10,6 +10,21 @@
  */
 export const BLOCK_SIZE = 8
 
+type Dated = { published_at?: string | null; created_at?: string | null; id: string }
+
+/**
+ * Newest first by publication time alone. The owner's rule is about time —
+ * "như thế thì sẽ đúng thời gian" — so pinning and manual order, which the
+ * rest of the site honours through `usePublishedPosts`, are ignored here:
+ * letting them in would move a post to another slot, the one thing the fixed
+ * blocks exist to prevent. A post without a publication date falls back to
+ * its creation date; ties break on id so the order never flickers.
+ */
+export function byTimeNewestFirst<T extends Dated>(posts: readonly T[]): T[] {
+  const at = (p: T) => p.published_at ?? p.created_at ?? ''
+  return [...posts].sort((a, b) => at(b).localeCompare(at(a)) || b.id.localeCompare(a.id))
+}
+
 export type Placement = {
   /** Index into the newest-first list the page already has. */
   i: number
@@ -19,7 +34,7 @@ export type Placement = {
   slot: number
 }
 
-/** Places `count` posts given newest first (the order `usePublishedPosts` returns). */
+/** Places `count` posts given newest first (see `byTimeNewestFirst`). */
 export function placePosts(count: number): Placement[] {
   const blocks = Math.ceil(count / BLOCK_SIZE)
   return Array.from({ length: count }, (_, i) => {

@@ -8,7 +8,7 @@ Chủ site 2026-09-24 gửi bản vẽ tay và yêu cầu: "có 2 size bài vi�
 
 - Trước (PR #48): bài xếp theo thứ tự mới nhất trước, mỗi hàng hai bài một món trang trí, ba kiểu hàng xoay vòng. Thêm một bài mới là mọi bài cũ dời đi một chỗ.
 - Sau: `placePosts` trong `frontend/src/lib/notesBlocks.ts`. Khối 8 ô (`BLOCK_SIZE`). Bài cũ nhất vào ô 7 của khối dưới cùng, bài kế vào ô 6, … bài thứ 8 vào ô 0. Bài thứ 9 mở khối mới **phía trên**, lại bắt đầu từ ô 7. Bài đã nằm ô nào thì không đổi ô khi có bài mới (test `notesBlocks.test.ts`, "thêm bài mới không dời chỗ bài cũ").
-- "Cũ nhất" tính theo thứ tự trang vốn nhận từ `usePublishedPosts` (ghim, `sort_order`, ngày đăng). Tôi không đổi phép xếp đó. Hệ quả: ghim hoặc kéo thứ tự một bài vẫn làm các bài đổi ô.
+- "Cũ nhất" tính theo thời gian thôi: `byTimeNewestFirst` (cùng file) xếp theo `published_at`, thiếu thì `created_at`, hoà thì theo `id`. Ghim và `sort_order` bị bỏ qua **trên trang Ghi 01**, vì để chúng chen vào thì bài đổi ô. `usePublishedPosts` không đổi, các trang khác vẫn tôn trọng ghim.
 - Lọc theo tag thì khối tính lại trên danh sách đã lọc.
 
 ## [ĐỔI HÀNH VI] Hình khối theo bản vẽ, hai cỡ bài
@@ -26,9 +26,14 @@ Bài mở ra: nằm ở hàng trống ngay dưới dải của nó (`OPEN_ROW`),
 
 Điện thoại: một cột theo thứ tự khối, ô; bài lớn rộng 92%, bài nhỏ xoay bốn cặp bề rộng/lề (`MOB_POSTS`).
 
+## [ĐỔI HÀNH VI] Dọn phần không còn dùng
+
+- Xoá ô F4 (`kind: 'count'`, ô đếm bài) khỏi `featureCells` trong `content/notes.ts`, cùng kiểu `'count'`. Trang đã không vẽ nó từ PR #47. Các ô khác giữ số cũ vì số được lưu cùng ảnh trong `modules.feature_cells`.
+- `FeatureCellsEditor`: nhãn "Ảnh trang trí ở chân trang" thành "Ảnh trang trí", vì trang trí giờ nằm trong khối chứ không ở chân trang.
+
 ## Bảng, cột, endpoint
 
-Không đụng. Chỉ đọc lại dữ liệu cũ của `usePublishedPosts` và `modules.feature_cells`.
+Không đụng. Chỉ đọc lại dữ liệu cũ của `usePublishedPosts` (thêm dùng `published_at`, `created_at` ở phía trang) và `modules.feature_cells`.
 
 ## Bằng chứng
 

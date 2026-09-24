@@ -5,7 +5,7 @@ import { noteFilterBar } from '../lib/notesFilter'
 import { useTags } from '../data/useTags'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useNarrow } from '../lib/useNarrow'
-import { placePosts } from '../lib/notesBlocks'
+import { byTimeNewestFirst, placePosts } from '../lib/notesBlocks'
 import {
   cellRatio,
   featureCells,
@@ -221,7 +221,7 @@ function Collapsed({ post, num }: { post: PostRow; num: string }) {
 
 /**
  * One piece of Ghi 01's decoration — a photo or the quotation — sitting small
- * in a row beside two posts.
+ * in a place of its own inside a block (`PHOTO_SPOT`, `QUOTE_SPOT`).
  *
  * A photo keeps its cell's old proportion (`cellRatio`) because the crop the
  * owner set in the CMS was cut to it; it is drawn at a fixed small height and
@@ -433,7 +433,8 @@ export function Notes() {
 
 
   const noteFilters = bar.chips
-  const shownPosts = bar.visiblePosts as typeof filed
+  // Ordered by time alone, so a post keeps its slot — see `byTimeNewestFirst`.
+  const shownPosts = useMemo(() => byTimeNewestFirst(bar.visiblePosts as typeof filed), [bar.visiblePosts])
   const layout = useMemo(() => blockLayout(shownPosts, decos), [shownPosts, decos])
 
   return (
