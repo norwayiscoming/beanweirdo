@@ -3476,6 +3476,36 @@ function ReportBlockFields({
     else onChange(next)
   }
 
+  /*
+   * Hai khối long-form đã vào kho, nên menu `+` của mọi khuôn chèn được chúng,
+   * nhưng `ReportBlock` không kể tên chúng và `switch` dưới kia rơi qua không
+   * trả gì. Chèn một khung ghi chú là có một khung trống trên trang mà màn sửa
+   * không có chỗ nào gõ vào — bài AI Twin mang ba cái như thế ở cuối.
+   */
+  const stored = block as unknown as { type: string; text?: string; items?: unknown[] }
+  if (stored.type === 'formula') {
+    return (
+      <div style={{ background: '#FFFFFF', borderLeft: `2px solid ${palette.ink}`, padding: '12px 16px' }}>
+        <EditableField
+          value={stored.text ?? ''}
+          placeholder="công thức"
+          onCommit={(v) => onChange({ ...stored, text: v } as unknown as ReportBlock)}
+          onArrowOut={onArrowOut}
+          style={{ fontSize: 14, letterSpacing: '.02em', color: palette.ink }}
+        />
+      </div>
+    )
+  }
+  if (stored.type === 'aside') {
+    return (
+      <AsideFields
+        items={stored.items ?? []}
+        onChange={(items) => onChange({ ...stored, items } as unknown as ReportBlock)}
+        palette={palette}
+      />
+    )
+  }
+
   switch (block.type) {
     case 'meta':
       return (
@@ -3627,6 +3657,53 @@ function ReportBlockFields({
         />
       )
   }
+}
+
+/**
+ * Chữ trong một khung ghi chú, gõ liền một ô như mọi dải chữ khác.
+ *
+ * Mỗi đoạn (cách nhau một dòng trống) là một khối `paragraph` bên trong
+ * khung. Khối con không phải chữ — hiếm, chỉ có ở bài dán từ nơi khác — giữ
+ * nguyên sau phần chữ, không bị ô nhập này ghi đè.
+ */
+function AsideFields({
+  items,
+  palette,
+  onChange,
+}: {
+  items: unknown[]
+  palette: Palette
+  onChange: (items: unknown[]) => void
+}) {
+  const isText = (x: unknown) => (x as { type?: unknown } | null)?.type === 'paragraph'
+  const text = items
+    .filter(isText)
+    .map((x) => String((x as { text?: unknown }).text ?? ''))
+    .filter((t) => t !== '')
+    .join('\n\n')
+  const rest = items.filter((x) => !isText(x))
+  return (
+    <div style={{ background: '#F3EEE1', padding: '18px 22px 14px' }}>
+      <EditableField
+        value={text}
+        multiline
+        rows={2}
+        placeholder="ghi chú trong khung"
+        markdown
+        accentInk={palette.ink}
+        onCommit={(v) => {
+          const paragraphs = v
+            .split(/\n\s*\n/)
+            .map((t) => t.trim())
+            .filter((t) => t !== '')
+            .map((t) => ({ type: 'paragraph', text: t }))
+          // Khung không bao giờ rỗng hẳn: vẫn phải có một đoạn để gõ vào.
+          onChange([...(paragraphs.length > 0 ? paragraphs : [{ type: 'paragraph', text: '' }]), ...rest])
+        }}
+        style={{ fontSize: 14.5, lineHeight: 1.66, color: ink.strong }}
+      />
+    </div>
+  )
 }
 
 function MetricsEditor({ items, onChange }: { items: ReportMetric[]; onChange: (items: ReportMetric[]) => void }) {

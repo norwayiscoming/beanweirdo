@@ -41,11 +41,21 @@ PR: #33 · nhánh `claude/project-thread-1onmw2`
    Tôi không tìm được luật đánh số nào trong `designSystem.ts` nói đúng khoảng
    này; 30px là con số chính khuôn Long form đã dùng.
 
+5. **[SỬA LỖI] Khung ghi chú và công thức chèn từ menu `+` không có ô gõ.**
+   `frontend/src/admin/screens/Editor.tsx` → `ReportBlockFields`: `aside` và
+   `formula` đã vào kho (`packages/post-renderer/src/elements/longform.tsx`)
+   nên menu `+` của mọi khuôn chèn được, nhưng kiểu `ReportBlock` không kể
+   tên chúng và `switch` rơi qua không vẽ gì. Thêm nhánh cho cả hai, cùng
+   component mới `AsideFields` (mỗi đoạn cách dòng trống là một khối
+   `paragraph` trong `items`).
+   Bằng chứng: `body` của bài AI Twin do chủ site chạy SQL gửi lại — ba phần tử
+   cuối là `{ type: 'aside', items: [{ type: 'paragraph', text: '' }] }`.
+   Ba khung ấy vẫn rỗng trong dữ liệu; chữ phải gõ lại sau khi PR này lên.
+
 ## Chưa làm
 
-- Bài AI Twin mất ba đoạn cuối: chưa tìm ra nguyên nhân vì phiên từ xa không
-  đọc được `posts.body`. Đã nhờ chủ site chạy
-  `select template, jsonb_pretty(body) from posts where en ilike '%AI Twin%'`.
+- Có **hai** bài khớp `en ilike '%AI Twin%'`. Một bài lặp phần 4–7 ba lần, xen
+  một ảnh và một khối `meta` rỗng. Chưa tìm nguyên nhân; chưa sửa dữ liệu.
 - Bài jurisprudence hiện có vẫn giữ ảnh hạt cà phê trong dữ liệu; thay đổi số 2
   chỉ áp cho bản sao từ nay. Gỡ ảnh ở bài có sẵn thuộc luồng ảnh.
 
