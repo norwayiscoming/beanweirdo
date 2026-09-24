@@ -70,7 +70,7 @@ describe('chữ đi và về qua ô nhập', () => {
       { t: 'nghiêng', w: '300', s: 'italic' },
     ]
     const text = runsToText(runs)
-    expect(text).toBe('thường *đậm* và _nghiêng_')
+    expect(text).toBe('thường **đậm** và *nghiêng*')
     expect(textToRuns(text)).toEqual(runs)
   })
 
