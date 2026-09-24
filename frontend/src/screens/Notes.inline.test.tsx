@@ -73,7 +73,7 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
     expect(c.every((x) => x.style.opacity === '1')).toBe(true)
   })
 
-  it('khối đầy tám bài có hai cỡ: ô 0 và ô 4 lớn, còn lại nhỏ', () => {
+  it('khối đầy tám bài có hai cỡ: ô 0 và ô 5 lớn, còn lại nhỏ', () => {
     usePublishedPosts.mockReturnValue({
       data: 'abcdefgh'.split('').map((id) => post(id, 'Bài ' + id)),
       loading: false,
@@ -83,7 +83,7 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
     const big = cards()
       .filter((x) => / \/ span 5$/.test(x.style.gridColumn))
       .map((x) => x.dataset.slot)
-    expect(big.sort()).toEqual(['0', '4'])
+    expect(big.sort()).toEqual(['0', '5'])
     expect(cards()).toHaveLength(8)
   })
 
