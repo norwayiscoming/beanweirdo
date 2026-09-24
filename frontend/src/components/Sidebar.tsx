@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { NAV, type Glyph, type NavItem } from '../content/navItems'
 import { SECTION_NAMES, type NavGroup } from '../content/site'
-import { sidebarModules, useModules, type ModuleRow } from '../data/useModules'
+import { indexModules, useModules, type ModuleRow } from '../data/useModules'
 import { buildTree, flattenTree } from '../lib/contentTree'
 import { countUnder } from '../lib/postGroups'
 import { usePublishedPosts, type PostRow } from '../data/usePublishedPosts'
@@ -255,7 +255,7 @@ export function Sidebar() {
   const mobile = useIsMobile()
   const [drawer, setDrawer] = useState(false)
   const { data: allModules } = useModules()
-  const modules = sidebarModules(allModules)
+  const modules = indexModules(allModules)
   const { data: posts } = usePublishedPosts()
   const { authed, signOut } = useAuth()
   const dark = nav.screen === 'notes' || nav.screen === 'hours'
@@ -278,7 +278,7 @@ export function Sidebar() {
 
     for (const item of items) {
       // The modules sit below "Mục lục" in Public — reading modules first,
-      // then the journals, which is the order `sidebarModules` returns.
+      // then the journals, which is the order `indexModules` returns.
       if (group === 'Public' && item.key === 'notes') {
         // Every module is listed, published or not: the sidebar is the map of
         // what the journal covers, and a module with nothing in it yet is still
@@ -345,7 +345,7 @@ export function Sidebar() {
    * thanh trên sẽ cắt mất mép trên của khối. Thanh dưới thì ngón cái với tới dễ
    * hơn đỉnh màn.
    *
-   * Dữ liệu không đổi: vẫn `NAV`, `sidebarModules`, `visibleGroups`, `countFor`
+   * Dữ liệu không đổi: vẫn `NAV`, `indexModules`, `visibleGroups`, `countFor`
    * — chỉ khác cách vẽ.
    */
   const body = (

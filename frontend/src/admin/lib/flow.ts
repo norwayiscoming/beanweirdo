@@ -33,13 +33,13 @@ import { splitAtLine } from './mdBlocks'
  */
 const FLOWING = new Set(['paragraph', 'heading', 'list'])
 
-export type Run =
+type Run =
   /** Một dải chữ liền, gộp từ các khối `at[0]`…`at[1]`. */
   | { kind: 'text'; at: [number, number]; text: string }
   /** Một thứ đứng riêng giữa dải chữ, vẫn giữ nguyên khối của nó. */
   | { kind: 'thing'; at: number; block: ReportBlock }
 
-export const flows = (block: ReportBlock | undefined) => block !== undefined && FLOWING.has(block.type)
+const flows = (block: ReportBlock | undefined) => block !== undefined && FLOWING.has(block.type)
 
 /**
  * Thân bài thành các dải.

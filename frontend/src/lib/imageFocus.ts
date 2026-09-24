@@ -10,4 +10,4 @@
  * không phải sửa từng chỗ một.
  */
 export { CENTRE, coverStyle, cropStyle, readCrop, readFocus, stripFocus, withCrop, withFocus } from 'post-renderer'
-export type { Crop, Focus } from 'post-renderer'
+export type { Focus } from 'post-renderer'

@@ -110,7 +110,7 @@ async function handleCreateKind(req: VercelRequest, res: VercelResponse): Promis
  * gửi — `addTag`, `rawRename`, `removeTag` đều đặt state trước rồi mới gọi. Đọc
  * lại chỉ để ghi đè một giá trị y hệt.
  *
- * Nên mỗi route nay trả về đúng thứ nó vừa làm. `bothSystems` không còn ai gọi.
+ * Nên mỗi route nay trả về đúng thứ nó vừa làm.
  */
 
 /** `{ system, name }` off the query string, or null with the 400 already sent. */

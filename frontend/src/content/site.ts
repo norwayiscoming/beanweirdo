@@ -127,7 +127,7 @@ export type SiteOverrides = Partial<SiteCopy> & {
  * Nay chỉ còn ở đây; màn CMS đọc qua hàm này, máy chủ chỉ xoá khoá khi nhận
  * `null`. Muốn lấy lại bản mặc định thì gửi `null`, không phải chuỗi rỗng.
  */
-export function siteValue<K extends keyof SiteCopy>(
+function siteValue<K extends keyof SiteCopy>(
   overrides: SiteOverrides | null | undefined,
   key: K,
 ): SiteCopy[K] {

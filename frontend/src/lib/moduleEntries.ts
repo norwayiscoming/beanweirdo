@@ -17,7 +17,7 @@ import { postThumbnail } from './postThumb'
  * that row three times over, once per layout, so the difference between the
  * two kinds is decided here instead of six times there.
  */
-export type Entry =
+type Entry =
   | { type: 'module'; id: string; module: ModuleRow }
   | { type: 'post'; id: string; post: PostRow }
 

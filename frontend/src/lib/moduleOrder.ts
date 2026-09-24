@@ -6,7 +6,7 @@
  */
 
 /** Phần nhỏ nhất của một module mà luật xếp thứ tự cần biết. */
-export type Banded = { kind: 'normal' | 'special'; sort_order: number }
+type Banded = { kind: 'normal' | 'special'; sort_order: number }
 
 /**
  * Whatever order the CMS set, journals included.

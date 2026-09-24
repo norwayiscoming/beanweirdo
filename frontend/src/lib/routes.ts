@@ -36,7 +36,7 @@ export type Where = {
  */
 export const moduleToUrl = (id: string, w: RouteWords = activeWords()) => w.modules[id] ?? id
 
-export function moduleFromUrl(name: string, w: RouteWords = activeWords()): string {
+function moduleFromUrl(name: string, w: RouteWords = activeWords()): string {
   for (const [id, spelt] of Object.entries(w.modules)) if (spelt === name) return id
   return name
 }
@@ -63,7 +63,7 @@ export type CmsTab = 'posts' | 'config'
  * tab. They still read, because links to them are already out there; only
  * `/ad-config` is written from here on.
  */
-export const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
+const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
   [`${w.admin}-${w.adPost}`]: 'posts',
   [`${w.admin}-${w.adConfig}`]: 'config',
   [`${w.admin}-${w.adSitemap}`]: 'config',
@@ -185,6 +185,3 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
       return '/'
   }
 }
-
-/** Whether two places are the same address — used to avoid stacking history. */
-export const samePath = (a: Where, b: Where) => toPath(a) === toPath(b)

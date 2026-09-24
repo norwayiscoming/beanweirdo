@@ -5,7 +5,7 @@ import { SECTION_NAMES } from '../content/site'
 import { goToArea } from './area'
 import type { Nav } from './nav'
 
-export type Crumb = {
+type Crumb = {
   label: string
   /** Absent on the trailing crumb and on the section headings, which aren't pages. */
   go?: () => void
