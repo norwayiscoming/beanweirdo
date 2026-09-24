@@ -156,3 +156,21 @@ describe('Article band height', () => {
     expect(screen.getByTestId('article-lead')).toHaveTextContent(post.lead)
   })
 })
+
+describe('Article: khung ghi chú rỗng', () => {
+  const sand = (c: HTMLElement) =>
+    Array.from(c.querySelectorAll('div')).filter((d) => d.style.background === 'rgb(243, 238, 225)')
+
+  it('draws nothing for an aside nobody has written in', () => {
+    const empty = { type: 'aside', items: [{ type: 'paragraph', text: '' }] }
+    const { container } = render(<Article post={{ ...post, sections: [...post.sections, empty, empty] as never }} />)
+    expect(sand(container)).toHaveLength(0)
+  })
+
+  it('still draws an aside with words in it', () => {
+    const full = { type: 'aside', items: [{ type: 'paragraph', text: 'Ghi chú.' }] }
+    const { container } = render(<Article post={{ ...post, sections: [...post.sections, full] as never }} />)
+    expect(sand(container)).toHaveLength(1)
+    expect(screen.getByText('Ghi chú.')).toBeInTheDocument()
+  })
+})
