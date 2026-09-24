@@ -290,3 +290,42 @@ describe('long-form: khối lồng trong aside', () => {
     expect(screen.queryByDisplayValue('Trong khung hai')).toBeNull()
   })
 })
+
+/*
+ * Bài AI Twin: ba khung ghi chú chèn từ menu `+` ở cuối một bài article, mỗi
+ * cái một đoạn rỗng. `ReportBlockFields` không có nhánh cho `aside` nên màn
+ * sửa không vẽ ô nào, và chữ không bao giờ gõ vào được.
+ */
+describe('article: khung ghi chú và công thức chèn từ kho', () => {
+  const withBody = (body: unknown) => ({ ...(post('article') as object), body }) as never
+
+  it('gives an aside a field, and writes what is typed back into its items', async () => {
+    const onChange = vi.fn()
+    render(
+      <EditorCanvas
+        template={'article' as never}
+        post={withBody([{ h: 'Mở', p: 'Chữ.' }, { type: 'aside', items: [{ type: 'paragraph', text: '' }] }])}
+        onChange={onChange}
+        onHeroDrop={vi.fn()}
+      />,
+    )
+    const field = await screen.findByText('ghi chú trong khung')
+    await userEvent.click(field)
+    await userEvent.keyboard('Đoạn một')
+    await userEvent.click(document.body)
+    const body = onChange.mock.calls.map((c) => c[0].body).filter(Boolean).at(-1)
+    expect(body[1]).toEqual({ type: 'aside', items: [{ type: 'paragraph', text: 'Đoạn một' }] })
+  })
+
+  it('gives a formula a field', async () => {
+    render(
+      <EditorCanvas
+        template={'article' as never}
+        post={withBody([{ h: 'Mở', p: 'Chữ.' }, { type: 'formula', text: 'C6H12O6' }])}
+        onChange={vi.fn()}
+        onHeroDrop={vi.fn()}
+      />,
+    )
+    expect(await screen.findByDisplayValue('C6H12O6')).toBeInTheDocument()
+  })
+})

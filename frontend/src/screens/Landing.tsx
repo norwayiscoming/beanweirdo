@@ -3,7 +3,9 @@ import { splitAesc } from '../content/site'
 import { landingModules, useModules } from '../data/useModules'
 import type { ModuleImageFields } from '../admin/moduleForm'
 import { coverStyle } from '../lib/imageFocus'
-import { groupByModule } from '../lib/postGroups'
+import { hasChildren } from '../lib/contentTree'
+import { newestFirst } from '../lib/postOrder'
+import { postsUnder } from '../lib/postGroups'
 import { usePublishedPosts } from '../data/usePublishedPosts'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { garden, ink, layout, paper, prose, sans, serif, wrapTitle } from '../design/tokens'
@@ -392,9 +394,29 @@ function PostSplit({ text }: { text: string }) {
 export function Landing() {
   const nav = useNav()
   const { data: allModules } = useModules()
-  const modules = landingModules(allModules)
+  const modules = useMemo(() => landingModules(allModules), [allModules])
   const { data: posts } = usePublishedPosts()
-  const postsByModule = useMemo(() => groupByModule(posts), [posts])
+  /*
+   * A block on the front page stands for its whole branch. A parent such as
+   * Cafe Hihi usually holds no posts of its own, everything sits in its
+   * sub-modules, so counting only direct posts showed "0 bài" and an empty
+   * "Mới nhất" over a branch full of writing.
+   *
+   * The walk uses public modules only, so a private sub-module's posts do not
+   * surface under a public parent.
+   */
+  const postsByModule = useMemo(() => {
+    const tree = allModules.filter((m) => m.visibility !== 'private')
+    const map = new Map<string, typeof posts>()
+    for (const m of modules) {
+      const under = postsUnder(posts, tree, m.id)
+      // The query's order (pinned, then hand-placed sort_order) is only
+      // meaningful inside one module — sort_order restarts at 1 in each — so a
+      // merged branch is re-read as what the heading says: newest first.
+      map.set(m.id, hasChildren(tree, m.id) ? [...under].sort(newestFirst) : under)
+    }
+    return map
+  }, [allModules, modules, posts])
   const { site } = useSiteCopy()
   const title = splitAesc(site.lTitle1)
   const mob = useIsMobile()

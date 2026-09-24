@@ -45,16 +45,22 @@ const mod = (id: string, title: string, sort_order: number, parent_id: string | 
   kind,
 })
 
-/* Ba tầng, để nhìn được cả lề thụt lẫn cỡ chữ giảm dần. */
+/*
+ * Năm tầng. Ba tầng là đủ để nhìn lề thụt và cỡ chữ giảm dần, nhưng cỡ chữ
+ * dừng giảm ở tầng 3 — nên chỗ duy nhất đo được nét dọc có làm nổi việc của nó
+ * hay không là từ tầng 4 trở xuống.
+ */
 let MODULES: Row[] = [
   mod('tu-duy', 'tư duy tư duy', 1, null),
   mod('bean', 'bean weirdo', 2, null),
   mod('roasting', 'roasting 101', 3, 'bean'),
   mod('biochem', 'biochemistry 101', 4, 'bean'),
   mod('maillard', 'phản ứng Maillard', 5, 'biochem'),
-  mod('sensory', 'sensory', 6, null),
-  mod('ghi-01', 'Ghi 01', 7, null, 'special'),
-  mod('ghi-02', 'Ghi 02', 8, null, 'special'),
+  mod('melanoidin', 'melanoidin', 6, 'maillard'),
+  mod('mau-nau', 'màu nâu từ đâu ra', 7, 'melanoidin'),
+  mod('sensory', 'sensory', 8, null),
+  mod('ghi-01', 'Ghi 01', 9, null, 'special'),
+  mod('ghi-02', 'Ghi 02', 10, null, 'special'),
 ]
 
 const json = (body: unknown) =>

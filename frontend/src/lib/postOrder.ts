@@ -34,7 +34,7 @@ export type Orderable = {
 }
 
 /** Newest first, and a post with no date at all sorts last rather than first. */
-function newestFirst(a: Orderable, b: Orderable): number {
+export function newestFirst(a: Orderable, b: Orderable): number {
   const at = a.published_at ?? a.created_at ?? ''
   const bt = b.published_at ?? b.created_at ?? ''
   if (at !== bt) {
