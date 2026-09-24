@@ -1,10 +1,11 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { noteFilterBar } from '../lib/notesFilter'
 import { useTags } from '../data/useTags'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useNarrow } from '../lib/useNarrow'
+import { placePosts } from '../lib/notesBlocks'
 import {
   cellRatio,
   featureCells,
@@ -111,28 +112,41 @@ function draw(
 const CARD_AR = '4/3'
 
 /**
- * Where things stand in one row of the grid.
+ * Ghi 01's block of eight slots, drawn from the owner's sketch of 2026-09-24:
+ * three bands — two posts and a small photo on top, the quotation and three
+ * posts in the middle, three posts at the bottom — and two sizes, big (five
+ * of twelve columns) for slots 0 and 4 and small (four) for the rest. Which
+ * post goes in which slot is `placePosts`.
  *
- * The owner, 2026-09-24: "mỗi hàng là 3 items, 2 bài main và 1 ảnh nhỏ deco
- * đang xen" — two posts and one small decoration per row, never overlapping,
- * and loosely placed rather than lined up. Every post is four of twelve
- * columns and 4:3; the decoration takes three. The three row shapes below move
- * the decoration left, right and centre and drop each item by a different
- * amount. Drops are downward only, so nothing can slide into the row above.
+ * Every band has a spare grid row after it for an opened post, so a post
+ * unfolds right under its own band and the slots around it do not move. An
+ * empty grid row has no height, so unused spare rows cost nothing.
  */
-type Slot = { start: number; mt: number }
-const ROWS: { posts: [Slot, Slot]; deco: Slot }[] = [
-  { posts: [{ start: 1, mt: 0 }, { start: 5, mt: 90 }], deco: { start: 10, mt: 30 } },
-  { posts: [{ start: 4, mt: 0 }, { start: 9, mt: 70 }], deco: { start: 1, mt: 110 } },
-  { posts: [{ start: 1, mt: 40 }, { start: 9, mt: 0 }], deco: { start: 5, mt: 0 } },
+type SlotSpot = { row: string; col: string; mt: number; big?: boolean; band: 0 | 1 | 2 }
+const SLOTS: SlotSpot[] = [
+  { row: '1 / span 2', col: '1 / span 5', mt: 70, big: true, band: 0 },
+  { row: '1', col: '8 / span 4', mt: 0, band: 0 },
+  { row: '4', col: '4 / span 4', mt: 110, band: 1 },
+  { row: '5', col: '2 / span 4', mt: 64, band: 1 },
+  { row: '4 / span 2', col: '8 / span 5', mt: 330, big: true, band: 1 },
+  { row: '7', col: '1 / span 4', mt: 120, band: 2 },
+  { row: '7', col: '5 / span 4', mt: 210, band: 2 },
+  { row: '7', col: '9 / span 4', mt: 80, band: 2 },
 ]
-const DECO_SPAN = 3
+/** The small photo under slot 1, and the quotation beside slot 2. */
+const PHOTO_SPOT = { row: '2', col: '10 / span 3', mt: 28 }
+const QUOTE_SPOT = { row: '4', col: '1 / span 3', mt: 150 }
+/** Grid rows per block: three bands of content, each followed by a spare row. */
+const BLOCK_ROWS = 8
+const OPEN_ROW = [3, 6, 8] as const
+/** Extra room above every block but the first. */
+const BLOCK_GAP = 90
 
 /*
  * One column on a phone, so the scatter lives in width and left margin
  * (percent of the column). Four steps, so two posts in a row never share
  * both — the owner found two same-width cards stacked edge to edge "too
- * straight".
+ * straight". Big slots are wider than any small one.
  */
 const MOB_POSTS: { w: number; ml: number }[] = [
   { w: 80, ml: 0 },
@@ -140,9 +154,7 @@ const MOB_POSTS: { w: number; ml: number }[] = [
   { w: 76, ml: 9 },
   { w: 66, ml: 22 },
 ]
-/** Space between rows. The grid's own row gap is 0 so that the empty row an
- *  opened post leaves behind collapses to nothing. */
-const ROW_GAP = 64
+const MOB_BIG = 92
 
 /**
  * Thẻ một bài trong lưới Ghi 01, lúc chưa mở.
@@ -275,6 +287,40 @@ function decorations(cells: readonly (FeatureCell & { img?: string | null })[]) 
   return cells.filter((c) => (c.kind === 'slot' && !!c.img) || (c.kind === 'quote' && !!c.t))
 }
 
+/** A slot's grid row, moved down to its block. */
+function gridRowAt(row: string, block: number) {
+  const [start, span] = row.split(' / ')
+  return `${block * BLOCK_ROWS + Number(start)}${span ? ` / ${span}` : ''}`
+}
+
+type LayoutItem =
+  | { kind: 'post'; post: PostRow; i: number; block: number; slot: number }
+  | { kind: 'deco'; cell: FeatureCell & { img?: string | null }; block: number }
+
+/**
+ * Posts in their slots, top block first, with the decoration slipped in where
+ * the sketch puts it — in the order a phone stacks them. Each block gets its
+ * own photo, in F-order, while photos last; the quotation appears once, in the
+ * first block whose slot 2 is filled. Decoration beside an empty slot is left
+ * out, or a young block would open on a photo with nothing next to it.
+ */
+function blockLayout(posts: readonly PostRow[], decos: ReturnType<typeof decorations>): LayoutItem[] {
+  const photos = decos.filter((c) => c.kind === 'slot')
+  const quote = decos.find((c) => c.kind === 'quote')
+  let quoteUsed = false
+  const placed = placePosts(posts.length).sort((a, b) => a.block - b.block || a.slot - b.slot)
+  const out: LayoutItem[] = []
+  for (const at of placed) {
+    if (at.slot === 2 && quote && !quoteUsed) {
+      out.push({ kind: 'deco', cell: quote, block: at.block })
+      quoteUsed = true
+    }
+    out.push({ kind: 'post', post: posts[at.i], ...at })
+    if (at.slot === 1 && photos[at.block]) out.push({ kind: 'deco', cell: photos[at.block], block: at.block })
+  }
+  return out
+}
+
 /**
  * One of the two images that close Ghi 01. Ghi 01 is a page, not a card, so it
  * has no homepage photos — its `img1`/`img2` columns carry these instead, which
@@ -388,6 +434,7 @@ export function Notes() {
 
   const noteFilters = bar.chips
   const shownPosts = bar.visiblePosts as typeof filed
+  const layout = useMemo(() => blockLayout(shownPosts, decos), [shownPosts, decos])
 
   return (
     <div
@@ -465,7 +512,7 @@ export function Notes() {
           mob
             ? { display: 'flex', flexDirection: 'column', gap: 36, marginTop: 30 }
             : {
-                // Twelve columns, so each item can start where `ROWS` says and
+                // Twelve columns, so each slot can sit where `SLOTS` says and
                 // an opened post can take `2 / span 9` on a row of its own.
                 display: 'grid',
                 gridTemplateColumns: 'repeat(12,minmax(0,1fr))',
@@ -480,81 +527,82 @@ export function Notes() {
             statistics panel unfolds on Ghi 02 — the reader stays on the page
             they were reading. Open, it widens on the line under its row and
             everything else steps back. */}
-        {shownPosts.map((p, i) => {
-          const open = openNote === p.id
-          const r = Math.floor(i / 2)
-          const shape = ROWS[r % ROWS.length]
-          const at = shape.posts[i % 2]
-          // Each item of a row is placed by row as well as column: with column
-          // starts alone, auto-placement pushes an item to the next row
-          // whenever the one before it sits further right.
-          const top = (r > 0 ? ROW_GAP : 0) + at.mt
-          const deco = i % 2 === 1 || i === shownPosts.length - 1 ? decos[r] : undefined
-          return (
-            <Fragment key={p.id}>
-              <Hover
-                data-note={p.id}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setOpenNote((prev) => (prev === p.id ? null : p.id))
-                }}
+        {layout.map((item, n) => {
+          if (item.kind === 'deco') {
+            const spot = item.cell.kind === 'quote' ? QUOTE_SPOT : PHOTO_SPOT
+            return (
+              <div
+                key={`deco-${item.block}-${item.cell.n}`}
                 style={{
                   ...(mob
                     ? {
-                        width: open ? '100%' : `${MOB_POSTS[i % MOB_POSTS.length].w}%`,
-                        marginLeft: open ? 0 : `${MOB_POSTS[i % MOB_POSTS.length].ml}%`,
+                        width: item.cell.kind === 'quote' ? '80%' : '52%',
+                        alignSelf: item.cell.kind === 'quote' ? 'flex-start' : 'flex-end',
                       }
                     : {
-                        /*
-                         * Bài mở ra KHÔNG chiếm trọn bề ngang.
-                         *
-                         * Chủ site: "bề ngang của bài nó chiếm trọn bề ngang
-                         * trang > trông rất lớn và cộc cằn (...) mục tiêu là
-                         * tạo cảm giác là bài này pop up và là 1 phần của trang
-                         * ghi, thay vì cảm giác như mở hẳn ra trang khác."
-                         *
-                         * Chín trên mười hai cột, thụt vào một cột ở mép trái,
-                         * trên dòng ngay dưới hàng của nó.
-                         */
-                        gridColumn: open ? '2 / span 9' : `${at.start} / span 4`,
-                        gridRow: open ? 2 * r + 2 : 2 * r + 1,
-                        marginTop: open ? ROW_GAP : top,
+                        gridColumn: spot.col,
+                        gridRow: gridRowAt(spot.row, item.block),
+                        marginTop: spot.mt + (item.cell.kind !== 'quote' && item.block > 0 ? BLOCK_GAP : 0),
                       }),
-                  cursor: 'pointer',
-                  // Room above the post once it is scrolled to — see the effect on `openNote`.
-                  scrollMarginTop: mob ? 16 : 32,
-                  opacity: openNote !== null && !open ? 0.18 : 1,
+                  opacity: openNote !== null ? 0.18 : 1,
                   transition: 'opacity .45s ease',
                 }}
-                hoverStyle={{ opacity: 1 }}
               >
-                {open ? (
-                  <OpenedPost post={p} mod={ghi01} />
-                ) : (
-                  <Collapsed post={p} num={String(shownPosts.length - i).padStart(2, '0')} />
-                )}
-              </Hover>
-              {deco ? (
-                <div
-                  style={{
-                    ...(mob
-                      ? {
-                          width: deco.kind === 'quote' ? '80%' : '52%',
-                          alignSelf: r % 2 === 0 ? 'flex-end' : 'flex-start',
-                        }
-                      : {
-                          gridColumn: `${shape.deco.start} / span ${DECO_SPAN}`,
-                          gridRow: 2 * r + 1,
-                          marginTop: (r > 0 ? ROW_GAP : 0) + shape.deco.mt,
-                        }),
-                    opacity: openNote !== null ? 0.18 : 1,
-                    transition: 'opacity .45s ease',
-                  }}
-                >
-                  <DecoItem cell={deco} mob={mob} />
-                </div>
-              ) : null}
-            </Fragment>
+                <DecoItem cell={item.cell} mob={mob} />
+              </div>
+            )
+          }
+          const { post: p, block, slot, i } = item
+          const open = openNote === p.id
+          const spot = SLOTS[slot]
+          const m = MOB_POSTS[n % MOB_POSTS.length]
+          return (
+            <Hover
+              key={p.id}
+              data-note={p.id}
+              data-slot={slot}
+              onClick={(e) => {
+                e.stopPropagation()
+                setOpenNote((prev) => (prev === p.id ? null : p.id))
+              }}
+              style={{
+                ...(mob
+                  ? {
+                      width: open ? '100%' : `${spot.big ? MOB_BIG : m.w}%`,
+                      marginLeft: open || spot.big ? 0 : `${m.ml}%`,
+                    }
+                  : {
+                      /*
+                       * Bài mở ra KHÔNG chiếm trọn bề ngang.
+                       *
+                       * Chủ site: "bề ngang của bài nó chiếm trọn bề ngang
+                       * trang > trông rất lớn và cộc cằn (...) mục tiêu là
+                       * tạo cảm giác là bài này pop up và là 1 phần của trang
+                       * ghi, thay vì cảm giác như mở hẳn ra trang khác."
+                       *
+                       * Chín trên mười hai cột, thụt vào một cột ở mép trái,
+                       * trên hàng trống ngay dưới dải của nó.
+                       */
+                      gridColumn: open ? '2 / span 9' : spot.col,
+                      gridRow: open
+                        ? String(block * BLOCK_ROWS + OPEN_ROW[spot.band])
+                        : gridRowAt(spot.row, block),
+                      marginTop: open ? 64 : spot.mt + (spot.band === 0 && block > 0 ? BLOCK_GAP : 0),
+                    }),
+                cursor: 'pointer',
+                // Room above the post once it is scrolled to — see the effect on `openNote`.
+                scrollMarginTop: mob ? 16 : 32,
+                opacity: openNote !== null && !open ? 0.18 : 1,
+                transition: 'opacity .45s ease',
+              }}
+              hoverStyle={{ opacity: 1 }}
+            >
+              {open ? (
+                <OpenedPost post={p} mod={ghi01} />
+              ) : (
+                <Collapsed post={p} num={String(shownPosts.length - i).padStart(2, '0')} />
+              )}
+            </Hover>
           )
         })}
 
