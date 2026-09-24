@@ -1,6 +1,6 @@
 # Ghi 01: khối 8 ô cố định theo bản vẽ
 
-PR: (điền sau khi mở) · nhánh `claude/project-thread-12dfli`
+PR: #50 · nhánh `claude/project-thread-12dfli`
 
 Chủ site 2026-09-24 gửi bản vẽ tay và yêu cầu: "có 2 size bài viết … fix vị trí … bài 1 → index 7, bài 2 → index 6, … bài 8 → index 0 … tới bài thứ 9 → tạo thêm 1 cục layout 8 ô".
 
