@@ -1,5 +1,5 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react'
-import { ElementList } from './elements'
+import { ElementList, Inline } from './elements'
 import { paletteFrom } from './palette'
 import { garden, ink, layout, paper, sans, serif, wrapTitle } from './tokens'
 import { fillStyle } from './focus'
@@ -289,7 +289,13 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
                   {overrides.renderSectionHeading ? overrides.renderSectionHeading(s.h, i) : s.h}
                 </h3>
                 <div style={{ fontSize: 16, lineHeight: 1.2, color: ink.body }}>
-                  {overrides.renderSectionBody ? overrides.renderSectionBody(s.p, i) : s.p}
+                  {/* Mặt soạn ghi đậm/nghiêng ra `**x**`, `*x*`; vẽ thẳng chuỗi
+                      thì bạn đọc thấy nguyên dấu sao. Màu giữ theo thân bài. */}
+                  {overrides.renderSectionBody ? (
+                    overrides.renderSectionBody(s.p, i)
+                  ) : (
+                    <Inline text={s.p} accentInk="inherit" />
+                  )}
                 </div>
 
                 {s.fig &&
