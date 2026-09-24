@@ -45,7 +45,7 @@ import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
 import type { FeatureOverride } from '../content/notes'
 import { ink, paper, sans, serif } from '../design/tokens'
 import { Button, IconButton } from '../design/Button'
-import { radius } from '../design/controls'
+import { radius, sizes } from '../design/controls'
 import { IconChevron, IconClose, IconDrag, IconPlus, IconTrash, IconUpload } from '../design/icons'
 import { useToast } from '../design/Toaster'
 import { Hover } from '../lib/Hover'
@@ -126,6 +126,15 @@ const INDENT = 29
 
 /** Vạch chỉ chỗ thẻ sẽ hạ xuống. Nét liền, cùng màu chữ — xem luật hình. */
 const dropBar: CSSProperties = { height: 2, background: ink.base }
+
+/**
+ * Chỗ đặt nét dọc của một tầng, tính từ mép trái của tầng ấy.
+ *
+ * 8px là giữa tay nắm kéo — thứ rộng 16px và đứng đầu mỗi hàng. Nên nét chạy
+ * thẳng dưới tay nắm của cha, còn hàng con bắt đầu ở đúng `INDENT`, tức còn
+ * 21px trống trước chữ của con: không nét nào cắt qua một cái nút.
+ */
+const GUIDE_X = 8
 
 /**
  * What a module row counts.
@@ -722,6 +731,19 @@ export function Cms() {
   // The site map names what Templates holds, so it has to know.
   const [posts, setPosts] = useState<PostSummary[]>([])
   const [openModule, setOpenModule] = useState<string | null>(null)
+  /**
+   * Những nhánh đang gấp lại.
+   *
+   * Chỉ sống trong phiên này, không ghi xuống đâu cả: gấp một nhánh là để nhìn
+   * cho đỡ dài lúc đang sắp xếp, không phải một thiết lập của site.
+   */
+  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
+  const toggleFold = (id: string) =>
+    setFolded((f) => {
+      const next = new Set(f)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
   const [dragModule, setDragModule] = useState<string | null>(null)
   /**
    * Chỗ con trỏ đang chỉ tới trong lúc kéo: thẻ nào, và phần nào của thẻ ấy.
@@ -923,10 +945,24 @@ export function Cms() {
    * Một hàng xuất hiện đúng một lần, dưới cha của nó — `buildTree` giữ nguyên
    * thứ tự đưa vào, nên thứ tự anh em vẫn là thứ tự chủ site kéo ra.
    */
-  const moduleRows = useMemo(
-    () => flattenTree(buildTree(shownModules)).map((n) => ({ m: n.row, depth: n.depth })),
-    [shownModules],
-  )
+  const moduleRows = useMemo(() => {
+    const out: { m: Module; depth: number; kids: boolean }[] = []
+    /*
+     * Gấp một nhánh là giấu cả cụm nằm trong nó, sâu bao nhiêu tầng cũng vậy.
+     * Duyệt cây đã duỗi thẳng thì chỉ cần nhớ một con số: dưới tầng nào thì
+     * mọi hàng đều bị giấu. Gặp một hàng nông hơn hoặc ngang nó là đã ra khỏi
+     * cụm ấy, nên con số hết hiệu lực.
+     */
+    let hideBelow = Number.POSITIVE_INFINITY
+    for (const n of flattenTree(buildTree(shownModules))) {
+      if (n.depth > hideBelow) continue
+      hideBelow = Number.POSITIVE_INFINITY
+      const kids = n.children.length > 0
+      if (kids && folded.has(n.row.id)) hideBelow = n.depth
+      out.push({ m: n.row, depth: n.depth, kids })
+    }
+    return out
+  }, [shownModules, folded])
 
   /** Số thứ tự đếm lại từ 01 trong mỗi cấp, vì đó là cái người đọc thấy. */
   const siblingIndex = useMemo(() => {
@@ -965,6 +1001,10 @@ export function Cms() {
       toast.info('Không đặt được module vào trong chính nó')
       return
     }
+
+    // Thả vào trong một nhánh đang gấp thì mở nhánh ấy ra: thả xong mà thẻ
+    // biến mất thì người ta tưởng lệnh hỏng.
+    if (where === 'inside') setFolded((f) => (f.has(targetId) ? new Set([...f].filter((x) => x !== targetId)) : f))
 
     const before = modules
     const byId = new Map(modules.map((m) => [m.id, m]))
@@ -1239,7 +1279,7 @@ export function Cms() {
             </Button>
           </div>
 
-          {moduleRows.map(({ m, depth }) => {
+          {moduleRows.map(({ m, depth, kids }) => {
             // Only what a reader sees. Order is a fact about the page, so a
             // post that is not on the page has no place in this list — the
             // drafts and the archive are managed on Tạo bài đăng.
@@ -1250,6 +1290,9 @@ export function Cms() {
             // Mỗi tầng thụt vào một nấc bằng đúng bề ngang tay nắm cộng mũi
             // tên, nên tên module của tầng con rơi thẳng hàng dưới tên cha.
             const indent = depth * INDENT
+            // Nhánh này đang gấp lại. Hàng không có con thì không gấp được,
+            // nên `folded` có nhớ id của nó cũng không có nghĩa gì.
+            const shut = kids && folded.has(m.id)
             const over = dropAt?.id === m.id && dragModule !== null && dragModule !== m.id
             const into = over && dropAt?.where === 'inside'
             return (
@@ -1279,11 +1322,36 @@ export function Cms() {
                   setDropAt(null)
                 }}
                 style={{
+                  position: 'relative',
                   borderBottom: '1px solid #F0EBDB',
                   padding: '13px 0',
                   opacity: dragModule === m.id ? 0.45 : 1,
                 }}
               >
+                {/*
+                  Một nét dọc cho mỗi tầng nằm trên hàng này.
+
+                  Cỡ chữ chỉ giảm được tới 17px rồi dừng, nên từ tầng bốn trở
+                  xuống hai tầng liền nhau chỉ còn khác nhau ở lề thụt — liếc
+                  qua không biết hàng nào nằm trong hàng nào. Nét chạy suốt
+                  chiều cao hàng, kể cả phần đệm, nên các hàng kề nhau nối
+                  thành một đường liền và đường ấy tự dứt ở hàng cuối của nhánh.
+                */}
+                {Array.from({ length: depth }, (_, i) => (
+                  <div
+                    key={i}
+                    aria-hidden="true"
+                    style={{
+                      position: 'absolute',
+                      left: i * INDENT + GUIDE_X,
+                      top: 0,
+                      bottom: 0,
+                      width: 1,
+                      background: paper.rule,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                ))}
                 {/*
                   Ba vùng thả, ba dấu hiệu khác nhau — vì thả sai chỗ trong một
                   cây không chỉ là đổi thứ tự, nó đổi cả chỗ bài nằm và địa chỉ
@@ -1328,18 +1396,30 @@ export function Cms() {
                     <IconDrag size={16} />
                   </Hover>
                   {/*
-                    The arrow and the module name were two separate `<div onClick>`
-                    doing the same thing, so a keyboard could reach neither. One
-                    button carrying both is also one tab stop instead of two.
+                    Mũi tên gấp/mở nhánh — không phải mở biểu mẫu sửa.
+
+                    Chủ site: *"Mũi tên hiện mở biểu mẫu sửa chứ không gấp cây,
+                    nên cây dài thì phải cuộn."* Mũi tên ở đầu một hàng trong
+                    cây là chỗ người ta bấm để gấp nhánh, nên nó nhận nghĩa ấy.
+                    Biểu mẫu sửa không mất đường vào: bấm tên module vẫn mở nó,
+                    và tên là cái bấm rộng hơn nhiều — thêm một nút thứ ba vào
+                    hàng thì mỗi hàng lại dài thêm 41px cho một việc đã có chỗ.
+
+                    Hàng không có con giữ một ô trống đúng bề ngang cái nút, để
+                    chấm màu của các hàng cùng tầng vẫn thẳng một cột.
                   */}
-                  <IconButton
-                    size="sm"
-                    label={open ? `Đóng ${m.title}` : `Mở ${m.title}`}
-                    aria-expanded={open}
-                    onClick={() => setOpenModule(open ? null : m.id)}
-                  >
-                    <IconChevron size={14} open={open} />
-                  </IconButton>
+                  {kids ? (
+                    <IconButton
+                      size="sm"
+                      label={shut ? `Mở nhánh ${m.title}` : `Gấp nhánh ${m.title}`}
+                      aria-expanded={!shut}
+                      onClick={() => toggleFold(m.id)}
+                    >
+                      <IconChevron size={14} open={!shut} />
+                    </IconButton>
+                  ) : (
+                    <div aria-hidden="true" style={{ width: sizes.sm.height, flex: 'none' }} />
+                  )}
                   <div style={{ width: 9, height: 9, borderRadius: '50%', background: m.accent, flex: 'none' }} />
                   <div
                     style={{ fontFamily: sans, fontSize: 10.5, letterSpacing: '.16em', color: ink.faint, width: 26, flex: 'none' }}
