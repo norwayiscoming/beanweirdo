@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { queryBuilder, mockReq, mockRes, authHeaders } from '../../../lib/test-helpers.js'
 
 const fromMock = vi.fn()
+const rpcMock = vi.fn()
 vi.mock('../../../lib/supabase.js', () => ({
-  getSupabase: () => ({ from: fromMock }),
+  getSupabase: () => ({ from: fromMock, rpc: rpcMock }),
 }))
 
 let handler: typeof import('./status.js').default
@@ -14,6 +15,9 @@ beforeEach(async () => {
   process.env.ADMIN_SESSION_SECRET = 'test-secret'
   process.env.ADMIN_ALLOWED_ORIGIN = 'https://admin.example.com'
   fromMock.mockReset()
+  rpcMock.mockReset()
+  // fold_post_draft (0029): a draft post with nothing pending.
+  rpcMock.mockResolvedValue({ data: { status: 'draft', applied: false }, error: null })
   handler = (await import('./status.js')).default
   signToken = (await import('../../../lib/auth.js')).signToken
   token = signToken()
@@ -74,6 +78,7 @@ describe('POST /api/posts/:id/status', () => {
 
   it('404s when the post does not exist', async () => {
     fromMock.mockReturnValue(queryBuilder({ data: null, error: null }))
+    rpcMock.mockResolvedValue({ data: null, error: null })
     const req = mockReq({
       method: 'POST',
       headers: authHeaders(token),
@@ -95,11 +100,7 @@ describe('POST /api/posts/:id/status', () => {
       data: { id: 'p1', status: 'published', published_at: 'now', updated_at: 'now' },
       error: null,
     })
-    fromMock
-      // No pending edits (migration 0028), and the post is still a draft.
-      .mockReturnValueOnce(queryBuilder({ data: null, error: null }))
-      .mockReturnValueOnce(queryBuilder({ data: { id: 'p1', status: 'draft' }, error: null }))
-      .mockReturnValue(builder)
+    fromMock.mockReturnValue(builder)
 
     const req = mockReq({
       method: 'POST',
@@ -112,7 +113,9 @@ describe('POST /api/posts/:id/status', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body.post.status).toBe('published')
 
-    expect(fromMock).toHaveBeenCalledTimes(3)
+    // The fold (one RPC) and the status change (one statement).
+    expect(rpcMock).toHaveBeenCalledTimes(1)
+    expect(fromMock).toHaveBeenCalledTimes(1)
     expect(builder.in).toHaveBeenCalledWith('status', ['draft'])
     // Và câu trả lời không kéo cả bài về: chỉ những cột vừa ghi.
     expect(builder.select.mock.calls[0][0]).not.toContain('body')
@@ -218,23 +221,17 @@ describe('POST /api/posts/:id/status', () => {
   })
 })
 
-describe('Publish on a published post publishes its pending edits (migration 0028)', () => {
-  it('copies the draft into posts, drops it, and keeps published_at', async () => {
-    const read = queryBuilder({ data: { data: { en: 'Mới', body: [{ k: 'fig', src: '/a.png' }] } }, error: null })
-    const write = queryBuilder({ data: null, error: null })
-    const drop = queryBuilder({ data: null, error: null })
-    const status = queryBuilder({ data: { id: 'p1', status: 'published' }, error: null })
-    fromMock.mockReturnValueOnce(read).mockReturnValueOnce(write).mockReturnValueOnce(drop).mockReturnValueOnce(status)
+describe('Publish on a published post publishes its pending edits (migrations 0028, 0029)', () => {
+  it('is one call: the fold copies the draft and reports the post already live', async () => {
+    rpcMock.mockResolvedValue({ data: { status: 'published', applied: true }, error: null })
     const req = mockReq({ method: 'POST', headers: authHeaders(token), query: { id: 'p1' }, body: { action: 'publish' } })
     const res = mockRes()
     await handler(req, res)
 
     expect(res.statusCode).toBe(200)
     expect(res.body).toMatchObject({ post: { id: 'p1', status: 'published' }, applied: true })
-    const patch = write.update.mock.calls[0][0]
-    expect(patch).toMatchObject({ en: 'Mới', thumbnail_url: '/a.png' })
-    expect(patch).not.toHaveProperty('published_at')
-    expect(drop.delete).toHaveBeenCalled()
-    expect(drop.eq).toHaveBeenCalledWith('post_id', 'p1')
+    expect(rpcMock).toHaveBeenCalledWith('fold_post_draft', { p_id: 'p1', p_now: expect.any(String) })
+    // published_at is not touched: nothing else runs.
+    expect(fromMock).not.toHaveBeenCalled()
   })
 })

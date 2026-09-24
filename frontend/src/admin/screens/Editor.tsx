@@ -254,6 +254,7 @@ function EditorContent({ postId }: { postId: string }) {
    */
   const inFlight = useRef(new Set<Promise<unknown>>())
   const [dirty, setDirty] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   function save(patch: Parameters<typeof updatePost>[1]) {
     const p = Promise.resolve(updatePost(postId, patch))
     inFlight.current.add(p)
@@ -537,19 +538,24 @@ function EditorContent({ postId }: { postId: string }) {
                 toast.info('Không có thay đổi nào chưa đăng')
                 return
               }
+              if (publishing) return
+              setPublishing(true)
+              const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
               try {
                 await Promise.allSettled([...inFlight.current])
                 await transitionStatus(postId, 'publish')
-                toast.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
+                card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
                 nav.goCms()
               } catch (e) {
-                toast.fromError(e)
+                card.fail(e)
+                setPublishing(false)
               }
             }}
+            disabled={publishing}
             className="admin-btn"
             style={{ marginLeft: 8 }}
           >
-            {published ? (pending ? 'Đăng thay đổi' : 'Đã đăng') : 'Publish'}
+            {publishing ? 'Đang đăng…' : published ? (pending ? 'Đăng thay đổi' : 'Đã đăng') : 'Publish'}
           </button>
         </div>
       </div>

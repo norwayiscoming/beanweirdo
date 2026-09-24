@@ -94,16 +94,14 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
       res.status(500).json({ error: (folded.error as { message?: string }).message ?? 'draft publish failed' })
       return
     }
-    if (action === 'publish') {
-      const { data: row, error: rowError } = await supabase.from('posts').select('id, status').eq('id', id).maybeSingle()
-      if (rowError) {
-        res.status(500).json({ error: rowError.message })
-        return
-      }
-      if ((row as { status?: string } | null)?.status === 'published') {
-        res.status(200).json({ post: { id, status: 'published' }, applied: folded.applied })
-        return
-      }
+    if (folded.known && folded.status === null) {
+      res.status(404).json({ error: `Post '${id}' not found` })
+      return
+    }
+    // Already live: the fold was the whole of it, one round trip.
+    if (action === 'publish' && folded.status === 'published') {
+      res.status(200).json({ post: { id, status: 'published' }, applied: folded.applied })
+      return
     }
   }
 

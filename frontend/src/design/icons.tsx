@@ -183,3 +183,6 @@ export const IconCheck = ({ size = 16, style }: IconProps) =>
 
 export const IconAlert = ({ size = 16, style }: IconProps) =>
   svg(size, style, <path d="M12 4v10M12 18v2" />)
+
+export const IconInfo = ({ size = 16, style }: IconProps) =>
+  svg(size, style, <path d="M12 10v10M12 4v2" />)

@@ -14,7 +14,7 @@ import {
   type PostTemplate,
 } from '../../lib/posts.js'
 import { slug } from '../../lib/tags.js'
-import { isMissingDraftTable, readDraft } from '../../lib/drafts.js'
+import { isDraftTableUnreadable, readDraft } from '../../lib/drafts.js'
 
 const LIST_FILTERS = [...POST_STATUSES, 'all'] as const
 
@@ -47,7 +47,7 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
    * key embed on every summary. A missing table (0028 not run) means none.
    */
   const { data: drafts, error: draftError } = await supabase.from('post_drafts').select('post_id')
-  if (draftError && !isMissingDraftTable(draftError)) {
+  if (draftError && !isDraftTableUnreadable(draftError)) {
     res.status(500).json({ error: draftError.message })
     return
   }
