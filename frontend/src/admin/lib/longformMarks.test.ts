@@ -119,3 +119,13 @@ describe('trang đọc đúng thứ mặt soạn ghi ra', () => {
     expect(textToRuns(out).map((r) => r.t).join('')).toBe('ng cả hai ng')
   })
 })
+
+describe('trích dẫn trong long-form', () => {
+  const Q = (t: string): LongformBlock => ({ k: 'p', quote: true, runs: [{ t, w: '300', s: 'normal' }] })
+  const blocks = [Q('câu hỏi'), Q('mục đích'), P([{ t: 'đoạn sau', w: '300', s: 'normal' }])]
+
+  it('đi qua mặt soạn mà đoạn sau không bị nuốt vào trích dẫn', () => {
+    const { out } = throughLexical(runToMarkdown(blocks))
+    expect(markdownToRun(out)).toEqual(blocks)
+  })
+})
