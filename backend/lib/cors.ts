@@ -13,6 +13,9 @@ export type Handler = (req: VercelRequest, res: VercelResponse) => void | Promis
  */
 export const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
 
+/** How long a browser may reuse a preflight answer, in seconds. */
+export const PREFLIGHT_MAX_AGE_S = 600
+
 /**
  * Sets CORS headers on every response and short-circuits OPTIONS preflight
  * requests with a 204. Every route in this app is wrapped with `withCors` so
@@ -35,10 +38,13 @@ export function applyCorsHeaders(req: VercelRequest, res: VercelResponse): void 
    * is answered by this function, not at the edge (see `withCors` below), so
    * the wasted trip can cold-start a lambda of its own.
    *
-   * A day is what Chrome caps this at; Firefox caps at 24h too. The headers
-   * and methods above never change at runtime, so there is nothing to go stale.
+   * Ten minutes, not a day. The headers and methods above never change at
+   * runtime, but they do change between deploys: when PUT was added, browsers
+   * kept the old answer for up to two hours (Chrome's cap on a day-long
+   * Max-Age), and the owner had to hard-reload to see the fix. Ten minutes
+   * still spares every click inside a working session a second round trip.
    */
-  res.setHeader('Access-Control-Max-Age', '86400')
+  res.setHeader('Access-Control-Max-Age', String(PREFLIGHT_MAX_AGE_S))
 }
 
 export function withCors(handler: Handler): Handler {
