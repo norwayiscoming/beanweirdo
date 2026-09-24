@@ -73,8 +73,8 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
         },
       ],
     })
-    // Không có `hero`: ảnh bìa đặt ở băng "trang bìa", một chỗ cho cả sáu khuôn.
-    expect(corners(container)).toEqual(['detail', 'fig-0', 'primary', 'secondary'])
+    // `hero` là khung ảnh hồng: mặc định theo ảnh bìa, đặt được ảnh riêng.
+    expect(corners(container)).toEqual(['detail', 'fig-0', 'hero', 'primary', 'secondary'])
   })
 
   /*
@@ -87,9 +87,25 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
     expect(corners(container)).toEqual([])
   })
 
-  it('bitesize: chỉ ô ảnh phụ, vì ô phương tiện là ảnh bìa', () => {
+  /*
+   * Ô phương tiện là ảnh bìa, và nay có nút riêng ở góc — chủ site: *"có khung
+   * ảnh nhưng không có nút tải lên và gắn link"*.
+   */
+  it('bitesize: ô phương tiện và ô ảnh phụ', () => {
     const { container } = draw('bitesize', { body: { sub: 'chữ ô phụ' } })
-    expect(corners(container)).toEqual(['sub'])
+    expect(corners(container)).toEqual(['hero', 'sub'])
+  })
+
+  it('bitesize có clip: ô phương tiện thêm nút tải ảnh thumbnail', () => {
+    const { container } = draw('bitesize', {
+      hero_image_url: 'https://kho/clip.mp4',
+      body: { media: 'vid' },
+    })
+    const labels = Array.from(container.querySelectorAll('[data-plate-corner="hero"] button')).map((b) =>
+      b.getAttribute('aria-label'),
+    )
+    expect(labels).toContain('tải ảnh thumbnail')
+    expect(labels).toContain('đặt link')
   })
 
   it('longform: mỗi khung ảnh, kể cả khung trong hộp ghi chú', () => {
@@ -118,10 +134,10 @@ describe('màn sửa nối nút tải ảnh vào từng ô ảnh cố định', 
     const labels = Array.from(container.querySelectorAll('[data-plate-corner] button')).map((b) =>
       b.getAttribute('aria-label'),
     )
-    // Ba ô: ảnh chính, ảnh phụ, chi tiết. Hero đi chỗ khác, và bài này không
-    // có phần nào có hình. Mỗi ô hai lối đưa ảnh vào; chưa ô nào có ảnh nên
-    // chưa có nút gỡ hay nút đặt khung.
-    expect(labels).toEqual(Array(3).fill(['tải ảnh lên', 'đặt link']).flat())
+    // Bốn ô: khung ảnh hồng, ảnh chính, ảnh phụ, chi tiết; bài này không có
+    // phần nào có hình. Mỗi ô hai lối đưa ảnh vào; chưa ô nào có ảnh riêng
+    // nên chưa có nút gỡ hay nút đặt khung.
+    expect(labels).toEqual(Array(4).fill(['tải ảnh lên', 'đặt link']).flat())
   })
 
   /*

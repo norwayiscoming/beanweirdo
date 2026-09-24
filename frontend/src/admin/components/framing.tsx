@@ -14,6 +14,7 @@
  */
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
 import { FocusPicker } from './FocusPicker'
+import { CropPicker } from './CropPicker'
 import { looksLikeVideo } from '../../lib/mediaShape'
 
 export type FrameRequest = {
@@ -38,11 +39,23 @@ export type FrameFn = (req: FrameRequest) => Promise<string>
  */
 const FramingContext = createContext<FrameFn>(async (req) => req.url)
 
+/**
+ * Cắt tay — cho khối ảnh trong thân bài, nơi không có hình dạng ô nào áp
+ * xuống. Cùng một provider với `frame` để hai hộp không bao giờ chồng nhau.
+ */
+export type CropFn = (req: { url: string; name: string }) => Promise<string>
+
+const CroppingContext = createContext<CropFn>(async (req) => req.url)
+
 export function useFraming(): FrameFn {
   return useContext(FramingContext)
 }
 
-type Pending = FrameRequest & { settle: (url: string) => void }
+export function useCropping(): CropFn {
+  return useContext(CroppingContext)
+}
+
+type Pending = FrameRequest & { settle: (url: string) => void; mode: 'focus' | 'crop' }
 
 export function FramingProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null)
@@ -61,7 +74,16 @@ export function FramingProvider({ children }: { children: ReactNode }) {
      */
     if (looksLikeVideo(req.url)) return Promise.resolve(req.url)
     return new Promise<string>((resolve) => {
-      const next: Pending = { ...req, settle: resolve }
+      const next: Pending = { ...req, settle: resolve, mode: 'focus' }
+      live.current = next
+      setPending(next)
+    })
+  }, [])
+
+  const crop = useCallback<CropFn>((req) => {
+    if (looksLikeVideo(req.url)) return Promise.resolve(req.url)
+    return new Promise<string>((resolve) => {
+      const next: Pending = { ...req, ratio: 1, settle: resolve, mode: 'crop' }
       live.current = next
       setPending(next)
     })
@@ -75,17 +97,27 @@ export function FramingProvider({ children }: { children: ReactNode }) {
 
   return (
     <FramingContext.Provider value={frame}>
-      {children}
-      {pending && (
-        <FocusPicker
-          url={pending.url}
-          name={pending.name}
-          ratio={pending.ratio}
-          previews={pending.previews}
-          onCancel={() => close(pending.url)}
-          onSave={(url) => close(url)}
-        />
-      )}
+      <CroppingContext.Provider value={crop}>
+        {children}
+        {pending?.mode === 'crop' && (
+          <CropPicker
+            url={pending.url}
+            name={pending.name}
+            onCancel={() => close(pending.url)}
+            onSave={(url) => close(url)}
+          />
+        )}
+        {pending?.mode === 'focus' && (
+          <FocusPicker
+            url={pending.url}
+            name={pending.name}
+            ratio={pending.ratio}
+            previews={pending.previews}
+            onCancel={() => close(pending.url)}
+            onSave={(url) => close(url)}
+          />
+        )}
+      </CroppingContext.Provider>
     </FramingContext.Provider>
   )
 }

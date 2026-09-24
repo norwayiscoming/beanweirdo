@@ -47,8 +47,8 @@ import { usePostAddresses } from '../../data/usePostAddresses'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
 import { CoverBand } from '../components/CoverBand'
-import { FramingProvider, useFraming } from '../components/framing'
-import { PlateImageUpload } from '../components/PlateUpload'
+import { FramingProvider, useCropping, useFraming } from '../components/framing'
+import { PlateImageUpload, PlateUpload } from '../components/PlateUpload'
 import { blankReportBlock, getBody, ORDERED_LIST, resolveTemplate } from '../lib/postData'
 import {
   addColumn,
@@ -77,6 +77,7 @@ import {
   notesOn,
   paletteFrom,
   fillStyle,
+  cropStyle,
   allElements,
   flatElements,
   htmlToMarkdown,
@@ -569,7 +570,7 @@ export function EditorCanvas({ template, post, module, onChange, onHeroDrop, her
         ) : template === 'report' ? (
           <ReportEditor post={post} module={module} onChange={onChange} />
         ) : template === 'bitesize' ? (
-          <BitesizeEditor post={post} module={module} onChange={onChange} />
+          <BitesizeEditor post={post} module={module} onChange={onChange} onHeroDrop={onHeroDrop} hero={hero} />
         ) : template === 'memo' ? (
           <MemoEditor post={post} module={module} onChange={onChange} />
         ) : template === 'longform' ? (
@@ -1172,6 +1173,7 @@ const ARTICLE_PLATE_NAME: Record<string, string> = {
   primary: 'Ảnh chính',
   secondary: 'Ảnh phụ',
   detail: 'Chi tiết · ô vuông ở cột phải',
+  hero: 'Khung ảnh hồng · cạnh tiêu đề',
 }
 
 /**
@@ -1210,7 +1212,11 @@ function ArticleEditor({
 }) {
   // Same adapter as the public journal, so the canvas is edited against what
   // will actually ship.
-  const data = toArticleData(withoutHero(post), module?.title ?? post.module_id, [], -1, module)
+  /*
+   * Không bỏ ảnh bìa: khung ảnh hồng (`hero`) nay có nút riêng và mặc định
+   * mang ảnh bìa, nên màn sửa phải cho thấy nó đang mang gì.
+   */
+  const data = toArticleData(post, module?.title ?? post.module_id, [], -1, module)
   const sections = getBody<SectionData>(post)
   const further_reading = post.further_reading ?? []
   /*
@@ -1296,7 +1302,20 @@ function ArticleEditor({
        * ảnh.
        */
       renderPlateAction={(slot) => {
-        if (slot.key === 'hero') return null
+        /*
+         * Khung ảnh hồng: mặc định theo ảnh bìa, và đặt được ảnh riêng — tải
+         * lên hoặc dán link. Nút chỉ biết ảnh RIÊNG của khung, nên "gỡ" chỉ
+         * hiện khi có ảnh riêng, và gỡ xong là khung lại mang ảnh bìa.
+         */
+        if (slot.key === 'hero')
+          return (
+            <PlateImageUpload
+              imageUrl={post.plate_images?.hero || null}
+              name={ARTICLE_PLATE_NAME.hero}
+              onUrl={(url) => onChange(platePatch(post, 'hero', url))}
+              onClear={() => onChange(platePatch(post, 'hero', null))}
+            />
+          )
         // `fig-3` là ô ảnh của phần thứ ba; ảnh của nó nằm trong `body`, cạnh
         // chú thích và ghi chú bên lề của chính phần ấy.
         const at = slot.key.startsWith('fig-') ? Number(slot.key.slice(4)) : NaN
@@ -2144,10 +2163,14 @@ function BitesizeEditor({
   post,
   module,
   onChange,
+  onHeroDrop,
+  hero,
 }: {
   post: PostDetail
   module?: Module
   onChange: (patch: EditPatch) => void
+  onHeroDrop?: (file: File, ratio?: number | null) => void
+  hero?: HeroActions
 }) {
   const body = (post.body ?? {}) as BitesizeBody
   const write = (patch: Partial<BitesizeBody>) =>
@@ -2206,7 +2229,13 @@ function BitesizeEditor({
       </div>
       <PostRenderer
         template="bitesize"
-        post={toBitesizeData(withoutHero(post), { mod: module })}
+        /*
+         * Ô phương tiện vẽ ảnh bìa thật, không vẽ bản đã bỏ ảnh. Nó có nút tải
+         * lên ngay ở góc (chủ site: *"có khung ảnh nhưng không có nút tải lên
+         * và gắn link"*), và một ô vừa tải ảnh vào mà vẫn trơn màu thì trông
+         * như tải hỏng.
+         */
+        post={toBitesizeData(post, { mod: module })}
         renderTitle={(title) => (
           <InlineField value={title} placeholder="Tiêu đề" onCommit={(v) => onChange({ en: v })} />
         )}
@@ -2223,16 +2252,51 @@ function BitesizeEditor({
          * Chỉ ô ảnh phụ có nút. Ô phương tiện là ảnh bìa, mà ảnh bìa nay đặt ở
          * băng "trang bìa" trên đầu khung sửa — một chỗ đặt cho cả sáu khuôn.
          */
-        renderPlateAction={(slot) =>
-          slot.key === 'sub' ? (
-            <PlateImageUpload
-              imageUrl={slot.imageUrl}
-              name="Ảnh body 1 · ô dọc cạnh dòng chữ"
-              onUrl={(url) => write({ subImage: url })}
-              onClear={() => write({ subImage: null })}
-            />
-          ) : null
-        }
+        renderPlateAction={(slot) => {
+          if (slot.key === 'sub')
+            return (
+              <PlateImageUpload
+                imageUrl={slot.imageUrl}
+                name="Ảnh body 1 · ô dọc cạnh dòng chữ"
+                onUrl={(url) => write({ subImage: url })}
+                onClear={() => write({ subImage: null })}
+              />
+            )
+          if (slot.key !== 'hero' || !onHeroDrop) return null
+          /*
+           * Ô phương tiện là ảnh bìa, nên nút của nó đi đúng đường của băng
+           * trang bìa (`setHero`): đo khung hình để đổi dàn trang, lấy poster
+           * nếu là clip. Hai chỗ đặt, một đường ghi.
+           */
+          const clip = Boolean(post.hero_image_url && looksLikeVideo(post.hero_image_url))
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+              <PlateUpload
+                imageUrl={post.hero_image_url}
+                accept="image/*,video/*"
+                onPick={(file, ratio) => onHeroDrop(file, ratio)}
+                onLink={hero?.link}
+                onReframe={hero?.reframe}
+                onClear={hero?.clear}
+              />
+              {/*
+                Ảnh thumbnail của clip: khung hình đắp lên lúc clip chưa chạy,
+                và là tấm đại diện trong danh sách. Tự lấy ở giây thứ nhất khi
+                đính clip, nhưng từ khi thanh đặt ảnh cũ bỏ đi thì không còn chỗ
+                nào đổi tay được nữa.
+              */}
+              {clip && (
+                <PlateImageUpload
+                  imageUrl={body.poster ?? null}
+                  name="Ảnh thumbnail của clip"
+                  label="tải ảnh thumbnail"
+                  onUrl={(url) => write({ poster: url })}
+                  onClear={() => write({ poster: null })}
+                />
+              )}
+            </div>
+          )
+        }}
         wrapElement={wrapElement}
         renderAfterElements={renderAfterElements}
       />
@@ -3654,6 +3718,7 @@ function ReportBlockFields({
           imageUrl={block.imageUrl}
           palette={palette}
           onChange={(patch) => onChange({ ...block, ...patch })}
+          onRemoveImage={() => onChange({ type: 'paragraph', text: '' } as ReportBlock)}
         />
       )
   }
@@ -3892,27 +3957,41 @@ function ImageBlockEditor({
   imageUrl,
   palette,
   onChange,
+  onRemoveImage,
 }: {
   caption: string
   imageUrl?: string | null
   palette: Palette
   onChange: (patch: { caption?: string; imageUrl?: string | null }) => void
+  /**
+   * Gỡ ảnh thì khối không còn là ảnh nữa. Chủ site: *"sau xoá layout thành cho
+   * phép viết text trên nền trắng thông thường"* — một ô màu trống nằm lại giữa
+   * bài là chỗ phải xoá thêm lần nữa, còn một đoạn chữ thì viết tiếp được ngay.
+   */
+  onRemoveImage?: () => void
 }) {
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const dropRef = useRef<HTMLDivElement>(null)
-  const frame = useFraming()
+  const crop = useCropping()
+
+  /*
+   * Khối ảnh trong thân bài không có hình dạng nào do khuôn quyết, nên nó mở
+   * hộp cắt tay chứ không mở khung căn: trước đây ô thả ảnh cao cứng 160px và
+   * khung căn khoá theo đúng dải ngang ấy — chủ site: *"logic đang cố định
+   * khung ngang >> mở thành tuỳ biến, cho phép user tự crop"*.
+   *
+   * Lưu trước rồi mới cắt: bấm Huỷ thì ảnh vẫn ở lại, huỷ là huỷ việc cắt.
+   */
+  async function place(url: string) {
+    onChange({ imageUrl: url })
+    onChange({ imageUrl: await crop({ url, name: 'Khối ảnh trong thân bài' }) })
+  }
 
   async function handleFile(file: File) {
     setUploading(true)
     try {
-      // Ô thả ảnh chính là khối ảnh, nên hình dạng của nó là hình dạng khung
-      // cắt — đo tại chỗ thay vì ghi cứng một tỉ lệ sẽ lệch khi cột đổi rộng.
-      const box = dropRef.current?.getBoundingClientRect()
-      const ratio = box && box.height > 0 ? box.width / box.height : 16 / 9
       const { url } = await uploadImage(file)
-      onChange({ imageUrl: url })
-      onChange({ imageUrl: await frame({ url, name: 'Khối ảnh trong thân bài', ratio }) })
+      await place(url)
     } finally {
       setUploading(false)
     }
@@ -3921,27 +4000,34 @@ function ImageBlockEditor({
   return (
     <div>
       <div
-        ref={dropRef}
         className="awc-image-drop"
+        data-testid="image-block-drop"
         onDragOver={(e) => e.preventDefault()}
         onDrop={(e) => {
           e.preventDefault()
+          // Không để thả lan lên khung sửa, nơi thả tệp nghĩa là đặt ảnh bìa.
+          e.stopPropagation()
           const file = e.dataTransfer.files[0]
           if (file) handleFile(file)
         }}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => {
+          if (!imageUrl) inputRef.current?.click()
+        }}
         style={{
-          height: 160,
-          ...fillStyle(imageUrl, palette.tint),
+          position: 'relative',
+          // Cùng một phép vẽ với trang thật (`elements/media.tsx`): ảnh đã cắt
+          // mang đúng hình đã cắt, ảnh cũ giữ dải 250px nó đã đăng.
+          ...(cropStyle(imageUrl) ?? { height: imageUrl ? 250 : 160, ...fillStyle(imageUrl, palette.tint) }),
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          cursor: imageUrl ? 'default' : 'pointer',
         }}
       >
         <input
           ref={inputRef}
           type="file"
-        accept="image/*"
+          accept="image/*"
           style={{ display: 'none' }}
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -3950,6 +4036,23 @@ function ImageBlockEditor({
           }}
         />
         {!imageUrl && <span style={{ fontFamily: 'inherit', fontSize: 11, color: palette.ink }}>{uploading ? 'đang tải…' : 'thả ảnh hoặc bấm để chọn'}</span>}
+        {/*
+          Cùng bốn nút ở góc như mọi ô ảnh của khuôn bài, để khối ảnh trong
+          thân bài không phải một ngoại lệ phải học riêng. `stopPropagation`:
+          bấm nút không được rơi xuống ô thả mà mở hộp chọn tệp lần hai.
+        */}
+        <div
+          style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, lineHeight: 0 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <PlateUpload
+            imageUrl={imageUrl ?? null}
+            onPick={(file) => handleFile(file)}
+            onLink={(url) => place(url)}
+            onReframe={() => (imageUrl ? place(imageUrl) : undefined)}
+            onClear={onRemoveImage ?? (() => onChange({ imageUrl: null }))}
+          />
+        </div>
       </div>
       <EditableField value={caption} placeholder="chú thích ảnh" onCommit={(v) => onChange({ caption: v })} style={{ fontSize: 10, color: palette.ink, marginTop: 8 }} />
     </div>

@@ -214,12 +214,15 @@ export function PlateImageUpload({
   onUrl,
   onClear,
   name = 'ô ảnh của khuôn bài',
+  label,
 }: {
   imageUrl: string | null
   onUrl: (url: string) => void
   onClear?: () => void
   /** Ô nào — hiện trên đầu khung cắt để biết đang căn cho chỗ nào. */
   name?: string
+  /** Chữ của nút tải lên, khi một ô có hai thứ tải lên được. */
+  label?: string
 }) {
   const frame = useFraming()
 
@@ -242,6 +245,7 @@ export function PlateImageUpload({
       onLink={place}
       onReframe={(ratio) => (imageUrl ? place(imageUrl, ratio) : undefined)}
       onClear={onClear}
+      label={label}
     />
   )
 }

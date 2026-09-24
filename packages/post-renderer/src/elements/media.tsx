@@ -1,5 +1,5 @@
 /** Elements that are a picture, or stand where one will be. */
-import { fillStyle } from '../focus'
+import { cropStyle, fillStyle } from '../focus'
 import { sans } from '../tokens'
 import { registerElement, type ElementViewProps } from './registry'
 
@@ -20,12 +20,15 @@ export const image = registerElement<ImageAttrs>({
     <div
       data-testid={testId}
       style={{
-        height: 250,
+        /*
+         * A photo cut by hand takes the shape it was cut to; one placed before
+         * cropping existed keeps the 250px strip it was published with.
+         */
+        ...(cropStyle(attributes.imageUrl) ?? { height: 250, ...fillStyle(attributes.imageUrl, palette.tint) }),
         display: 'flex',
         alignItems: 'flex-end',
         padding: 20,
         margin: '0 0 20px',
-        ...fillStyle(attributes.imageUrl, palette.tint),
       }}
     >
       <div style={{ fontFamily: sans, fontSize: 10, color: palette.ink }}>

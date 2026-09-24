@@ -32,17 +32,27 @@ export const CENTRE: Focus = { x: 50, y: 50 }
 
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)))
 
+const FOCUS_RE = /#focus=(-?[\d.]+),(-?[\d.]+)$/
+const CROP_RE = /#crop=([\d.]+),([\d.]+),([\d.]+),([\d.]+),([\d.]+)$/
+
 /** The focal point written on a URL, or the centre when it carries none. */
 export function readFocus(url: string | null | undefined): Focus {
   if (!url) return CENTRE
-  const m = /#focus=(-?[\d.]+),(-?[\d.]+)$/.exec(url)
-  if (!m) return CENTRE
-  return { x: clamp(Number(m[1])), y: clamp(Number(m[2])) }
+  const m = FOCUS_RE.exec(url)
+  if (m) return { x: clamp(Number(m[1])), y: clamp(Number(m[2])) }
+  /*
+   * A cropped photo that lands in a fixed cell — a body image picked up as a
+   * post's thumbnail — should keep roughly the part that was kept, so its crop
+   * turns into the focal point that shows the same window.
+   */
+  const c = readCrop(url)
+  if (c) return { x: c.w >= 100 ? 50 : clamp((c.x / (100 - c.w)) * 100), y: c.h >= 100 ? 50 : clamp((c.y / (100 - c.h)) * 100) }
+  return CENTRE
 }
 
-/** The URL without any focal point — what actually gets fetched. */
+/** The URL without any focal point or crop — what actually gets fetched. */
 export function stripFocus(url: string): string {
-  return url.replace(/#focus=-?[\d.]+,-?[\d.]+$/, '')
+  return url.replace(FOCUS_RE, '').replace(CROP_RE, '')
 }
 
 /** The same URL carrying a focal point; the centre is left implicit. */
@@ -52,6 +62,54 @@ export function withFocus(url: string, focus: Focus): string {
   const y = clamp(focus.y)
   if (x === CENTRE.x && y === CENTRE.y) return bare
   return `${bare}#focus=${x},${y}`
+}
+
+/**
+ * A crop someone drew by hand: the rectangle of the photo that is kept, in
+ * percentages of the photo's own width and height, plus the width ÷ height of
+ * that rectangle on screen.
+ *
+ * A focal point only works for a cell whose shape the template decides. A body
+ * image has no such shape — the owner wanted to cut it themselves instead of
+ * living with a fixed landscape strip — so the shape is part of what is stored.
+ * The ratio travels with the rectangle because the page cannot work it out: it
+ * would need the photo's pixel size, and a background image never reports it.
+ */
+export type Crop = { x: number; y: number; w: number; h: number; ratio: number }
+
+const round = (n: number, d = 2) => Math.round(n * 10 ** d) / 10 ** d
+
+export function readCrop(url: string | null | undefined): Crop | null {
+  if (!url) return null
+  const m = CROP_RE.exec(url)
+  if (!m) return null
+  const [x, y, w, h, ratio] = m.slice(1).map(Number)
+  if (!(w > 0 && h > 0 && ratio > 0)) return null
+  return { x, y, w: Math.min(100, w), h: Math.min(100, h), ratio }
+}
+
+/** The same URL carrying a crop instead of any focal point. */
+export function withCrop(url: string, c: Crop): string {
+  const nums = [c.x, c.y, c.w, c.h].map((n) => round(Math.max(0, Math.min(100, n))))
+  return `${stripFocus(url)}#crop=${nums.join(',')},${round(c.ratio, 4)}`
+}
+
+/**
+ * What a cell that takes its shape from the crop draws: the photo scaled so the
+ * kept rectangle fills the cell exactly. Null when the URL carries no crop, so
+ * the caller falls back to its own fixed shape.
+ */
+export function cropStyle(url: string | null | undefined): CSSProperties | null {
+  const c = url ? readCrop(url) : null
+  if (!url || !c) return null
+  const at = (from: number, size: number) => (size >= 100 ? 0 : round((from / (100 - size)) * 100, 3))
+  return {
+    aspectRatio: String(c.ratio),
+    backgroundImage: `url(${stripFocus(url)})`,
+    backgroundSize: `${round(10000 / c.w, 3)}% ${round(10000 / c.h, 3)}%`,
+    backgroundPosition: `${at(c.x, c.w)}% ${at(c.y, c.h)}%`,
+    backgroundRepeat: 'no-repeat',
+  }
 }
 
 /**

@@ -9,5 +9,5 @@
  * Tệp này ở lại làm cửa cũ cho hơn hai mươi chỗ gọi trong app, để bản dọn ấy
  * không phải sửa từng chỗ một.
  */
-export { CENTRE, coverStyle, readFocus, stripFocus, withFocus } from 'post-renderer'
-export type { Focus } from 'post-renderer'
+export { CENTRE, coverStyle, cropStyle, readCrop, readFocus, stripFocus, withCrop, withFocus } from 'post-renderer'
+export type { Crop, Focus } from 'post-renderer'
