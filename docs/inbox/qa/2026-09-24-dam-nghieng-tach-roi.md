@@ -1,6 +1,6 @@
 # Đậm và nghiêng: thừa dấu sao, và đậm tự nghiêng theo
 
-- **PR:** (số PR ghi ở commit kế tiếp của cùng nhánh)
+- **PR:** #36
 - **Nhánh:** `claude/project-thread-7yatkf`
 - **Lane:** QA hot-fix
 - **Ngày:** 2026-09-24
