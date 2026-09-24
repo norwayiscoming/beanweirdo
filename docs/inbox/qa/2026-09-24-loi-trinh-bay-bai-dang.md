@@ -1,6 +1,6 @@
 # Lỗi trình bày bài đăng: thanh màu Article, nhân bản bài, lề tên bài Long form
 
-PR: #(điền khi mở) · nhánh `claude/project-thread-1onmw2`
+PR: #33 · nhánh `claude/project-thread-1onmw2`
 
 ## Đã đổi
 
