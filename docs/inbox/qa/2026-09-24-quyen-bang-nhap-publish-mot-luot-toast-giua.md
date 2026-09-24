@@ -1,6 +1,6 @@
 # Bảng nháp thiếu quyền; lưu nháp và Publish mỗi việc một lượt; toast ở giữa trang
 
-PR: #(điền khi mở) · nhánh `claude/project-thread-1onmw2`
+PR: #43 · nhánh `claude/project-thread-1onmw2`
 
 Nối tiếp PR #40, #41.
 
