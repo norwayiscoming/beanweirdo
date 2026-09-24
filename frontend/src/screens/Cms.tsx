@@ -1091,6 +1091,7 @@ export function Cms() {
       // Bài đã đăng: chữ sửa ở đây cũng chỉ vào bản nháp (migration 0028), mà
       // danh sách này không có nút Đăng — nên phải nói ra chỗ để đăng nó.
       if ((saved as { has_draft?: boolean }).has_draft) {
+        setPosts((ps) => ps.map((p) => (p.id === id ? { ...p, has_draft: true } : p)))
         toast.info('Đã lưu nháp — mở bài và bấm "Đăng thay đổi" để lên trang')
       }
     } catch (e) {

@@ -251,7 +251,7 @@ export function PostCard({
         >
           {post.template ? TEMPLATE_LABEL[post.template] : '—'}
         </span>
-        <StatusBadge status={post.status} />
+        <StatusBadge status={post.status} pending={post.has_draft} />
         {/* Ghim là việc của mọi module, không riêng Ghi 01: bài ghim dẫn đầu
             module của nó dù phần còn lại xếp theo gì. Nó ở ngoài menu vì nó là
             một trạng thái nhìn là thấy, không phải một việc đi tìm. */}
