@@ -291,12 +291,12 @@ type LayoutItem =
 
 /**
  * Posts in their slots, top block first, each row closed by its decoration —
- * the order a phone stacks them. The quotation takes the second row of the
- * top block, where the sketch puts it; every other row takes the next photo
- * in F-order, starting over when they run out, so every row has its piece.
- * Decoration is drawn whether or not its row holds a post yet: posts fill a
- * block from the bottom, and tying the two together hid the decoration on a
- * page with few posts.
+ * the order a phone stacks them. A row with no post yet is left out whole,
+ * decoration and all (the owner, 2026-09-24: "row nào mà chưa có bài này thì
+ * ẩn đi"); posts fill a block from the bottom, so a young block shows only
+ * its lower rows. The quotation takes the first row shown on the page; every
+ * other row takes the next photo in F-order, starting over when they run
+ * out, so every row shown has its piece.
  */
 function blockLayout(posts: readonly PostRow[], decos: ReturnType<typeof decorations>): LayoutItem[] {
   const photos = decos.filter((c) => c.kind === 'slot')
@@ -305,11 +305,14 @@ function blockLayout(posts: readonly PostRow[], decos: ReturnType<typeof decorat
   const blocks = Math.ceil(posts.length / BLOCK_SIZE)
   const out: LayoutItem[] = []
   let nextPhoto = 0
+  let quoteShown = false
   for (let block = 0; block < blocks; block++) {
     for (let row = 0; row < ROWS_PER_BLOCK; row++) {
-      for (const at of placed.filter((p) => p.block === block && Math.floor(p.slot / 2) === row).sort((a, b) => a.slot - b.slot))
-        out.push({ kind: 'post', post: posts[at.i], ...at })
-      const cell = block === 0 && row === 1 && quote ? quote : photos.length ? photos[nextPhoto++ % photos.length] : undefined
+      const here = placed.filter((p) => p.block === block && Math.floor(p.slot / 2) === row)
+      if (!here.length) continue
+      for (const at of here.sort((a, b) => a.slot - b.slot)) out.push({ kind: 'post', post: posts[at.i], ...at })
+      const cell = !quoteShown && quote ? quote : photos.length ? photos[nextPhoto++ % photos.length] : undefined
+      if (cell === quote) quoteShown = true
       if (cell) out.push({ kind: 'deco', cell, block, row })
     }
   }
