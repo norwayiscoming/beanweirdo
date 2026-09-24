@@ -20,12 +20,12 @@ const FIELD =
   'input:not([type=file]):not([type=hidden]), textarea, [role=textbox], .awc-live-input, [contenteditable=true]'
 
 /** Vùng chứa các chỗ dừng — một thân bài, hay một thẻ của cards. */
-export function flowRoot(from: Element | null): HTMLElement | null {
+function flowRoot(from: Element | null): HTMLElement | null {
   return (from?.closest('[data-flow-root]') as HTMLElement | null) ?? null
 }
 
 /** Mọi ô gõ được trong thân bài, theo đúng thứ tự người đọc thấy. */
-export function flowFields(root: HTMLElement): HTMLElement[] {
+function flowFields(root: HTMLElement): HTMLElement[] {
   const out: HTMLElement[] = []
   root.querySelectorAll<HTMLElement>('[data-flow]').forEach((stop) => {
     // Dải chữ nằm trong một khối (hộp ghi chú của long-form) đã được khối ấy đếm.
@@ -119,7 +119,7 @@ export function fieldBeside(from: HTMLElement, dir: -1 | 1): HTMLElement | null 
  * focus chưa có mặt lúc gọi. Thử lại qua vài khung hình rồi thôi — không tìm
  * thấy thì con trỏ ở yên, không phải lỗi.
  */
-export function focusLater(
+function focusLater(
   root: HTMLElement | null,
   find: (root: HTMLElement) => HTMLElement | null | undefined,
   then: (el: HTMLElement) => void,
@@ -135,7 +135,7 @@ export function focusLater(
 }
 
 /** Chỗ dừng mang chỉ số `at` trong kho. */
-export function stopAt(root: HTMLElement, kind: 'run' | 'thing', at: number): HTMLElement | null {
+function stopAt(root: HTMLElement, kind: 'run' | 'thing', at: number): HTMLElement | null {
   return root.querySelector<HTMLElement>(`[data-flow="${kind}"][data-flow-at="${at}"]`)
 }
 
@@ -153,7 +153,7 @@ function fieldsOf(stop: HTMLElement): HTMLElement[] {
  * khối nhấn có một dòng nhãn tuỳ chọn đứng trước phần chữ, và chèn xong mà con
  * trỏ rơi vào nhãn là gõ nhầm chỗ ngay chữ đầu tiên.
  */
-export function fieldOf(stop: HTMLElement, edge: 'start' | 'end'): HTMLElement | null {
+function fieldOf(stop: HTMLElement, edge: 'start' | 'end'): HTMLElement | null {
   if (stop.dataset.flow === 'run') return stop.querySelector<HTMLElement>('.awc-live-input')
   const fields = fieldsOf(stop)
   const body = fields.find((f) => f instanceof HTMLTextAreaElement || f.getAttribute('role') === 'textbox')
@@ -166,7 +166,7 @@ export function fieldOf(stop: HTMLElement, edge: 'start' | 'end'): HTMLElement |
 }
 
 /** Đặt một giá trị vào ô nhập mà React vẫn nghe thấy như người gõ. */
-export function setFieldValue(field: HTMLInputElement | HTMLTextAreaElement, value: string): void {
+function setFieldValue(field: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const proto = field instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
   Object.getOwnPropertyDescriptor(proto, 'value')?.set?.call(field, value)
   field.dispatchEvent(new Event('input', { bubbles: true }))

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { resolveSite, SITE_DEFAULTS, type SiteCopy, type SiteOverrides } from '../content/site'
 import { supabase } from '../lib/supabaseClient'
 
-export type UseSiteCopyResult = {
+type UseSiteCopyResult = {
   /** Defaults merged with whatever the CMS has overridden. Never null. */
   site: SiteCopy
   /** The raw overrides — what the CMS edits and PATCHes back. */

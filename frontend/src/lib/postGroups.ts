@@ -13,7 +13,7 @@ import { descendantIds } from './contentTree'
  */
 
 /** The little this file needs to know about a post. */
-export type FiledPost = { module_id: string }
+type FiledPost = { module_id: string }
 
 /**
  * Posts filed directly under each module, keeping the order they came in.

@@ -62,7 +62,7 @@ export const DEFAULT_WORDS: RouteWords = {
   modules: { biochem: 'biochemistry', ghi01: 'ghi' },
 }
 
-export const DATE_ORDERS: DateOrder[] = ['yymmdd', 'mmddyy', 'ddmmyy']
+const DATE_ORDERS: DateOrder[] = ['yymmdd', 'mmddyy', 'ddmmyy']
 
 /** Ô nào là chữ, và tên tiếng Việt của nó trong màn Sơ đồ trang. */
 export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'modules'>, string> = {
@@ -111,7 +111,7 @@ const MUST_DIFFER: (keyof RouteWords)[][] = [
   ['create', 'edit', 'view'],
 ]
 
-export type WordErrors = Partial<Record<keyof RouteWords, string>>
+type WordErrors = Partial<Record<keyof RouteWords, string>>
 
 /** Chỗ nào sai, và sai vì gì. Rỗng nghĩa là lưu được. */
 export function checkWords(words: RouteWords): WordErrors {
@@ -162,7 +162,7 @@ export function checkWords(words: RouteWords): WordErrors {
  * để đổi tên không làm gãy link: một địa chỉ viết bằng bộ từ cũ vẫn đọc ra đúng
  * chỗ, rồi được viết lại bằng bộ từ mới.
  */
-export type StoredRoutes = Partial<RouteWords> & { past?: Partial<RouteWords>[] }
+type StoredRoutes = Partial<RouteWords> & { past?: Partial<RouteWords>[] }
 
 /** Bản đã kiểm, hoà với bản mặc định — thiếu ô nào thì lấy ô mặc định. */
 export function resolveWords(stored: StoredRoutes | null | undefined): RouteWords {
@@ -183,7 +183,7 @@ export function resolveWords(stored: StoredRoutes | null | undefined): RouteWord
 /*
  * Bộ từ đang dùng.
  *
- * Địa chỉ phải đọc được **trước** khi React chạy — `areaFromPath` chọn cổng vào
+ * Địa chỉ phải đọc được **trước** khi React chạy — app chọn cổng vào theo địa chỉ
  * ngay lúc dựng app — mà bộ từ thì nằm dưới cơ sở dữ liệu, về sau một nhịp
  * mạng. Nên bản vừa dùng được cất trong `localStorage`: người đã ghé một lần
  * đọc đúng địa chỉ ngay từ nhịp đầu, và khi bản thật về mà khác thì địa chỉ

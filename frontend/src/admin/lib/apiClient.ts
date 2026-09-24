@@ -21,7 +21,6 @@ const IMAGE_BUCKET = 'post-images'
  */
 import type { PostTemplate } from '../../content/templates'
 
-export { POST_TEMPLATE_KEYS as TEMPLATES } from '../../content/templates'
 export type { PostTemplate }
 
 export type PostKind = 'note' | 'essay' | 'ref' | 'log'
@@ -538,28 +537,8 @@ export type TemplateSummary = {
   sort_order: number
 }
 
-export type StoredTemplate = TemplateSummary & { body: unknown | null }
-
 /** GET /api/templates — the choices, without their bodies. */
 export async function listTemplates(): Promise<TemplateSummary[]> {
   const result = await request<{ templates: TemplateSummary[] }>('/api/templates')
   return result.templates
-}
-
-/** GET /api/templates?id=… — one template, body included. */
-export async function getTemplate(id: string): Promise<StoredTemplate> {
-  const result = await request<{ template: StoredTemplate }>(`/api/templates?id=${encodeURIComponent(id)}`)
-  return result.template
-}
-
-/** PATCH /api/templates?id=… — save an edited template back. */
-export async function updateTemplate(
-  id: string,
-  patch: Partial<Pick<StoredTemplate, 'name' | 'description' | 'body' | 'sort_order'>>,
-): Promise<StoredTemplate> {
-  const result = await request<{ template: StoredTemplate }>(`/api/templates?id=${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
-  })
-  return result.template
 }

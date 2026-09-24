@@ -18,7 +18,7 @@
  * because a layout's markup belongs with the other markup, not in a data file.
  */
 
-export type LayoutSpec = {
+type LayoutSpec = {
   key: string
   /** What the CMS offers in its dropdown. */
   label: string

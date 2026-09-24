@@ -83,7 +83,7 @@ export type RenderablePost = {
 }
 
 /** What every template needs from the module a post is filed under. */
-export type RenderableModule = {
+type RenderableModule = {
   title: string
   accent: string
   on_color: string

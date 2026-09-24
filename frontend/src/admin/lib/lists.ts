@@ -67,8 +67,6 @@ export const forgetModules = (): void => {
 }
 /** Gọi sau khi ghi vào `tags`. */
 export const forgetTags = (): void => tags.forget()
-/** Gọi sau khi ghi vào `templates`. */
-export const forgetTemplates = (): void => templates.forget()
 
 /** Quên sạch — dùng khi đăng xuất, và trong test. */
 export function forgetAllLists(): void {

@@ -23,7 +23,7 @@ import { ink, paper } from '../../design/tokens'
 import { uploadImage } from '../lib/apiClient'
 import { useFraming } from './framing'
 
-export type PlateUploadProps = {
+type PlateUploadProps = {
   /** Đang có gì trong ô — quyết định nút gỡ và nút đặt khung có mặt hay không. */
   imageUrl: string | null
   /** `ratio` là hình dạng thật của ô, đo lúc bấm; vắng khi không đo được. */

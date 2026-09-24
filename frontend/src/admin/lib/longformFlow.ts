@@ -19,9 +19,9 @@ import { splitAtLine } from './mdBlocks'
 /** Khối nào markdown viết ra rồi đọc lại được mà không mất gì. */
 const FLOWING = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'li'])
 
-export const flowsLongform = (b: LongformBlock | undefined) => b !== undefined && FLOWING.has(b.k)
+const flowsLongform = (b: LongformBlock | undefined) => b !== undefined && FLOWING.has(b.k)
 
-export type FlowRun =
+type FlowRun =
   /** Một dải chữ liền, gộp từ các khối `at[0]`…`at[1]`. */
   | { kind: 'text'; at: [number, number]; text: string }
   /** Một thứ đứng riêng giữa dải chữ — `fig`, `note`, `aside`, `formula`. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sidebarModules, type ModuleRow } from '../data/useModules'
+import { indexModules, type ModuleRow } from '../data/useModules'
 import { buildTree, flattenTree } from '../lib/contentTree'
 import { countUnder } from '../lib/postGroups'
 import type { PostRow } from '../data/usePublishedPosts'
@@ -31,7 +31,7 @@ const post = (module_id: string) => ({ module_id }) as unknown as PostRow
 
 /** Exactly what `section()` walks. */
 const rowsOf = (modules: ModuleRow[]) =>
-  flattenTree(buildTree(sidebarModules(modules))).map((n) => ({ id: n.row.id, depth: n.depth }))
+  flattenTree(buildTree(indexModules(modules))).map((n) => ({ id: n.row.id, depth: n.depth }))
 
 describe('the sidebar rows', () => {
   it('is a flat list of depth 0 while nothing is filed inside anything', () => {
