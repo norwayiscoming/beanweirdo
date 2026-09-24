@@ -1,6 +1,6 @@
 # Trình soạn: khối ảnh đã có ảnh không còn mất vì một phím Backspace
 
-PR: (số PR điền khi mở)    nhánh: claude/project-thread-mok7tv
+PR: #55    nhánh: claude/project-thread-mok7tv
 Nguồn: chủ site, 2026-09-24 13:36, sau PR #54: *"có ảnh rồi cũng vẫn delete bằng backspace được"*.
 
 ## Đã làm
