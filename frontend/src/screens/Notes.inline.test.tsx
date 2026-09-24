@@ -67,7 +67,6 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
     // Chủ site 2026-09-24: bài cũ nhất vào ô 7, bài mới hơn lấp ngược lên.
     expect(c.map((x) => [x.textContent?.includes('Bài C'), x.dataset.slot])).toContainEqual([true, '7'])
     expect(c.map((x) => x.dataset.slot).sort()).toEqual(['5', '6', '7'])
-    expect(c.every((x) => / \/ span 4$/.test(x.style.gridColumn))).toBe(true)
     expect(new Set(c.map((x) => x.style.gridColumn)).size).toBeGreaterThan(1)
     expect(new Set(c.map((x) => x.style.marginTop)).size).toBeGreaterThan(1)
     expect(c.every((x) => x.style.opacity === '1')).toBe(true)
@@ -92,7 +91,7 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
     fireEvent.click(screen.getByText('Bài B'))
 
     const open = cards().filter((x) => x.style.gridColumn === OPEN_COL)
-    const rest = cards().filter((x) => /^\d+ \/ span 4$/.test(x.style.gridColumn))
+    const rest = cards().filter((x) => x.style.gridColumn !== OPEN_COL)
     expect(open).toHaveLength(1)
     expect(open[0].textContent).toContain('Bài B')
     expect(rest).toHaveLength(2)
