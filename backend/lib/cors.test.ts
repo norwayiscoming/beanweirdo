@@ -59,7 +59,7 @@ describe('applyCorsHeaders', () => {
   it('lets the browser cache the preflight, so one click is one round trip', () => {
     const { req, res, headers } = mockReqRes('GET')
     applyCorsHeaders(req, res)
-    expect(headers['Access-Control-Max-Age']).toBe('86400')
+    expect(headers['Access-Control-Max-Age']).toBe('600')
   })
 })
 
