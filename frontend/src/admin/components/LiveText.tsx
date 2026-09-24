@@ -27,7 +27,7 @@ import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPl
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
-import { BLUR_COMMAND, COMMAND_PRIORITY_LOW } from 'lexical'
+import { BLUR_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_LOW } from 'lexical'
 import { useEffect, useRef } from 'react'
 import { SITE_TRANSFORMERS, unescapeSite } from '../lib/liveMarkdown'
 import { registerLiveKeys, type LiveEdges } from './liveKeys'
@@ -104,6 +104,16 @@ function SyncOutside({ text }: { text: string }) {
     })
     if (current === text) return
     editor.update(() => $convertFromMarkdownString(text, SITE_TRANSFORMERS))
+    /*
+     * Chữ đổi từ bên ngoài thì bộ hoàn tác của Lexical phải quên hết.
+     *
+     * Chèn một khối vào giữa dải là cắt dải làm đôi: nửa sau sang một mặt soạn
+     * mới, mặt này chỉ còn nửa trước. Bộ hoàn tác của mặt này vẫn nhớ cả dải
+     * cũ, nên Ctrl+Z ở đây dựng lại nguyên dải — rồi rời ô là ghi nó đè vào
+     * chỗ chỉ còn nửa trước, và nửa sau có hai bản. Đó là bài AI Twin lặp phần
+     * 4–7 (2026-09-24).
+     */
+    editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined)
   }, [editor, text])
   return null
 }
