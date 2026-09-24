@@ -3,7 +3,7 @@ import { withCors } from '../../../lib/cors.js'
 import { requireAuth } from '../../../lib/auth.js'
 import { getSupabase } from '../../../lib/supabase.js'
 import { firstImageIn, POST_DETAIL_COLUMNS, toPostDetail, type PostRow } from '../../../lib/posts.js'
-import { readDraft, splitDraftPatch, writeDraft } from '../../../lib/drafts.js'
+import { readDraft, splitDraftPatch, stageDraft } from '../../../lib/drafts.js'
 
 function getId(req: VercelRequest): string | null {
   const raw = req.query.id
@@ -155,38 +155,28 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
    */
   const { content } = splitDraftPatch(patch)
   if (Object.keys(content).length > 0) {
-    const { data: row, error: statusError } = await supabase
-      .from('posts')
-      .select('status')
-      .eq('id', id)
-      .maybeSingle()
-    if (statusError) {
-      res.status(500).json({ error: statusError.message })
+    // `thumbnail_url` rides with `body` into the draft so Publish copies both.
+    if (Object.prototype.hasOwnProperty.call(patch, 'thumbnail_url')) content.thumbnail_url = patch.thumbnail_url
+    const staged = await stageDraft(supabase, id, content, patch.updated_at as string)
+    if (staged.error) {
+      res.status(500).json({ error: (staged.error as { message?: string }).message ?? 'draft write failed' })
       return
     }
-    if (!row) {
+    if (staged.status === null) {
       res.status(404).json({ error: `Post '${id}' not found` })
       return
     }
-    if ((row as { status?: string }).status === 'published') {
-      const staged = await writeDraft(supabase, id, content, patch.updated_at as string)
-      if (staged.error) {
-        res.status(500).json({ error: (staged.error as { message?: string }).message ?? 'draft write failed' })
-        return
-      }
-      // `missing`: migration 0028 not run yet — fall through and write live.
-      if (!staged.missing) {
-        for (const key of [...Object.keys(content), 'thumbnail_url']) delete patch[key]
-        if (Object.keys(patch).some((key) => key !== 'updated_at')) {
-          const { error: liveError } = await supabase.from('posts').update(patch).eq('id', id)
-          if (liveError) {
-            res.status(500).json({ error: liveError.message })
-            return
-          }
+    if (staged.status === 'published') {
+      for (const key of Object.keys(content)) delete patch[key]
+      if (Object.keys(patch).some((key) => key !== 'updated_at')) {
+        const { error: liveError } = await supabase.from('posts').update(patch).eq('id', id)
+        if (liveError) {
+          res.status(500).json({ error: liveError.message })
+          return
         }
-        res.status(200).json({ post: { id, has_draft: true } })
-        return
       }
+      res.status(200).json({ post: { id, has_draft: true } })
+      return
     }
   }
 

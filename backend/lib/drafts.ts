@@ -4,7 +4,6 @@
 // and a `post_drafts` row holds the fields edited since, under the same column
 // names. The editor's autosave writes there; Publish copies them across.
 
-import { firstImageIn } from './posts.js'
 import type { getSupabase } from './supabase.js'
 
 type Supabase = ReturnType<typeof getSupabase>
@@ -45,16 +44,23 @@ export function splitDraftPatch(patch: Record<string, unknown>): {
 }
 
 /**
- * The table is not there yet — migration 0028 has not been run.
+ * `post_drafts` cannot be read: the table is missing (0028 not run) or the API
+ * has no grant on it (0028 without 0029).
  *
- * The API must keep working in that window, the way it did before: edits go
- * straight to `posts`. A deploy landing before the SQL is run would otherwise
- * stop every autosave dead.
+ * Only reads may shrug this off, as "no pending edits". A write never does:
+ * the first version of this file treated a refused draft write as "no table
+ * yet" and wrote the edit to `posts` instead, which is exactly how edits to a
+ * published post kept going live after 0028 — the grant was missing.
  */
-export function isMissingDraftTable(error: unknown): boolean {
-  const e = error as { code?: string; message?: string } | null
-  if (!e) return false
-  return e.code === '42P01' || e.code === 'PGRST205' || /post_drafts/.test(e.message ?? '')
+export function isDraftTableUnreadable(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code
+  return code === '42P01' || code === 'PGRST205' || code === '42501'
+}
+
+/** The RPC from migration 0029 does not exist yet. */
+function isMissingFunction(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code
+  return code === 'PGRST202' || code === '42883'
 }
 
 function asFields(value: unknown): Record<string, unknown> | null {
@@ -64,62 +70,66 @@ function asFields(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-/** The pending edits of a post, or null when it has none (or the table is missing). */
+/** The pending edits of a post, or null when it has none (or they cannot be read). */
 export async function readDraft(
   supabase: Supabase,
   id: string,
 ): Promise<{ data: Record<string, unknown> | null; error: unknown }> {
   const { data, error } = await supabase.from('post_drafts').select('data').eq('post_id', id).maybeSingle()
-  if (error) return { data: null, error: isMissingDraftTable(error) ? null : error }
+  if (error) return { data: null, error: isDraftTableUnreadable(error) ? null : error }
   return { data: asFields(data), error: null }
 }
 
 /**
- * Merge `content` into the post's pending edits.
+ * Hold `content` back as pending edits if the post is published.
  *
- * Read then write: PostgREST has no jsonb merge in an upsert, and one owner
- * editing one post means two autosaves never race on the same row in practice.
- * Returns `missing: true` when the table does not exist, so the caller can fall
- * back to writing `posts`.
+ * One call (`stage_post_draft`, migration 0029): it reads the status and merges
+ * into the draft in the database, where the API used to spend three trips
+ * between Vercel in the US and Supabase in Tokyo on the same thing.
+ *
+ * `status` is the post's status (null: no such post). Anything but
+ * 'published' means nothing was staged and the caller writes `posts` itself.
  */
-export async function writeDraft(
+export async function stageDraft(
   supabase: Supabase,
   id: string,
   content: Record<string, unknown>,
   nowIso: string,
-): Promise<{ missing: boolean; error: unknown }> {
-  const current = await readDraft(supabase, id)
-  if (current.error) return { missing: false, error: current.error }
-  const { error } = await supabase
-    .from('post_drafts')
-    .upsert({ post_id: id, data: { ...(current.data ?? {}), ...content }, updated_at: nowIso }, { onConflict: 'post_id' })
-  if (error) return { missing: isMissingDraftTable(error), error: isMissingDraftTable(error) ? null : error }
-  return { missing: false, error: null }
+): Promise<{ status: string | null; error: unknown }> {
+  const { data, error } = await supabase.rpc('stage_post_draft', { p_id: id, p_content: content, p_now: nowIso })
+  if (!error) return { status: (data as string | null) ?? null, error: null }
+  if (!isMissingFunction(error)) return { status: null, error }
+
+  // 0029 not run yet. A post that is not published can still be written
+  // straight through; a published one cannot be held back, so refuse rather
+  // than put the edit on the site.
+  const { data: row, error: rowError } = await supabase.from('posts').select('status').eq('id', id).maybeSingle()
+  if (rowError) return { status: null, error: rowError }
+  const status = (row as { status?: string } | null)?.status ?? null
+  if (status === 'published') {
+    return { status, error: { message: 'Chưa lưu được nháp: cần chạy migration 0029 trên database' } }
+  }
+  return { status, error: null }
 }
 
 /**
  * Copy a post's pending edits into `posts` and drop them — what Publish does.
  *
- * `applied` is false when there was nothing pending. `thumbnail_url` follows
- * `body` here for the same reason it does in PATCH: it is derived, and this is
- * now a second route that changes `body` on a live post.
+ * One call (`fold_post_draft`, migration 0029), which also returns the post's
+ * status so Publish on an already-published post needs nothing else.
+ * `status` null means no such post. Without 0029 no draft can have been
+ * staged (see `stageDraft`), so there is nothing to fold.
  */
 export async function foldDraft(
   supabase: Supabase,
   id: string,
   nowIso: string,
-): Promise<{ applied: boolean; error: unknown }> {
-  const pending = await readDraft(supabase, id)
-  if (pending.error) return { applied: false, error: pending.error }
-  if (!pending.data) return { applied: false, error: null }
-
-  const { content } = splitDraftPatch(pending.data)
-  const patch: Record<string, unknown> = { ...content, updated_at: nowIso }
-  if (Object.prototype.hasOwnProperty.call(content, 'body')) patch.thumbnail_url = firstImageIn(content.body)
-
-  const { error } = await supabase.from('posts').update(patch).eq('id', id)
-  if (error) return { applied: false, error }
-  const { error: dropError } = await supabase.from('post_drafts').delete().eq('post_id', id)
-  if (dropError) return { applied: true, error: dropError }
-  return { applied: true, error: null }
+): Promise<{ status: string | null; applied: boolean; error: unknown; known: boolean }> {
+  const { data, error } = await supabase.rpc('fold_post_draft', { p_id: id, p_now: nowIso })
+  if (error) {
+    if (isMissingFunction(error)) return { status: null, applied: false, error: null, known: false }
+    return { status: null, applied: false, error, known: false }
+  }
+  const result = data as { status?: string; applied?: boolean } | null
+  return { status: result?.status ?? null, applied: Boolean(result?.applied), error: null, known: true }
 }

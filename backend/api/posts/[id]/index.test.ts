@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { queryBuilder, mockReq, mockRes, authHeaders } from '../../../lib/test-helpers.js'
 
 const fromMock = vi.fn()
+const rpcMock = vi.fn()
 vi.mock('../../../lib/supabase.js', () => ({
-  getSupabase: () => ({ from: fromMock }),
+  getSupabase: () => ({ from: fromMock, rpc: rpcMock }),
 }))
 
 let handler: typeof import('./index.js').default
@@ -14,6 +15,9 @@ beforeEach(async () => {
   process.env.ADMIN_SESSION_SECRET = 'test-secret'
   process.env.ADMIN_ALLOWED_ORIGIN = 'https://admin.example.com'
   fromMock.mockReset()
+  rpcMock.mockReset()
+  // stage_post_draft (0029) answers with the post's status; a draft is written straight through.
+  rpcMock.mockResolvedValue({ data: 'draft', error: null })
   handler = (await import('./index.js')).default
   signToken = (await import('../../../lib/auth.js')).signToken
   token = signToken()
@@ -126,7 +130,6 @@ describe('PATCH /api/posts/:id', () => {
     await handler(req, res)
 
     expect(res.statusCode).toBe(200)
-    // The first select reads the status (drafts, migration 0028); the answer is the last.
     const selected = builder.select.mock.calls.at(-1)![0] as string
     const columns = selected.split(',').map((c: string) => c.trim())
     expect(columns).toContain('id')
@@ -139,6 +142,7 @@ describe('PATCH /api/posts/:id', () => {
 
   it('404s when updating a post that does not exist', async () => {
     fromMock.mockReturnValue(queryBuilder({ data: null, error: null }))
+    rpcMock.mockResolvedValue({ data: null, error: null })
     const req = mockReq({
       method: 'PATCH',
       headers: authHeaders(token),
@@ -288,12 +292,9 @@ describe('PATCH /api/posts/:id — chuyển bài sang module khác', () => {
   })
 })
 
-describe('PATCH a published post — edits wait for Publish (migration 0028)', () => {
-  it('stages content in post_drafts and leaves posts alone', async () => {
-    const status = queryBuilder({ data: { status: 'published' }, error: null })
-    const read = queryBuilder({ data: { data: { en: 'Cũ hơn' } }, error: null })
-    const upsert = queryBuilder({ data: null, error: null })
-    fromMock.mockReturnValueOnce(status).mockReturnValueOnce(read).mockReturnValueOnce(upsert)
+describe('PATCH a published post — edits wait for Publish (migrations 0028, 0029)', () => {
+  it('stages content in one call and leaves posts alone', async () => {
+    rpcMock.mockResolvedValue({ data: 'published', error: null })
     const req = mockReq({
       method: 'PATCH',
       headers: authHeaders(token),
@@ -305,13 +306,13 @@ describe('PATCH a published post — edits wait for Publish (migration 0028)', (
 
     expect(res.statusCode).toBe(200)
     expect(res.body.post).toEqual({ id: 'p1', has_draft: true })
-    expect(fromMock.mock.calls.map((c) => c[0])).toEqual(['posts', 'post_drafts', 'post_drafts'])
-    // Merged over what was already pending, and nothing written to posts.
-    expect(upsert.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ post_id: 'p1', data: { en: 'Cũ hơn', lead: 'Mới', body: [{ k: 'p' }] } }),
-      { onConflict: 'post_id' },
-    )
-    expect(status.update).not.toHaveBeenCalled()
+    expect(rpcMock).toHaveBeenCalledWith('stage_post_draft', {
+      p_id: 'p1',
+      // The derived thumbnail rides along, so Publish copies it with the body.
+      p_content: { lead: 'Mới', body: [{ k: 'p' }], thumbnail_url: null },
+      p_now: expect.any(String),
+    })
+    expect(fromMock).not.toHaveBeenCalled()
   })
 
   it('still applies filing at once — a pin is not content', async () => {
@@ -321,20 +322,39 @@ describe('PATCH a published post — edits wait for Publish (migration 0028)', (
     const res = mockRes()
     await handler(req, res)
     expect(res.statusCode).toBe(200)
-    expect(fromMock.mock.calls.map((c) => c[0])).toEqual(['posts'])
+    expect(rpcMock).not.toHaveBeenCalled()
     expect(builder.update).toHaveBeenCalledWith(expect.objectContaining({ pinned: true }))
   })
 
-  it('writes live when post_drafts does not exist yet', async () => {
-    const status = queryBuilder({ data: { status: 'published' }, error: null })
-    const missing = queryBuilder({ data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.post_drafts'" } })
-    const live = queryBuilder({ data: { id: 'p1', lead: 'Mới' }, error: null })
-    fromMock.mockReturnValueOnce(status).mockReturnValueOnce(missing).mockReturnValueOnce(missing).mockReturnValueOnce(live)
-    const req = mockReq({ method: 'PATCH', headers: authHeaders(token), query: { id: 'p1' }, body: { lead: 'Mới' } })
+  /*
+   * The bug this replaced: a refused draft write (the grant was missing from
+   * 0028) was read as "no table yet" and the edit went to `posts`, live.
+   */
+  it('never writes a published post live when the draft cannot be saved', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { code: '42501', message: 'permission denied for table post_drafts' } })
+    const live = queryBuilder({ data: { id: 'p1' }, error: null })
+    fromMock.mockReturnValue(live)
     const res = mockRes()
-    await handler(req, res)
-    expect(res.statusCode).toBe(200)
-    expect(live.update).toHaveBeenCalledWith(expect.objectContaining({ lead: 'Mới' }))
+    await handler(mockReq({ method: 'PATCH', headers: authHeaders(token), query: { id: 'p1' }, body: { lead: 'Mới' } }), res)
+    expect(res.statusCode).toBe(500)
+    expect(live.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses a published post before 0029 is run, still writes a draft post', async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } })
+    const published = queryBuilder({ data: { status: 'published' }, error: null })
+    fromMock.mockReturnValue(published)
+    const res = mockRes()
+    await handler(mockReq({ method: 'PATCH', headers: authHeaders(token), query: { id: 'p1' }, body: { lead: 'Mới' } }), res)
+    expect(res.statusCode).toBe(500)
+    expect(published.update).not.toHaveBeenCalled()
+
+    const draft = queryBuilder({ data: { status: 'draft' }, error: null })
+    fromMock.mockReturnValue(draft)
+    const res2 = mockRes()
+    await handler(mockReq({ method: 'PATCH', headers: authHeaders(token), query: { id: 'p1' }, body: { lead: 'Mới' } }), res2)
+    expect(res2.statusCode).toBe(200)
+    expect(draft.update).toHaveBeenCalledWith(expect.objectContaining({ lead: 'Mới' }))
   })
 })
 
