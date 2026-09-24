@@ -25,7 +25,7 @@ export function byTimeNewestFirst<T extends Dated>(posts: readonly T[]): T[] {
   return [...posts].sort((a, b) => at(b).localeCompare(at(a)) || b.id.localeCompare(a.id))
 }
 
-export type Placement = {
+type Placement = {
   /** Index into the newest-first list the page already has. */
   i: number
   /** Block counted from the top of the page — 0 is the newest. */
