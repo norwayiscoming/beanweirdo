@@ -1256,7 +1256,7 @@ function ArticleEditor({
       template="article"
       post={data}
       renderTitle={(title) => <EditableField value={title} onCommit={(v) => onChange({ en: v })} />}
-      renderLead={(lead) => <EditableField value={lead} multiline rows={2} onCommit={(v) => onChange({ lead: v })} />}
+      renderLead={(lead) => <EditableField value={lead} multiline rows={1} placeholder="mô tả" onCommit={(v) => onChange({ lead: v })} />}
       renderSectionHeading={(h, i) => <EditableField value={h} onCommit={(v) => updateSection(i, { h: v })} />}
       renderSectionBody={(p, i) => <EditableField value={p} multiline rows={3} onCommit={(v) => updateSection(i, { p: v })} />}
       renderPullQuote={(pull) => <EditableField value={pull} multiline rows={3} onCommit={(v) => onChange({ pull_quote: v })} />}
