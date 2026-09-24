@@ -225,9 +225,9 @@ function Collapsed({ post, num }: { post: PostRow; num: string }) {
  * owner set in the CMS was cut to it; it is drawn at a fixed small height and
  * never wider than its three columns. A slot with no photo is a colour block
  * with the design's placeholder caption, which says nothing to a reader, so
- * it is left out (see `decorations`).
+ * it is left out (see `blockLayout`).
  */
-function DecoItem({ cell, mob }: { cell: FeatureCell & { img?: string | null }; mob: boolean }) {
+function DecoItem({ cell, mob }: { cell: Cell; mob: boolean }) {
   if (cell.kind === 'quote') {
     return (
       <div
@@ -280,40 +280,41 @@ function DecoItem({ cell, mob }: { cell: FeatureCell & { img?: string | null }; 
   )
 }
 
-/** The decoration worth showing, in F-order: photos that have a photo, and the quotation. */
-function decorations(cells: readonly (FeatureCell & { img?: string | null })[]) {
-  return cells.filter((c) => (c.kind === 'slot' && !!c.img) || (c.kind === 'quote' && !!c.t))
-}
+type Cell = FeatureCell & { img?: string | null }
+
+/** A cell the owner has filled in under Cấu hình: a photo, or the quotation's words. */
+const configured = (c: Cell) => (c.kind === 'slot' ? !!c.img : !!c.t)
 
 type LayoutItem =
   | { kind: 'post'; post: PostRow; i: number; block: number; slot: number }
-  | { kind: 'deco'; cell: FeatureCell & { img?: string | null }; block: number; row: number }
+  | { kind: 'deco'; cell: Cell; block: number; row: number }
 
 /**
  * Posts in their slots, top block first, each row closed by its decoration —
  * the order a phone stacks them. A row with no post yet is left out whole,
  * decoration and all (the owner, 2026-09-24: "row nào mà chưa có bài này thì
  * ẩn đi"); posts fill a block from the bottom, so a young block shows only
- * its lower rows. The quotation takes the first row shown on the page; every
- * other row takes the next photo in F-order, starting over when they run
- * out, so every row shown has its piece.
+ * its lower rows.
+ *
+ * The rows shown take the feature cells in F-order, one each: the first row
+ * F1, the next F2, and so on. A cell the owner has not filled in under Cấu
+ * hình leaves its row without decoration — the owner, 2026-09-24: "cái nào
+ * đang chưa có config thì để trống". Rows past the last cell have none. An
+ * earlier version skipped empty cells and cycled the photos, which drew the
+ * one photo set on every row.
  */
-function blockLayout(posts: readonly PostRow[], decos: ReturnType<typeof decorations>): LayoutItem[] {
-  const photos = decos.filter((c) => c.kind === 'slot')
-  const quote = decos.find((c) => c.kind === 'quote')
+function blockLayout(posts: readonly PostRow[], cells: readonly Cell[]): LayoutItem[] {
   const placed = placePosts(posts.length)
   const blocks = Math.ceil(posts.length / BLOCK_SIZE)
   const out: LayoutItem[] = []
-  let nextPhoto = 0
-  let quoteShown = false
+  let shown = 0
   for (let block = 0; block < blocks; block++) {
     for (let row = 0; row < ROWS_PER_BLOCK; row++) {
       const here = placed.filter((p) => p.block === block && Math.floor(p.slot / 2) === row)
       if (!here.length) continue
       for (const at of here.sort((a, b) => a.slot - b.slot)) out.push({ kind: 'post', post: posts[at.i], ...at })
-      const cell = !quoteShown && quote ? quote : photos.length ? photos[nextPhoto++ % photos.length] : undefined
-      if (cell === quote) quoteShown = true
-      if (cell) out.push({ kind: 'deco', cell, block, row })
+      const cell = cells[shown++]
+      if (cell && configured(cell)) out.push({ kind: 'deco', cell, block, row })
     }
   }
   return out
@@ -390,7 +391,6 @@ export function Notes() {
     () => withOverrides(featureCells, ghi01?.feature_cells as FeatureOverride[] | undefined),
     [ghi01?.feature_cells],
   )
-  const decos = useMemo(() => decorations(drawnCells), [drawnCells])
   // Posts filed under Ghi 01 — the memo lives here, as a post like any other.
   // `withBody` bật ở đúng màn này: bài filed dưới Ghi 01 mở ra **ngay tại chỗ**
   // (xem `OpenedPost`), nên danh sách phải cầm sẵn nội dung. Mọi màn khác dẫn
@@ -433,7 +433,7 @@ export function Notes() {
   const noteFilters = bar.chips
   // Ordered by time alone, so a post keeps its slot — see `byTimeNewestFirst`.
   const shownPosts = useMemo(() => byTimeNewestFirst(bar.visiblePosts as typeof filed), [bar.visiblePosts])
-  const layout = useMemo(() => blockLayout(shownPosts, decos), [shownPosts, decos])
+  const layout = useMemo(() => blockLayout(shownPosts, drawnCells), [shownPosts, drawnCells])
 
   return (
     <div
