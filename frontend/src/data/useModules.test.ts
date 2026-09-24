@@ -20,7 +20,7 @@ vi.mock('../lib/supabaseClient', () => ({
   supabase: { from: (...args: unknown[]) => from(...args) },
 }))
 
-const { useModules, landingModules, indexModules, sidebarModules } = await import('./useModules')
+const { useModules, landingModules, indexModules } = await import('./useModules')
 
 describe('useModules', () => {
   it('fetches every module ordered by sort_order, ascending', async () => {
@@ -81,7 +81,7 @@ describe('module surfaces', () => {
   })
 
   it('never lists a private module anywhere', () => {
-    for (const surface of [landingModules, indexModules, sidebarModules]) {
+    for (const surface of [landingModules, indexModules]) {
       expect(surface(all).map((m) => m.id)).not.toContain('ghi02')
     }
   })
@@ -89,13 +89,13 @@ describe('module surfaces', () => {
   it('lets a journal sit among the reading modules when the CMS numbers it there', () => {
     // The owner asked on 2026-09-24 to drag Ghi 01 up among the reading
     // modules, so the numbering wins over the old journals-last band.
-    const ids = sidebarModules([...all, mod('ghi01b', 'special', 'public', 5)]).map((m) => m.id)
+    const ids = indexModules([...all, mod('ghi01b', 'special', 'public', 5)]).map((m) => m.id)
     expect(ids.indexOf('ghi01b')).toBeLessThan(ids.indexOf('biochem'))
   })
 
   it('breaks a numbering tie the old way, reading module first', () => {
     const tied = [mod('ghi01', 'special', 'public', 3), mod('sensory', 'normal', 'public', 3)]
-    expect(sidebarModules(tied).map((m) => m.id)).toEqual(['sensory', 'ghi01'])
+    expect(indexModules(tied).map((m) => m.id)).toEqual(['sensory', 'ghi01'])
   })
 
   it('keeps a module whose kind or visibility has not been set', () => {

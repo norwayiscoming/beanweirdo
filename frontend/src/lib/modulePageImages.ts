@@ -20,7 +20,7 @@ import type { CSSProperties } from 'react'
  * keeps the common case — one good photo, both surfaces — a single upload, and
  * it is why adding these columns changed nothing on the site.
  */
-export type PageImageFields = {
+type PageImageFields = {
   layout: string
   img1: string | null
   img2: string | null
@@ -38,7 +38,7 @@ export type PageImageFields = {
   page_shot4: string | null
 }
 
-export type PageSlot = 1 | 2 | 3 | 4
+type PageSlot = 1 | 2 | 3 | 4
 
 /**
  * How many photos this layout's page draws.

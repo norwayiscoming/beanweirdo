@@ -50,21 +50,6 @@
   background: #f6f2e2;
 }
 
-.admin-tpl-card {
-  border: 1px solid #5a4632;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  background: #ffffff;
-  box-shadow: 0 1px 2px rgba(35, 33, 26, 0.04);
-}
-.admin-tpl-card:hover {
-  border-color: #5a4632;
-}
-.admin-tpl-card.sel {
-  border: 2px solid #23211a;
-}
-
 .admin-field {
   font-family: 'Be Vietnam Pro', system-ui, sans-serif;
   font-weight: 300;

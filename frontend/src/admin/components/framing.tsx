@@ -22,7 +22,7 @@ import { createContext, useCallback, useContext, useRef, useState, type ReactNod
 import { CropPicker } from './CropPicker'
 import { looksLikeVideo } from '../../lib/mediaShape'
 
-export type FrameRequest = {
+type FrameRequest = {
   url: string
   /** Dòng chữ nhỏ trên đầu hộp thoại: ô nào của bài đang được căn. */
   name: string
@@ -36,7 +36,7 @@ export type FrameRequest = {
  * Trả về địa chỉ ảnh đã đặt điểm căn, hoặc đúng địa chỉ đưa vào nếu người dùng
  * bấm Huỷ — huỷ là huỷ việc căn, không phải huỷ tấm ảnh vừa tải lên.
  */
-export type FrameFn = (req: FrameRequest) => Promise<string>
+type FrameFn = (req: FrameRequest) => Promise<string>
 
 /*
  * Không có provider thì trả nguyên địa chỉ. Đây là đường dành cho bài kiểm và
@@ -48,7 +48,7 @@ const FramingContext = createContext<FrameFn>(async (req) => req.url)
  * Cắt tay — cho khối ảnh trong thân bài, nơi không có hình dạng ô nào áp
  * xuống. Cùng một provider với `frame` để hai hộp không bao giờ chồng nhau.
  */
-export type CropFn = (req: { url: string; name: string }) => Promise<string>
+type CropFn = (req: { url: string; name: string }) => Promise<string>
 
 const CroppingContext = createContext<CropFn>(async (req) => req.url)
 

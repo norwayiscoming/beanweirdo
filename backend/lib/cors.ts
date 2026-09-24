@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-export type Handler = (req: VercelRequest, res: VercelResponse) => void | Promise<void>
+type Handler = (req: VercelRequest, res: VercelResponse) => void | Promise<void>
 
 /**
  * Every method the admin app actually sends.
@@ -11,7 +11,7 @@ export type Handler = (req: VercelRequest, res: VercelResponse) => void | Promis
  * reached the server and no response reached `apiClient`, so the CMS showed the
  * new order optimistically and the site kept the old one.
  */
-export const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
+const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'] as const
 
 /**
  * Sets CORS headers on every response and short-circuits OPTIONS preflight

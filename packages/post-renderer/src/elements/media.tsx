@@ -29,7 +29,7 @@ export function safeHref(raw: string | null | undefined): string | null {
   return `https://${v.replace(/^\/+/, '')}`
 }
 
-export const image = registerElement<ImageAttrs>({
+registerElement<ImageAttrs>({
   name: 'image',
   title: 'Ảnh',
   category: 'media',

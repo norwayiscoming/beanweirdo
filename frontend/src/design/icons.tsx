@@ -85,26 +85,6 @@ export const IconChevron = ({ size = 16, open = false, style }: IconProps & { op
   svg(size, { transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform .15s ease', ...style },
     <path d="M5 9l7 7 7-7" />)
 
-export const IconEdit = ({ size = 16, style }: IconProps) =>
-  svg(
-    size,
-    style,
-    <>
-      <path d="M4 20h4L19.5 8.5 15.5 4.5 4 16v4z" />
-      <path d="M14 6l4 4" />
-    </>,
-  )
-
-export const IconCopy = ({ size = 16, style }: IconProps) =>
-  svg(
-    size,
-    style,
-    <>
-      <rect x="9" y="9" width="11" height="11" />
-      <path d="M5 15V5h10" />
-    </>,
-  )
-
 /*
  * The one solid mark in the set, and the reason is size.
  *

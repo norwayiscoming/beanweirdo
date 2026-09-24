@@ -38,7 +38,7 @@ export type TreeRow = {
   parent_id?: string | null
 }
 
-export type TreeNode<T extends TreeRow> = {
+type TreeNode<T extends TreeRow> = {
   row: T
   children: TreeNode<T>[]
   /** 0 for a top-level entry. */

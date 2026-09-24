@@ -59,7 +59,7 @@ export interface ModuleRow {
   kind: 'normal' | 'special'
 }
 
-export interface Module {
+interface Module {
   id: string
   title: string
   accent: string

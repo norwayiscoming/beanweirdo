@@ -68,41 +68,6 @@ export const garden = {
   honeyTint2: '#F3DCAE',
 } as const
 
-/** Practice — 01 / Hours runs its own cool grey-green language. */
-export const hoursTheme = {
-  bg: '#E9EBE4',
-  ink: '#212520',
-  muted: '#767C70',
-  soft: '#5E645A',
-  dim: '#8A8F84',
-  card: '#F7F7F2',
-  border: '#D3D6CB',
-  borderSoft: '#C6CABC',
-  track: '#DDE0D6',
-  accent: '#2E8C74',
-  cellIdle: '#F4F4EF',
-  cellDone: '#EAEEE4',
-  cellStrong: '#DDE3D6',
-  chartIdle: '#D3D6CB',
-  chartMid: '#9DBFAF',
-  onInk: '#F1F2EC',
-} as const
-
-/** Practice — 02 / Notes: cold white editorial, four ink colours. */
-export const notesTheme = {
-  bg: '#FCFCFA',
-  ink: '#12120F',
-  body: '#33332C',
-  soft: '#5A5A50',
-  mid: '#4A4A42',
-  muted: '#8A8A80',
-  faint: '#9A9A90',
-  ghost: '#B0B0A6',
-  arcStrong: '#E2E2DC',
-  arcSoft: '#E8E8E2',
-  carmine: '#C0143C',
-} as const
-
 /**
  * Spacing rhythm — 8 / 20 / 40 / 64 / 96.
  * Section padding is 56px on the sides, 44 top / 72 bottom.
