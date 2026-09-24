@@ -4,6 +4,7 @@ import { requireAuth } from '../../lib/auth.js'
 import { getSupabase } from '../../lib/supabase.js'
 import {
   firstImageIn,
+  withoutImages,
   POST_STATUSES,
   POST_SUMMARY_COLUMNS,
   POST_TEMPLATES,
@@ -172,7 +173,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
   if (fromPostId) {
     const { data: src, error: srcError } = await supabase
       .from('posts')
-      .select('template, body, lead, hero_image_url, hero_caption, pull_quote, further_reading')
+      .select('template, body, lead, pull_quote, further_reading')
       .eq('id', fromPostId)
       .maybeSingle()
 
@@ -186,7 +187,8 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
     }
     const row = src as { template: string; body: unknown }
     template = row.template
-    startingBody = row.body ?? null
+    // Pictures stay with the original — see `withoutImages`.
+    startingBody = withoutImages(row.body ?? null)
     copied = src as Record<string, unknown>
   }
 
@@ -233,8 +235,9 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
       thumbnail_url: firstImageIn(startingBody),
       lead: copied?.lead ?? null,
       theme_color,
-      hero_image_url: copied?.hero_image_url ?? null,
-      hero_caption: copied?.hero_caption ?? null,
+      // The cover and the line describing it both belong to the original's photo.
+      hero_image_url: null,
+      hero_caption: null,
       pull_quote: copied?.pull_quote ?? null,
       further_reading: copied?.further_reading ?? null,
     })

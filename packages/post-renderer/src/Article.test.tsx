@@ -144,3 +144,15 @@ describe('đậm và nghiêng trong thân bài article', () => {
     ])
   })
 })
+
+describe('Article band height', () => {
+  it('draws no lead line when the post has no description', () => {
+    render(<Article post={{ ...post, lead: '' }} />)
+    expect(screen.queryByTestId('article-lead')).toBeNull()
+  })
+
+  it('keeps the lead when there is one', () => {
+    render(<Article post={post} />)
+    expect(screen.getByTestId('article-lead')).toHaveTextContent(post.lead)
+  })
+})
