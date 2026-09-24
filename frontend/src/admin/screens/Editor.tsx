@@ -45,6 +45,7 @@ import { useNav } from '../../lib/nav'
 import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { ink, paper, sans, serif } from '../../design/tokens'
+import { useToast } from '../../design/Toaster'
 import { ThemePicker } from '../components/ThemePicker'
 import { CoverBand } from '../components/CoverBand'
 import { FramingProvider, useCropping, useFraming } from '../components/framing'
@@ -206,6 +207,7 @@ function EditorContent({ postId }: { postId: string }) {
    * bấm "Sửa" bài nào cũng trắng, không riêng bài nào.
    */
   const frame = useFraming()
+  const toast = useToast()
 
   /**
    * Khung cắt cho ảnh bìa.
@@ -494,15 +496,31 @@ function EditorContent({ postId }: { postId: string }) {
           <button onClick={() => nav.goCms()} className="admin-btn-ghost" style={{ marginLeft: 8 }}>
             Lưu nháp
           </button>
+          {/*
+            * Bấm Publish trên một bài đã đăng từng không làm gì cả: máy chủ từ
+            * chối chuyển `published` → `published`, lời từ chối rơi vào một
+            * promise không ai bắt, và màn hình đứng yên. Bài đã đăng thì mọi
+            * ô soạn tự lưu khi rời ô và hiện ngay trên trang, nên nút chỉ cần
+            * nói ra điều đó.
+            */}
           <button
             onClick={async () => {
-              await transitionStatus(postId, 'publish')
-              nav.goCms()
+              if (post.status === 'published') {
+                toast.ok('Bài đang công khai — thay đổi đã tự lưu và hiện ngay trên trang')
+                return
+              }
+              try {
+                await transitionStatus(postId, 'publish')
+                toast.ok('Đã đăng bài')
+                nav.goCms()
+              } catch (e) {
+                toast.fromError(e)
+              }
             }}
             className="admin-btn"
             style={{ marginLeft: 8 }}
           >
-            Publish
+            {post.status === 'published' ? 'Đã đăng' : 'Publish'}
           </button>
         </div>
       </div>

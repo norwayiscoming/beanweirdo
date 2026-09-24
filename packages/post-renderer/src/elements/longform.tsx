@@ -55,7 +55,13 @@ export const aside = registerElement<AsideAttrs>({
   keywords: ['khung', 'ghi chú', 'aside', 'hộp', 'note', 'bên lề'],
   attributes: { items: { type: 'array', note: 'các khối bên trong khung' } },
   blank: () => ({ type: 'aside', items: [{ type: 'paragraph', text: '' }] }),
-  View: ({ attributes, palette, mobile, testId }: ElementViewProps<AsideAttrs>) => (
+  /*
+   * Khung không có chữ nào thì không vẽ. Chèn từ menu `+` là được ngay một
+   * khung với một đoạn rỗng, và trang từng bày ra những ô nền cát trống
+   * trơn mà người đọc không hiểu từ đâu ra — bài AI Twin có ba ô như thế.
+   */
+  View: ({ attributes, palette, mobile, testId }: ElementViewProps<AsideAttrs>) =>
+    isEmptyAside(attributes.items) ? null : (
     <div
       data-testid={testId}
       style={{ background: '#F3EEE1', padding: '24px 26px 20px', margin: '22px 0 26px' }}
@@ -63,8 +69,16 @@ export const aside = registerElement<AsideAttrs>({
       {/* Khối trong khung là element như mọi chỗ khác — khung chỉ là cái nền. */}
       <ElementList elements={attributes.items} palette={palette} mobile={mobile} />
     </div>
-  ),
+    ),
 })
+
+/** Mọi khối con là đoạn chữ rỗng — thứ menu `+` vừa chèn mà chưa ai gõ. */
+function isEmptyAside(items: unknown[] | undefined): boolean {
+  return (items ?? []).every((x) => {
+    const el = x as { type?: unknown; text?: unknown } | null
+    return el?.type === 'paragraph' && String(el.text ?? '').trim() === ''
+  })
+}
 
 /** Chữ trơn trong khung, khi chỗ gọi chưa dựng element con. */
 export function AsideLine({ text, accentInk }: { text: string; accentInk: string }) {
