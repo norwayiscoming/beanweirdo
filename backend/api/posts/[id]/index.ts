@@ -3,6 +3,7 @@ import { withCors } from '../../../lib/cors.js'
 import { requireAuth } from '../../../lib/auth.js'
 import { getSupabase } from '../../../lib/supabase.js'
 import { firstImageIn, POST_DETAIL_COLUMNS, toPostDetail, type PostRow } from '../../../lib/posts.js'
+import { readDraft, splitDraftPatch, writeDraft } from '../../../lib/drafts.js'
 
 function getId(req: VercelRequest): string | null {
   const raw = req.query.id
@@ -10,9 +11,20 @@ function getId(req: VercelRequest): string | null {
   return typeof id === 'string' && id.length > 0 ? id : null
 }
 
+/**
+ * The post as the editor should see it: the published row with its pending
+ * edits laid over it, and `has_draft` saying whether there are any.
+ *
+ * This route is behind auth and only the admin reads it — the editor and the
+ * admin preview — so showing the unpublished version here is the point. The
+ * public site reads `posts` directly and never sees `post_drafts`.
+ */
 async function handleGet(req: VercelRequest, res: VercelResponse, id: string): Promise<void> {
   const supabase = getSupabase()
-  const { data, error } = await supabase.from('posts').select(POST_DETAIL_COLUMNS).eq('id', id).maybeSingle()
+  const [{ data, error }, pending] = await Promise.all([
+    supabase.from('posts').select(POST_DETAIL_COLUMNS).eq('id', id).maybeSingle(),
+    readDraft(supabase, id),
+  ])
 
   if (error) {
     res.status(500).json({ error: error.message })
@@ -22,8 +34,13 @@ async function handleGet(req: VercelRequest, res: VercelResponse, id: string): P
     res.status(404).json({ error: `Post '${id}' not found` })
     return
   }
+  if (pending.error) {
+    res.status(500).json({ error: (pending.error as { message?: string }).message ?? 'draft read failed' })
+    return
+  }
 
-  res.status(200).json({ post: toPostDetail(data as PostRow) })
+  const post = toPostDetail({ ...(data as PostRow), ...(pending.data ?? {}) } as PostRow)
+  res.status(200).json({ post: { ...post, has_draft: pending.data !== null } })
 }
 
 interface PatchPostBody {
@@ -126,9 +143,55 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
    * `step`, `Cms.patchPost`, and the pin button in `PostsPanel`. `id` is here so
    * the shape still names which post answered.
    */
+  const supabase = getSupabase()
+
+  /*
+   * Bài đã đăng: sửa nội dung chỉ là lưu nháp.
+   *
+   * Chủ site: "nếu không bấm publish thì coi như chỉ là auto lưu nháp".
+   * Nội dung đi vào `post_drafts` và chờ Publish (`status.ts`); phần xếp đặt
+   * — module, thứ tự, ghim — vẫn áp ngay, xem `DRAFT_FIELDS`. Bài chưa đăng
+   * thì ghi thẳng như trước: nó chưa lên trang nên không có gì để giữ lại.
+   */
+  const { content } = splitDraftPatch(patch)
+  if (Object.keys(content).length > 0) {
+    const { data: row, error: statusError } = await supabase
+      .from('posts')
+      .select('status')
+      .eq('id', id)
+      .maybeSingle()
+    if (statusError) {
+      res.status(500).json({ error: statusError.message })
+      return
+    }
+    if (!row) {
+      res.status(404).json({ error: `Post '${id}' not found` })
+      return
+    }
+    if ((row as { status?: string }).status === 'published') {
+      const staged = await writeDraft(supabase, id, content, patch.updated_at as string)
+      if (staged.error) {
+        res.status(500).json({ error: (staged.error as { message?: string }).message ?? 'draft write failed' })
+        return
+      }
+      // `missing`: migration 0028 not run yet — fall through and write live.
+      if (!staged.missing) {
+        for (const key of [...Object.keys(content), 'thumbnail_url']) delete patch[key]
+        if (Object.keys(patch).some((key) => key !== 'updated_at')) {
+          const { error: liveError } = await supabase.from('posts').update(patch).eq('id', id)
+          if (liveError) {
+            res.status(500).json({ error: liveError.message })
+            return
+          }
+        }
+        res.status(200).json({ post: { id, has_draft: true } })
+        return
+      }
+    }
+  }
+
   const returned = ['id', ...Object.keys(patch).filter((column) => column !== 'body')].join(', ')
 
-  const supabase = getSupabase()
   const { data, error } = await supabase
     .from('posts')
     .update(patch)

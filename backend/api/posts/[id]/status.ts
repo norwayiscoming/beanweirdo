@@ -11,6 +11,7 @@ import {
   type PostRow,
   type StatusAction,
 } from '../../../lib/posts.js'
+import { foldDraft } from '../../../lib/drafts.js'
 
 function getId(req: VercelRequest): string | null {
   const raw = req.query.id
@@ -76,6 +77,34 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
     }
     res.status(200).json({ deleted: true })
     return
+  }
+
+  /*
+   * Publish và gỡ đăng đều mang theo bản nháp của bài đã đăng (migration 0028).
+   *
+   * Publish trên một bài **đã đăng** là "đăng các thay đổi": chép bản nháp vào
+   * `posts`, giữ nguyên `published_at` — ngày đăng là ngày bài lên trang lần
+   * đầu, không phải lần sửa gần nhất. Gỡ đăng cũng gộp bản nháp vào trước:
+   * bài về nháp thì màn sửa lại ghi thẳng vào `posts`, và những gì đang chờ
+   * không được mất ở đó.
+   */
+  if (action === 'publish' || action === 'unpublish') {
+    const folded = await foldDraft(supabase, id, nowIso)
+    if (folded.error) {
+      res.status(500).json({ error: (folded.error as { message?: string }).message ?? 'draft publish failed' })
+      return
+    }
+    if (action === 'publish') {
+      const { data: row, error: rowError } = await supabase.from('posts').select('id, status').eq('id', id).maybeSingle()
+      if (rowError) {
+        res.status(500).json({ error: rowError.message })
+        return
+      }
+      if ((row as { status?: string } | null)?.status === 'published') {
+        res.status(200).json({ post: { id, status: 'published' }, applied: folded.applied })
+        return
+      }
+    }
   }
 
   const fixed = fixedStatusPatch(action as StatusAction, nowIso)
