@@ -12,7 +12,7 @@
  * people using it cannot reach.
  */
 import { useEffect, useRef, type DragEvent, type ReactNode } from 'react'
-import { FLOW_EXIT, exitThing, thingKeyDown } from '../lib/flowFocus'
+import { FLOW_EXIT, exitThing, fieldOf, focusField, removeThing, thingKeyDown } from '../lib/flowFocus'
 
 const GRIP_LABEL = 'Kéo thả để đổi thứ tự · Delete để xoá'
 
@@ -135,6 +135,7 @@ export function FlowThing({
  * Tay nắm ở máng trái — một cho mọi khuôn.
  *
  * Kéo để dời, và bàn phím làm được đúng hai việc ấy: mũi tên dời, Delete xoá.
+ * `Esc` trong khối đưa con trỏ lên đây (chọn cả khối); `Enter` quay vào.
  * Tay nắm chỉ kéo được là tay nắm một nửa số người dùng không với tới.
  */
 export function Grip({
@@ -169,7 +170,17 @@ export function Grip({
           followGrip(e.currentTarget, at + 1)
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault()
-          onRemove()
+          const stop = e.currentTarget.closest<HTMLElement>('[data-flow="thing"]')
+          if (stop) removeThing(stop, onRemove)
+          else onRemove()
+        } else if (e.key === 'Enter' || e.key === 'Escape') {
+          // Chọn khối bằng Esc rồi đổi ý: Enter hay Esc đưa con trỏ về lại trong khối.
+          const stop = e.currentTarget.closest<HTMLElement>('[data-flow="thing"]')
+          const into = stop && fieldOf(stop, 'start')
+          if (into && into !== e.currentTarget) {
+            e.preventDefault()
+            focusField(into, 'end')
+          }
         }
       }}
     >

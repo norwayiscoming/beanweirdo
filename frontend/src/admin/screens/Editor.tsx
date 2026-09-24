@@ -712,6 +712,8 @@ function EditorStyles() {
       .awc-rep-block:hover .awc-grip, .awc-grip:focus-visible{ opacity: 1; }
       .awc-grip:hover{ color: #3B3729; }
       .awc-grip:active{ cursor: grabbing; }
+      /* Esc trong khối chọn cả khối (con trỏ lên tay nắm): khung sáng quanh nó cho thấy Delete sẽ xoá cái gì. */
+      [data-flow="thing"]:has(.awc-grip:focus-visible){ outline: 2px solid #DCD5C0; outline-offset: 2px; }
       .awc-grip-tip{ position: absolute; top: calc(100% + 6px); left: 0; white-space: nowrap; background: #23211A; color: #FDFBF2; font-family: 'Be Vietnam Pro', system-ui, sans-serif; font-size: 11px; letter-spacing: .01em; padding: 5px 9px; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 5; }
       .awc-grip:hover .awc-grip-tip, .awc-grip:focus-visible .awc-grip-tip{ opacity: 1; }
       .awc-dropline{ height: 2px; margin: 6px 0; background: #5A4632; }
@@ -1406,7 +1408,9 @@ function ArticleEditor({
             index={i}
             drag={drag}
             onMove={(dir) => setSections(move(sections, i, i + dir))}
-            onRemove={() => setSections(removeAt(sections, i, true))}
+            // Phần chữ thì giữ lại cái cuối cùng; khối (bảng, ảnh) thì xoá được
+            // cả khi nó là thứ duy nhất trong bài — bài rỗng vẫn có dải chữ để gõ.
+            onRemove={() => setSections(removeAt(sections, i, !isStoredElement(sections[i])))}
             onDuplicate={() => setSections(duplicateAt(sections, i))}
             plus={insertPlus(i, i + 1)}
             onAddLine={() => setSections(insertAt(sections, i + 1, { h: '', p: '' } as SectionData))}
