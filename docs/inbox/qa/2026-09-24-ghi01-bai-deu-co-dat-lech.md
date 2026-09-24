@@ -28,3 +28,11 @@ hàng như kia", rồi "logic là mỗi hàng là 3 items, 2 bài main và 1 ả
 Trang thử dữ liệu giả trong Chromium, 1–6 bài, 390/905/1280/1440px: không cặp món
 nào trong lưới giao nhau. Mở bài thứ ba: bài nằm dòng dưới hàng của nó, trang cuộn
 tới. `Notes.inline.test.tsx` đổi kỳ vọng, bộ lọc thẻ đọc `[data-note]`.
+
+## [ĐỔI HÀNH VI] Màn hẹp: bài không còn thẳng hàng
+
+Chủ site: "2 cái này hơi thẳng nhau quá" (hai bài liền nhau trên điện thoại cùng rộng, cùng lề).
+
+- Trước: mọi bài rộng 84%, bài chẵn sát trái, bài lẻ sát phải.
+- Sau: `MOB_POSTS` trong `screens/Notes.tsx` xoay vòng bốn cặp bề rộng/lề trái (80/0, 70/28, 76/9, 66/22 — phần trăm cột), nên hai bài liền nhau không trùng cả hai. Bài đang mở vẫn 100%.
+- Không đụng bảng, cột hay endpoint nào.

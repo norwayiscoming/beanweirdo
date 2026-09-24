@@ -127,6 +127,19 @@ const ROWS: { posts: [Slot, Slot]; deco: Slot }[] = [
   { posts: [{ start: 1, mt: 40 }, { start: 9, mt: 0 }], deco: { start: 5, mt: 0 } },
 ]
 const DECO_SPAN = 3
+
+/*
+ * One column on a phone, so the scatter lives in width and left margin
+ * (percent of the column). Four steps, so two posts in a row never share
+ * both — the owner found two same-width cards stacked edge to edge "too
+ * straight".
+ */
+const MOB_POSTS: { w: number; ml: number }[] = [
+  { w: 80, ml: 0 },
+  { w: 70, ml: 28 },
+  { w: 76, ml: 9 },
+  { w: 66, ml: 22 },
+]
 /** Space between rows. The grid's own row gap is 0 so that the empty row an
  *  opened post leaves behind collapses to nothing. */
 const ROW_GAP = 64
@@ -488,8 +501,8 @@ export function Notes() {
                 style={{
                   ...(mob
                     ? {
-                        width: open ? '100%' : '84%',
-                        alignSelf: open || i % 2 === 0 ? 'flex-start' : 'flex-end',
+                        width: open ? '100%' : `${MOB_POSTS[i % MOB_POSTS.length].w}%`,
+                        marginLeft: open ? 0 : `${MOB_POSTS[i % MOB_POSTS.length].ml}%`,
                       }
                     : {
                         /*
