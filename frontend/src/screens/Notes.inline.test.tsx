@@ -55,13 +55,13 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
     })
   })
 
-  it('đóng hết thì mỗi bài chiếm 5 cột và không bài nào mờ', () => {
+  it('đóng hết thì mọi bài cùng một cỡ, không lệch, không bài nào mờ', () => {
     render(<Notes />)
     const c = cards()
     expect(c).toHaveLength(3)
-    // Không thẳng cột: chu kỳ dàn trang cho mỗi bài một cỡ và một độ trồi.
-    expect(new Set(c.map((x) => x.style.gridColumn)).size).toBeGreaterThan(1)
-    expect(new Set(c.map((x) => x.style.marginTop)).size).toBeGreaterThan(1)
+    // Chủ site 2026-09-24: các bài phải cùng cỡ với nhau, bất kể template.
+    expect(c.every((x) => x.style.gridColumn === 'span 4')).toBe(true)
+    expect(c.every((x) => !x.style.marginTop)).toBe(true)
     expect(c.every((x) => x.style.opacity === '1')).toBe(true)
   })
 
