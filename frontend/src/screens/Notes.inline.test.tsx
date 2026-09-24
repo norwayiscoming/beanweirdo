@@ -38,9 +38,9 @@ const post = (id: string, en: string) => ({
 const OPEN_COL = '2 / span 9'
 
 const cards = () =>
-  Array.from(document.querySelectorAll<HTMLElement>('div')).filter(
+  Array.from(document.querySelectorAll<HTMLElement>('[data-note]')).filter(
     // Thẻ bài: hoặc một ô trong chu kỳ dàn trang, hoặc mở hết chiều ngang.
-    (d) => /^span [45]$/.test(d.style.gridColumn) || d.style.gridColumn === OPEN_COL,
+    (d) => /^\d+ \/ span 4$/.test(d.style.gridColumn) || d.style.gridColumn === OPEN_COL,
   )
 
 describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
@@ -55,13 +55,14 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
     })
   })
 
-  it('đóng hết thì mọi bài cùng một cỡ, không lệch, không bài nào mờ', () => {
+  it('đóng hết thì mọi bài cùng một cỡ nhưng đặt lệch nhau, không bài nào mờ', () => {
     render(<Notes />)
     const c = cards()
     expect(c).toHaveLength(3)
-    // Chủ site 2026-09-24: các bài phải cùng cỡ với nhau, bất kể template.
-    expect(c.every((x) => x.style.gridColumn === 'span 4')).toBe(true)
-    expect(c.every((x) => !x.style.marginTop)).toBe(true)
+    // Chủ site 2026-09-24: cùng cỡ với nhau bất kể template, nhưng "hơi lộn xộn".
+    expect(c.every((x) => / \/ span 4$/.test(x.style.gridColumn))).toBe(true)
+    expect(new Set(c.map((x) => x.style.gridColumn)).size).toBeGreaterThan(1)
+    expect(new Set(c.map((x) => x.style.marginTop)).size).toBeGreaterThan(1)
     expect(c.every((x) => x.style.opacity === '1')).toBe(true)
   })
 
@@ -70,7 +71,7 @@ describe('Ghi 01 — mở bài tại chỗ khi có nhiều bài', () => {
     fireEvent.click(screen.getByText('Bài B'))
 
     const open = cards().filter((x) => x.style.gridColumn === OPEN_COL)
-    const rest = cards().filter((x) => /^span [45]$/.test(x.style.gridColumn))
+    const rest = cards().filter((x) => /^\d+ \/ span 4$/.test(x.style.gridColumn))
     expect(open).toHaveLength(1)
     expect(open[0].textContent).toContain('Bài B')
     expect(rest).toHaveLength(2)

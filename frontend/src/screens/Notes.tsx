@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { noteFilterBar } from '../lib/notesFilter'
@@ -111,6 +111,40 @@ function draw(
 const CARD_AR = '4/3'
 
 /**
+ * Where things stand in one row of the grid.
+ *
+ * The owner, 2026-09-24: "mỗi hàng là 3 items, 2 bài main và 1 ảnh nhỏ deco
+ * đang xen" — two posts and one small decoration per row, never overlapping,
+ * and loosely placed rather than lined up. Every post is four of twelve
+ * columns and 4:3; the decoration takes three. The three row shapes below move
+ * the decoration left, right and centre and drop each item by a different
+ * amount. Drops are downward only, so nothing can slide into the row above.
+ */
+type Slot = { start: number; mt: number }
+const ROWS: { posts: [Slot, Slot]; deco: Slot }[] = [
+  { posts: [{ start: 1, mt: 0 }, { start: 5, mt: 90 }], deco: { start: 10, mt: 30 } },
+  { posts: [{ start: 4, mt: 0 }, { start: 9, mt: 70 }], deco: { start: 1, mt: 110 } },
+  { posts: [{ start: 1, mt: 40 }, { start: 9, mt: 0 }], deco: { start: 5, mt: 0 } },
+]
+const DECO_SPAN = 3
+
+/*
+ * One column on a phone, so the scatter lives in width and left margin
+ * (percent of the column). Four steps, so two posts in a row never share
+ * both — the owner found two same-width cards stacked edge to edge "too
+ * straight".
+ */
+const MOB_POSTS: { w: number; ml: number }[] = [
+  { w: 80, ml: 0 },
+  { w: 70, ml: 28 },
+  { w: 76, ml: 9 },
+  { w: 66, ml: 22 },
+]
+/** Space between rows. The grid's own row gap is 0 so that the empty row an
+ *  opened post leaves behind collapses to nothing. */
+const ROW_GAP = 64
+
+/**
  * Thẻ một bài trong lưới Ghi 01, lúc chưa mở.
  *
  * Bài viết trên template bitesize note vẽ bằng đúng thẻ của template ấy — vệt
@@ -174,58 +208,71 @@ function Collapsed({ post, num }: { post: PostRow; num: string }) {
 }
 
 /**
- * Ảnh trang trí và câu trích của Ghi 01, dồn xuống chân trang.
+ * One piece of Ghi 01's decoration — a photo or the quotation — sitting small
+ * in a row beside two posts.
  *
- * Chủ site 2026-09-24: chúng "là các element trang trí thôi, không được để nó
- * chèn lên các bài viết và size có thể bé đi". Nên chúng rời lưới bài hẳn:
- * một dải thấp ở cuối, ảnh cao 120px (bản hẹp 88px), câu trích cỡ nhỏ.
- *
- * Mỗi ảnh giữ tỉ lệ khung cũ của ô mình (`cellRatio`) — khung cắt chủ site đã
- * chỉnh trong CMS tính theo tỉ lệ ấy, đổi tỉ lệ là cắt lệch. Ô chưa có ảnh là
- * một khung màu kèm dòng gợi ý của design, không nói gì với người đọc, nên
- * không vẽ. Ô đếm số bài cũng bỏ: hàng lọc ở đầu trang đã in con số ấy.
+ * A photo keeps its cell's old proportion (`cellRatio`) because the crop the
+ * owner set in the CMS was cut to it; it is drawn at a fixed small height and
+ * never wider than its three columns. A slot with no photo is a colour block
+ * with the design's placeholder caption, which says nothing to a reader, so
+ * it is left out (see `decorations`).
  */
-function DecoStrip({ cells, mob }: { cells: readonly (FeatureCell & { img?: string | null })[]; mob: boolean }) {
-  const quote = cells.find((c) => c.kind === 'quote')
-  const photos = cells.filter((c) => c.kind === 'slot' && c.img)
-  if (!quote?.t && photos.length === 0) return null
-  const h = mob ? 88 : 120
+function DecoItem({ cell, mob }: { cell: FeatureCell & { img?: string | null }; mob: boolean }) {
+  if (cell.kind === 'quote') {
+    return (
+      <div
+        style={{
+          fontFamily: serif,
+          fontStyle: 'italic',
+          fontSize: mob ? 20 : 22,
+          lineHeight: 1.2,
+          letterSpacing: '-.02em',
+          color: '#12120F',
+          borderTop: '1px solid #12120F',
+          paddingTop: 14,
+        }}
+      >
+        {cell.t}
+      </div>
+    )
+  }
+  const h = mob ? 120 : 170
   return (
     <div
       style={{
-        marginTop: mob ? 64 : 110,
+        height: h,
+        width: Math.round(h * cellRatio(cell)),
+        maxWidth: '100%',
+        ...coverStyle(cell.img!),
         display: 'flex',
-        flexWrap: 'wrap',
         alignItems: 'flex-end',
-        gap: mob ? 14 : 20,
+        padding: 8,
+        boxSizing: 'border-box',
       }}
     >
-      {quote?.t ? (
+      {cell.t ? (
         <div
           style={{
-            fontFamily: serif,
-            fontStyle: 'italic',
-            fontSize: mob ? 20 : 24,
-            lineHeight: 1.2,
-            letterSpacing: '-.02em',
-            color: '#12120F',
-            maxWidth: 300,
-            marginRight: mob ? 0 : 20,
-            flexBasis: mob ? '100%' : undefined,
+            fontFamily: "'Be Vietnam Pro',sans-serif",
+            fontSize: 8.5,
+            letterSpacing: '.16em',
+            textTransform: 'uppercase',
+            lineHeight: 1.5,
+            color: '#FDFBF2',
+            background: 'rgba(24,22,17,.55)',
+            padding: '2px 6px',
           }}
         >
-          {quote.t}
+          {cell.t}
         </div>
       ) : null}
-      {photos.map((c) => (
-        <div
-          key={c.n}
-          title={c.t || undefined}
-          style={{ height: h, width: Math.round(h * cellRatio(c)), maxWidth: '100%', ...coverStyle(c.img!) }}
-        />
-      ))}
     </div>
   )
+}
+
+/** The decoration worth showing, in F-order: photos that have a photo, and the quotation. */
+function decorations(cells: readonly (FeatureCell & { img?: string | null })[]) {
+  return cells.filter((c) => (c.kind === 'slot' && !!c.img) || (c.kind === 'quote' && !!c.t))
 }
 
 /**
@@ -299,6 +346,7 @@ export function Notes() {
     () => withOverrides(featureCells, ghi01?.feature_cells as FeatureOverride[] | undefined),
     [ghi01?.feature_cells],
   )
+  const decos = useMemo(() => decorations(drawnCells), [drawnCells])
   // Posts filed under Ghi 01 — the memo lives here, as a post like any other.
   // `withBody` bật ở đúng màn này: bài filed dưới Ghi 01 mở ra **ngay tại chỗ**
   // (xem `OpenedPost`), nên danh sách phải cầm sẵn nội dung. Mọi màn khác dẫn
@@ -415,62 +463,98 @@ export function Notes() {
       <div
         style={
           mob
-            ? { display: 'flex', flexDirection: 'column', gap: 48, marginTop: 30 }
+            ? { display: 'flex', flexDirection: 'column', gap: 36, marginTop: 30 }
             : {
-                // Ba bài một hàng, mỗi bài bốn trên mười hai cột. Vẫn là lưới
-                // 12 cột để bài mở ra lấy được `2 / span 9`.
+                // Twelve columns, so each item can start where `ROWS` says and
+                // an opened post can take `2 / span 9` on a row of its own.
                 display: 'grid',
                 gridTemplateColumns: 'repeat(12,minmax(0,1fr))',
-                gap: '64px 40px',
+                columnGap: 40,
+                rowGap: 0,
                 marginTop: 44,
-                gridAutoFlow: 'row dense',
                 alignItems: 'start',
               }
         }
       >
         {/* A post filed under Ghi 01 unfolds where it sits, the way the
             statistics panel unfolds on Ghi 02 — the reader stays on the page
-            they were reading. Open, it widens and everything else steps back. */}
+            they were reading. Open, it widens on the line under its row and
+            everything else steps back. */}
         {shownPosts.map((p, i) => {
           const open = openNote === p.id
+          const r = Math.floor(i / 2)
+          const shape = ROWS[r % ROWS.length]
+          const at = shape.posts[i % 2]
+          // Each item of a row is placed by row as well as column: with column
+          // starts alone, auto-placement pushes an item to the next row
+          // whenever the one before it sits further right.
+          const top = (r > 0 ? ROW_GAP : 0) + at.mt
+          const deco = i % 2 === 1 || i === shownPosts.length - 1 ? decos[r] : undefined
           return (
-            <Hover
-              key={p.id}
-              data-note={p.id}
-              onClick={(e) => {
-                e.stopPropagation()
-                setOpenNote((prev) => (prev === p.id ? null : p.id))
-              }}
-              style={{
-                ...(mob
-                  ? { width: '100%' }
-                  : {
-                      /*
-                       * Bài mở ra KHÔNG chiếm trọn bề ngang.
-                       *
-                       * Chủ site: "bề ngang của bài nó chiếm trọn bề ngang
-                       * trang > trông rất lớn và cộc cằn (...) mục tiêu là
-                       * tạo cảm giác là bài này pop up và là 1 phần của trang
-                       * ghi, thay vì cảm giác như mở hẳn ra trang khác."
-                       *
-                       * Chín trên mười hai cột, thụt vào một cột ở mép trái.
-                       */
-                      gridColumn: open ? '2 / span 9' : 'span 4',
-                    }),
-                cursor: 'pointer',
-                // Room above the post once it is scrolled to — see the effect on `openNote`.
-                scrollMarginTop: mob ? 16 : 32,
-                opacity: openNote !== null && !open ? 0.18 : 1,
-                transition: 'opacity .45s ease',
-              }}
-              hoverStyle={{ opacity: 1 }}
-            >
-              {open ? (
-                <OpenedPost post={p} mod={ghi01} />
-              ) : (
-                <Collapsed post={p} num={String(shownPosts.length - i).padStart(2, '0')} />
-              )}
-            </Hover>
+            <Fragment key={p.id}>
+              <Hover
+                data-note={p.id}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenNote((prev) => (prev === p.id ? null : p.id))
+                }}
+                style={{
+                  ...(mob
+                    ? {
+                        width: open ? '100%' : `${MOB_POSTS[i % MOB_POSTS.length].w}%`,
+                        marginLeft: open ? 0 : `${MOB_POSTS[i % MOB_POSTS.length].ml}%`,
+                      }
+                    : {
+                        /*
+                         * Bài mở ra KHÔNG chiếm trọn bề ngang.
+                         *
+                         * Chủ site: "bề ngang của bài nó chiếm trọn bề ngang
+                         * trang > trông rất lớn và cộc cằn (...) mục tiêu là
+                         * tạo cảm giác là bài này pop up và là 1 phần của trang
+                         * ghi, thay vì cảm giác như mở hẳn ra trang khác."
+                         *
+                         * Chín trên mười hai cột, thụt vào một cột ở mép trái,
+                         * trên dòng ngay dưới hàng của nó.
+                         */
+                        gridColumn: open ? '2 / span 9' : `${at.start} / span 4`,
+                        gridRow: open ? 2 * r + 2 : 2 * r + 1,
+                        marginTop: open ? ROW_GAP : top,
+                      }),
+                  cursor: 'pointer',
+                  // Room above the post once it is scrolled to — see the effect on `openNote`.
+                  scrollMarginTop: mob ? 16 : 32,
+                  opacity: openNote !== null && !open ? 0.18 : 1,
+                  transition: 'opacity .45s ease',
+                }}
+                hoverStyle={{ opacity: 1 }}
+              >
+                {open ? (
+                  <OpenedPost post={p} mod={ghi01} />
+                ) : (
+                  <Collapsed post={p} num={String(shownPosts.length - i).padStart(2, '0')} />
+                )}
+              </Hover>
+              {deco ? (
+                <div
+                  style={{
+                    ...(mob
+                      ? {
+                          width: deco.kind === 'quote' ? '80%' : '52%',
+                          alignSelf: r % 2 === 0 ? 'flex-end' : 'flex-start',
+                        }
+                      : {
+                          gridColumn: `${shape.deco.start} / span ${DECO_SPAN}`,
+                          gridRow: 2 * r + 1,
+                          marginTop: (r > 0 ? ROW_GAP : 0) + shape.deco.mt,
+                        }),
+                    opacity: openNote !== null ? 0.18 : 1,
+                    transition: 'opacity .45s ease',
+                  }}
+                >
+                  <DecoItem cell={deco} mob={mob} />
+                </div>
+              ) : null}
+            </Fragment>
           )
         })}
 
@@ -491,11 +575,9 @@ export function Notes() {
 
       </div>
 
-      <DecoStrip cells={drawnCells} mob={mob} />
-
       <div
         style={{
-          marginTop: mob ? 56 : 80,
+          marginTop: mob ? 80 : 130,
           borderTop: '1px solid #12120F',
           paddingTop: 26,
           display: 'grid',
