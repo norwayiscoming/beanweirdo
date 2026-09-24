@@ -147,7 +147,11 @@ export function toArticleData(
     heroPlate: {
       tint: PLATE_FALLBACK.hero.tint,
       caption: post.hero_caption ?? PLATE_FALLBACK.hero.caption,
-      imageUrl: post.hero_image_url ?? null,
+      /*
+       * Khung ảnh hồng mặc định mang ảnh bìa; chủ site đặt ảnh riêng cho nó
+       * thì ảnh riêng thắng, gỡ ảnh riêng ra là nó lại theo ảnh bìa.
+       */
+      imageUrl: plateImage(post, 'hero') ?? post.hero_image_url ?? null,
     },
     sections,
     pull: post.pull_quote ?? post.vi,

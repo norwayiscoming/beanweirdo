@@ -79,8 +79,8 @@ export { flatElements, sectionElements } from './memoElements'
 export { indentOf, normalizeBlocks, stepIndent, MAX_INDENT } from './longformBlocks'
 export { runsToText as longformRunsToText, textToRuns as longformTextToRuns } from './longformText'
 
-export { CENTRE, coverStyle, fillStyle, readFocus, stripFocus, withFocus } from './focus'
-export type { Focus } from './focus'
+export { CENTRE, coverStyle, cropStyle, fillStyle, readCrop, readFocus, stripFocus, withCrop, withFocus } from './focus'
+export type { Crop, Focus } from './focus'
 
 export { PlateCorner, plateHost } from './plates'
 export type { PlateAction, PlateSlot } from './plates'
