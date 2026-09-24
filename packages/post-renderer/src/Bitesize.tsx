@@ -215,6 +215,9 @@ function Media({
         flex: 'none',
         aspectRatio: aspect,
         width,
+        // The 14px padding below must sit inside `width`: at "100%" it pushed
+        // the box 28px past its column, on phones and in the Ghi 01 grid.
+        boxSizing: 'border-box',
         ...fillStyle(post.image, post.wash),
         // Clip nằm phủ kín ô, nên ô phải là mốc toạ độ của nó.
         position: 'relative',
