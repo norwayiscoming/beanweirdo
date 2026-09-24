@@ -5,7 +5,7 @@ import { noteFilterBar } from '../lib/notesFilter'
 import { useTags } from '../data/useTags'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useNarrow } from '../lib/useNarrow'
-import { byTimeNewestFirst, placePosts } from '../lib/notesBlocks'
+import { BLOCK_SIZE, byTimeNewestFirst, placePosts } from '../lib/notesBlocks'
 import {
   cellRatio,
   featureCells,
@@ -112,35 +112,33 @@ function draw(
 const CARD_AR = '4/3'
 
 /**
- * Ghi 01's block of eight slots, drawn from the owner's sketch of 2026-09-24:
- * three bands — two posts and a small photo on top, the quotation and three
- * posts in the middle, three posts at the bottom — and two sizes, big (five
- * of twelve columns) for slots 0 and 4 and small (four) for the rest. Which
- * post goes in which slot is `placePosts`.
+ * Ghi 01's block of eight slots, from the owner's sketch of 2026-09-24 and
+ * their rule that followed it: "các row đều sẽ là 2 bài 1 deco" — four rows,
+ * each two posts and one piece of decoration, placed loosely rather than in
+ * line. Two sizes: big (five of twelve columns) for slots 0 and 5, small
+ * (four) for the rest; decoration takes two or three. Within a row nothing
+ * shares a column, so nothing can overlap whatever its height. Which post
+ * goes in which slot is `placePosts`; row r holds slots 2r and 2r+1.
  *
- * Every band has a spare grid row after it for an opened post, so a post
- * unfolds right under its own band and the slots around it do not move. An
+ * Each row has a spare grid row under it for an opened post, so a post
+ * unfolds right under its own row and the slots around it do not move. An
  * empty grid row has no height, so unused spare rows cost nothing.
  */
-type SlotSpot = { row: string; col: string; mt: number; big?: boolean; band: 0 | 1 | 2 }
-const SLOTS: SlotSpot[] = [
-  { row: '1 / span 2', col: '1 / span 5', mt: 70, big: true, band: 0 },
-  { row: '1', col: '8 / span 4', mt: 0, band: 0 },
-  { row: '4', col: '4 / span 4', mt: 110, band: 1 },
-  { row: '5', col: '2 / span 4', mt: 64, band: 1 },
-  { row: '4 / span 2', col: '8 / span 5', mt: 330, big: true, band: 1 },
-  { row: '7', col: '1 / span 4', mt: 120, band: 2 },
-  { row: '7', col: '5 / span 4', mt: 210, band: 2 },
-  { row: '7', col: '9 / span 4', mt: 80, band: 2 },
+type Spot = { col: string; mt: number; big?: boolean }
+const ROWS: { posts: [Spot, Spot]; deco: Spot }[] = [
+  { posts: [{ col: '1 / span 5', mt: 60, big: true }, { col: '7 / span 4', mt: 0 }], deco: { col: '11 / span 2', mt: 150 } },
+  { posts: [{ col: '5 / span 4', mt: 30 }, { col: '9 / span 4', mt: 160 }], deco: { col: '1 / span 3', mt: 110 } },
+  { posts: [{ col: '2 / span 4', mt: 80 }, { col: '8 / span 5', mt: 0, big: true }], deco: { col: '6 / span 2', mt: 190 } },
+  { posts: [{ col: '1 / span 4', mt: 100 }, { col: '6 / span 4', mt: 20 }], deco: { col: '11 / span 2', mt: 140 } },
 ]
-/** The small photo under slot 1, and the quotation beside slot 2. */
-const PHOTO_SPOT = { row: '2', col: '10 / span 3', mt: 28 }
-const QUOTE_SPOT = { row: '4', col: '1 / span 3', mt: 150 }
-/** Grid rows per block: three bands of content, each followed by a spare row. */
-const BLOCK_ROWS = 8
-const OPEN_ROW = [3, 6, 8] as const
-/** Extra room above every block but the first. */
-const BLOCK_GAP = 90
+const ROWS_PER_BLOCK = ROWS.length
+/** Space above every row but a block's first, and above every block but the first. */
+const ROW_GAP = 70
+const BLOCK_GAP = 100
+
+/** Where row `r` of `block` sits in the grid; the row after it is its spare. */
+const gridLine = (block: number, r: number) => block * ROWS_PER_BLOCK * 2 + 2 * r + 1
+const rowTop = (block: number, r: number) => (r > 0 ? ROW_GAP : block > 0 ? BLOCK_GAP : 0)
 
 /*
  * One column on a phone, so the scatter lives in width and left margin
@@ -221,7 +219,7 @@ function Collapsed({ post, num }: { post: PostRow; num: string }) {
 
 /**
  * One piece of Ghi 01's decoration — a photo or the quotation — sitting small
- * in a place of its own inside a block (`PHOTO_SPOT`, `QUOTE_SPOT`).
+ * in its own columns of a row (`ROWS`).
  *
  * A photo keeps its cell's old proportion (`cellRatio`) because the crop the
  * owner set in the CMS was cut to it; it is drawn at a fixed small height and
@@ -287,36 +285,33 @@ function decorations(cells: readonly (FeatureCell & { img?: string | null })[]) 
   return cells.filter((c) => (c.kind === 'slot' && !!c.img) || (c.kind === 'quote' && !!c.t))
 }
 
-/** A slot's grid row, moved down to its block. */
-function gridRowAt(row: string, block: number) {
-  const [start, span] = row.split(' / ')
-  return `${block * BLOCK_ROWS + Number(start)}${span ? ` / ${span}` : ''}`
-}
-
 type LayoutItem =
   | { kind: 'post'; post: PostRow; i: number; block: number; slot: number }
-  | { kind: 'deco'; cell: FeatureCell & { img?: string | null }; block: number }
+  | { kind: 'deco'; cell: FeatureCell & { img?: string | null }; block: number; row: number }
 
 /**
- * Posts in their slots, top block first, with the decoration slipped in where
- * the sketch puts it — in the order a phone stacks them. Each block gets its
- * own photo, in F-order, while photos last; the quotation appears once, in the
- * first block whose slot 2 is filled. Decoration beside an empty slot is left
- * out, or a young block would open on a photo with nothing next to it.
+ * Posts in their slots, top block first, each row closed by its decoration —
+ * the order a phone stacks them. The quotation takes the second row of the
+ * top block, where the sketch puts it; every other row takes the next photo
+ * in F-order, starting over when they run out, so every row has its piece.
+ * Decoration is drawn whether or not its row holds a post yet: posts fill a
+ * block from the bottom, and tying the two together hid the decoration on a
+ * page with few posts.
  */
 function blockLayout(posts: readonly PostRow[], decos: ReturnType<typeof decorations>): LayoutItem[] {
   const photos = decos.filter((c) => c.kind === 'slot')
   const quote = decos.find((c) => c.kind === 'quote')
-  let quoteUsed = false
-  const placed = placePosts(posts.length).sort((a, b) => a.block - b.block || a.slot - b.slot)
+  const placed = placePosts(posts.length)
+  const blocks = Math.ceil(posts.length / BLOCK_SIZE)
   const out: LayoutItem[] = []
-  for (const at of placed) {
-    if (at.slot === 2 && quote && !quoteUsed) {
-      out.push({ kind: 'deco', cell: quote, block: at.block })
-      quoteUsed = true
+  let nextPhoto = 0
+  for (let block = 0; block < blocks; block++) {
+    for (let row = 0; row < ROWS_PER_BLOCK; row++) {
+      for (const at of placed.filter((p) => p.block === block && Math.floor(p.slot / 2) === row).sort((a, b) => a.slot - b.slot))
+        out.push({ kind: 'post', post: posts[at.i], ...at })
+      const cell = block === 0 && row === 1 && quote ? quote : photos.length ? photos[nextPhoto++ % photos.length] : undefined
+      if (cell) out.push({ kind: 'deco', cell, block, row })
     }
-    out.push({ kind: 'post', post: posts[at.i], ...at })
-    if (at.slot === 1 && photos[at.block]) out.push({ kind: 'deco', cell: photos[at.block], block: at.block })
   }
   return out
 }
@@ -513,7 +508,7 @@ export function Notes() {
           mob
             ? { display: 'flex', flexDirection: 'column', gap: 36, marginTop: 30 }
             : {
-                // Twelve columns, so each slot can sit where `SLOTS` says and
+                // Twelve columns, so each slot can sit where `ROWS` says and
                 // an opened post can take `2 / span 9` on a row of its own.
                 display: 'grid',
                 gridTemplateColumns: 'repeat(12,minmax(0,1fr))',
@@ -530,10 +525,10 @@ export function Notes() {
             everything else steps back. */}
         {layout.map((item, n) => {
           if (item.kind === 'deco') {
-            const spot = item.cell.kind === 'quote' ? QUOTE_SPOT : PHOTO_SPOT
+            const spot = ROWS[item.row].deco
             return (
               <div
-                key={`deco-${item.block}-${item.cell.n}`}
+                key={`deco-${item.block}-${item.row}`}
                 style={{
                   ...(mob
                     ? {
@@ -542,8 +537,8 @@ export function Notes() {
                       }
                     : {
                         gridColumn: spot.col,
-                        gridRow: gridRowAt(spot.row, item.block),
-                        marginTop: spot.mt + (item.cell.kind !== 'quote' && item.block > 0 ? BLOCK_GAP : 0),
+                        gridRow: gridLine(item.block, item.row),
+                        marginTop: spot.mt + rowTop(item.block, item.row),
                       }),
                   opacity: openNote !== null ? 0.18 : 1,
                   transition: 'opacity .45s ease',
@@ -555,7 +550,8 @@ export function Notes() {
           }
           const { post: p, block, slot, i } = item
           const open = openNote === p.id
-          const spot = SLOTS[slot]
+          const r = Math.floor(slot / 2)
+          const spot = ROWS[r].posts[slot % 2]
           const m = MOB_POSTS[n % MOB_POSTS.length]
           return (
             <Hover
@@ -582,13 +578,11 @@ export function Notes() {
                        * ghi, thay vì cảm giác như mở hẳn ra trang khác."
                        *
                        * Chín trên mười hai cột, thụt vào một cột ở mép trái,
-                       * trên hàng trống ngay dưới dải của nó.
+                       * trên hàng trống ngay dưới hàng của nó.
                        */
                       gridColumn: open ? '2 / span 9' : spot.col,
-                      gridRow: open
-                        ? String(block * BLOCK_ROWS + OPEN_ROW[spot.band])
-                        : gridRowAt(spot.row, block),
-                      marginTop: open ? 64 : spot.mt + (spot.band === 0 && block > 0 ? BLOCK_GAP : 0),
+                      gridRow: gridLine(block, r) + (open ? 1 : 0),
+                      marginTop: open ? 64 : spot.mt + rowTop(block, r),
                     }),
                 cursor: 'pointer',
                 // Room above the post once it is scrolled to — see the effect on `openNote`.
