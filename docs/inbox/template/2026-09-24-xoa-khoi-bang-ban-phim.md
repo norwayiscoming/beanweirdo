@@ -1,6 +1,6 @@
 # Trình soạn: xoá khối ảnh, khối bảng bằng bàn phím
 
-PR: (xem nhánh)    nhánh: claude/project-thread-mok7tv
+PR: #54    nhánh: claude/project-thread-mok7tv
 Nguồn: chủ site, 2026-09-24: "không delete được khối ảnh, bảng … keyboard".
 
 ## Đã sửa
