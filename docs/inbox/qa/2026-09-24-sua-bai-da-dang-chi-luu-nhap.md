@@ -1,6 +1,6 @@
 # Sửa bài đã đăng chỉ lưu nháp, bấm Publish mới lên trang
 
-PR: #(điền khi mở) · nhánh `claude/project-thread-1onmw2`
+PR: #40 · nhánh `claude/project-thread-1onmw2`
 
 ## Đã đổi
 
