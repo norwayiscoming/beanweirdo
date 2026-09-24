@@ -129,3 +129,20 @@ describe('trích dẫn trong long-form', () => {
     expect(markdownToRun(out)).toEqual(blocks)
   })
 })
+
+describe('mỗi khối long-form là một khối trên mặt soạn', () => {
+  it('hai đoạn liền nhau không gộp thành một đoạn có ngắt dòng', () => {
+    // Gộp lại thì nút `+` và chỗ thả khối chỉ đặt được sau cả cụm.
+    const md = runToMarkdown([P([{ t: 'một' }]), P([{ t: 'hai' }]), { k: 'li', runs: [{ t: 'mục' }] }, P([{ t: 'ba' }])])
+    const editor = createEditor({
+      nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, CodeNode, CodeHighlightNode],
+      onError: (e) => {
+        throw e
+      },
+    })
+    editor.update(() => $convertFromMarkdownString(md, SITE_TRANSFORMERS), { discrete: true })
+    const kids = editor.getEditorState().read(() => $getRoot().getChildren().map((n) => n.getTextContent()))
+    expect(kids).toEqual(['một', 'hai', 'mục', 'ba'])
+    expect(markdownToRun(md).map((b) => b.k)).toEqual(['p', 'p', 'li', 'p'])
+  })
+})

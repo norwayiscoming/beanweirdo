@@ -27,7 +27,13 @@ import { MarkdownShortcutPlugin } from '@lexical/react/LexicalMarkdownShortcutPl
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
-import { BLUR_COMMAND, CLEAR_HISTORY_COMMAND, COMMAND_PRIORITY_LOW } from 'lexical'
+import {
+  $getRoot,
+  BLUR_COMMAND,
+  CLEAR_HISTORY_COMMAND,
+  COMMAND_PRIORITY_LOW,
+  type LexicalEditor,
+} from 'lexical'
 import { useEffect, useRef } from 'react'
 import { SITE_TRANSFORMERS, unescapeSite } from '../lib/liveMarkdown'
 import { registerLiveKeys, type LiveEdges } from './liveKeys'
@@ -181,4 +187,32 @@ export function LiveText({
       </div>
     </LexicalComposer>
   )
+}
+
+function editorOf(input: HTMLElement | null | undefined): LexicalEditor | null {
+  return (input as (HTMLElement & { __lexicalEditor?: LexicalEditor }) | null)?.__lexicalEditor ?? null
+}
+
+/** Markdown **đang** nằm trên mặt soạn — kể cả phần chưa ghi vì chưa rời ô. */
+export function liveMarkdown(input: HTMLElement | null | undefined): string | null {
+  const editor = editorOf(input)
+  if (!editor) return null
+  let out = ''
+  editor.getEditorState().read(() => {
+    out = unescapeSite($convertToMarkdownString(SITE_TRANSFORMERS))
+  })
+  return out
+}
+
+/**
+ * Bỏ khối thứ `block` khỏi mặt soạn rồi trả markdown còn lại.
+ *
+ * Dùng cho `/`: dòng `/bảng` người viết vừa gõ là lời gọi menu, không phải
+ * chữ của bài — chèn xong mà nó còn nằm đó là phải xoá tay thêm một lần.
+ */
+export function takeBlock(input: HTMLElement | null | undefined, block: number): string | null {
+  const editor = editorOf(input)
+  if (!editor) return null
+  editor.update(() => $getRoot().getChildAtIndex(block)?.remove(), { discrete: true })
+  return liveMarkdown(input)
 }

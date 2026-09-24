@@ -18,7 +18,7 @@
  * Cách lưu **không đổi một chữ**. Đây thuần tuý là cách bày ra để sửa.
  */
 import { bodyToMarkdown, markdownToBlocks, type ReportBlock } from 'post-renderer'
-import { splitAfterBlock } from './mdBlocks'
+import { splitAtLine } from './mdBlocks'
 
 /**
  * Khối nào là **chữ**, tức nhập chung một ô với đoạn văn bên cạnh.
@@ -109,10 +109,11 @@ export function insertThing(
   blocks: ReportBlock[],
   at: [number, number],
   text: string,
-  blockIndex: number,
+  /** Số dòng có chữ của dải đứng trên chỗ chèn — xem `linesThrough`. */
+  lines: number,
   thing: ReportBlock,
 ): ReportBlock[] {
-  const [before, after] = splitAfterBlock(text, blockIndex)
+  const [before, after] = splitAtLine(text, lines)
   const head = before.trim() === '' ? [] : (markdownToBlocks(before) as unknown as ReportBlock[])
   const tail = after.trim() === '' ? [] : (markdownToBlocks(after) as unknown as ReportBlock[])
 
@@ -122,4 +123,32 @@ export function insertThing(
   const next = [...blocks]
   next.splice(at[0], at[1] - at[0] + 1, ...named.slice(0, head.length), thing, ...named.slice(head.length))
   return next
+}
+
+/**
+ * Nhấc một thứ đang đứng riêng lên rồi thả nó **vào giữa một dải chữ**.
+ *
+ * Trước đây chỗ thả cộng `run.at[0] + dòng thứ mấy` rồi gọi `move` — lại đúng
+ * phép cộng chỉ số mà `insertThing` đã bỏ: dòng trên mặt soạn không phải khối
+ * trong kho, nên cái bảng rơi lệch chỗ, hoặc rơi hẳn ra ngoài dải. Chủ site:
+ * *"vụ di chuyển các khối cũng chưa ăn"*.
+ *
+ * Nay đi đúng đường của nút `+`: cắt dải ở dòng được thả, chèn vào đó, rồi mới
+ * bỏ bản cũ đi. Dùng chung cho mọi khuôn — mỗi khuôn đưa hàm chèn của mình.
+ */
+export function moveIntoRun<T>(
+  items: readonly T[],
+  from: number,
+  at: [number, number],
+  text: string,
+  lines: number,
+  insert: (items: T[], at: [number, number], text: string, lines: number, thing: T) => T[],
+): T[] {
+  const thing = items[from]
+  // Thả vào chính dải nó đang đứng trong thì không có nghĩa: nó không đứng trong dải nào.
+  if (thing === undefined || (from >= at[0] && from <= at[1])) return items as T[]
+  const placed = insert([...items], at, text, lines, thing)
+  // Mọi thứ trước dải giữ nguyên chỉ số; thứ sau dải trượt theo độ dài dải mới.
+  const old = from < at[0] ? from : from + (placed.length - items.length)
+  return placed.filter((_, k) => k !== old)
 }
