@@ -170,6 +170,9 @@ export function Grip({
           followGrip(e.currentTarget, at + 1)
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault()
+          // Giữ Backspace để xoá chú thích thì phím tự lặp; lần lặp không được
+          // xoá luôn khối vừa được chọn — chỉ một lần bấm thật mới xoá.
+          if (e.repeat) return
           const stop = e.currentTarget.closest<HTMLElement>('[data-flow="thing"]')
           if (stop) removeThing(stop, onRemove)
           else onRemove()
