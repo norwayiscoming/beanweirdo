@@ -111,6 +111,32 @@ function draw(
 const CARD_AR = '4/3'
 
 /**
+ * Where each card stands — same size, scattered placement.
+ *
+ * The owner, the same day, after seeing them in rows: "tôi muốn sự hơi lộn xộn
+ * ấy chứ không theo hàng". So every card is still four of twelve columns and
+ * 4:3, but two to a row, each starting on a different column and dropping by
+ * a different amount. Only positive drops: a card never slides up into the one
+ * above, so nothing can overlap. Cycles every six posts.
+ */
+const SCATTER: { start: number; mt: number }[] = [
+  { start: 1, mt: 0 },
+  { start: 7, mt: 110 },
+  { start: 3, mt: 30 },
+  { start: 9, mt: 150 },
+  { start: 1, mt: 70 },
+  { start: 6, mt: 0 },
+]
+
+/** Narrow screens: one column, cards 84% wide, swapping sides. */
+const SCATTER_MOBILE: { side: 'left' | 'right'; mt: number }[] = [
+  { side: 'left', mt: 0 },
+  { side: 'right', mt: 28 },
+  { side: 'left', mt: 12 },
+  { side: 'right', mt: 36 },
+]
+
+/**
  * Thẻ một bài trong lưới Ghi 01, lúc chưa mở.
  *
  * Bài viết trên template bitesize note vẽ bằng đúng thẻ của template ấy — vệt
@@ -415,10 +441,10 @@ export function Notes() {
       <div
         style={
           mob
-            ? { display: 'flex', flexDirection: 'column', gap: 48, marginTop: 30 }
+            ? { display: 'flex', flexDirection: 'column', gap: 40, marginTop: 30 }
             : {
-                // Ba bài một hàng, mỗi bài bốn trên mười hai cột. Vẫn là lưới
-                // 12 cột để bài mở ra lấy được `2 / span 9`.
+                // Twelve columns, so each card can start where `SCATTER` says
+                // and an opened post can take `2 / span 9`.
                 display: 'grid',
                 gridTemplateColumns: 'repeat(12,minmax(0,1fr))',
                 gap: '64px 40px',
@@ -433,6 +459,8 @@ export function Notes() {
             they were reading. Open, it widens and everything else steps back. */}
         {shownPosts.map((p, i) => {
           const open = openNote === p.id
+          const at = SCATTER[i % SCATTER.length]
+          const atMob = SCATTER_MOBILE[i % SCATTER_MOBILE.length]
           return (
             <Hover
               key={p.id}
@@ -443,7 +471,11 @@ export function Notes() {
               }}
               style={{
                 ...(mob
-                  ? { width: '100%' }
+                  ? {
+                      width: open ? '100%' : '84%',
+                      alignSelf: open || atMob.side === 'left' ? 'flex-start' : 'flex-end',
+                      marginTop: open ? 0 : atMob.mt,
+                    }
                   : {
                       /*
                        * Bài mở ra KHÔNG chiếm trọn bề ngang.
@@ -455,7 +487,8 @@ export function Notes() {
                        *
                        * Chín trên mười hai cột, thụt vào một cột ở mép trái.
                        */
-                      gridColumn: open ? '2 / span 9' : 'span 4',
+                      gridColumn: open ? '2 / span 9' : `${at.start} / span 4`,
+                      marginTop: open ? 0 : at.mt,
                     }),
                 cursor: 'pointer',
                 // Room above the post once it is scrolled to — see the effect on `openNote`.
