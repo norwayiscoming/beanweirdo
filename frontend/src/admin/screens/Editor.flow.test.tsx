@@ -14,7 +14,7 @@ import type { ReportBlock } from 'post-renderer'
 import { textToRuns } from 'post-renderer'
 import { describe, expect, it, vi } from 'vitest'
 import type { PostDetail } from '../lib/apiClient'
-import { EditorCanvas } from './Editor'
+import { EditorCanvas, menuNames } from './Editor'
 
 const head = (text: string, id: string) => ({ type: 'heading', id, level: 2, text }) as unknown as ReportBlock
 const para = (text: string, id: string) => ({ type: 'paragraph', id, text }) as unknown as ReportBlock
@@ -138,5 +138,14 @@ describe('menu `+` bên máng', () => {
     // Tiêu đề, danh sách, trích dẫn là chữ — gõ ra, không chèn.
     expect(screen.queryByRole('button', { name: 'Tiêu đề' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Đoạn văn' })).toBeNull()
+  })
+})
+
+describe('lọc menu chèn', () => {
+  it('gõ không dấu, không cách vẫn ra đúng khối', () => {
+    // `/khoinhan` sau dấu `/` trong dải chữ — không ai bật bộ gõ để gõ lệnh.
+    expect(menuNames('khoinhan', 'things')).toContain('callout')
+    expect(menuNames('bang', 'things')).toContain('table')
+    expect(menuNames('số liệu', 'things')).toContain('metrics')
   })
 })

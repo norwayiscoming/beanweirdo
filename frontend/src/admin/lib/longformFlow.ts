@@ -14,7 +14,7 @@
  * đang chạy trên trang thật, và đây thuần tuý là cách bày ra để sửa.
  */
 import { longformRunsToText, longformTextToRuns, type LongformBlock } from 'post-renderer'
-import { splitAfterBlock } from './mdBlocks'
+import { splitAtLine } from './mdBlocks'
 
 /** Khối nào markdown viết ra rồi đọc lại được mà không mất gì. */
 const FLOWING = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'li'])
@@ -45,18 +45,24 @@ function blockToMarkdown(b: LongformBlock): string {
 /**
  * Cả một dải khối thành một chuỗi markdown.
  *
- * Sau một trích dẫn phải có dòng trống: Lexical cho trích dẫn **nuốt** dòng chữ
- * thường ngay sau nó (đo trong `longformMarks.test.ts`), nên `> câu\nđoạn` ghi
- * lại thành hai dòng trích dẫn — đoạn văn phía dưới tự dưng bị gạch lề.
+ * Mỗi khối một đoạn, cách nhau một dòng trống — trừ hai mục danh sách liền
+ * nhau, hay hai dòng trích dẫn liền nhau, vốn là một khối trên mặt soạn.
+ *
+ * Trước 2026-09-24 cả dải nối bằng **một** dấu xuống dòng, và Lexical gộp các
+ * dòng liền nhau thành một đoạn có ngắt dòng (`$importBlocks`): năm đoạn văn
+ * thành một khối, một đoạn ngay sau danh sách bị nuốt vào mục cuối. Nút `+`
+ * và chỗ thả khối vì thế chỉ đặt được sau cả cụm. Chủ site: *"nó phải chèn
+ * được vào line text chứ không phải là chèn vào từng khối paragraph"*.
  */
 export function runToMarkdown(blocks: LongformBlock[]): string {
   return blocks
     .map((b, i) => {
-      const md = blockToMarkdown(b)
       const next = blocks[i + 1]
-      return b.quote && next && !next.quote ? `${md}\n` : md
+      if (!next) return blockToMarkdown(b)
+      const tight = (b.k === 'li' && next.k === 'li') || (!!b.quote && !!next.quote)
+      return `${blockToMarkdown(b)}${tight ? '\n' : '\n\n'}`
     })
-    .join('\n')
+    .join('')
 }
 
 const HEADING = /^(#{1,3})\s+(.*)$/
@@ -133,10 +139,11 @@ export function insertLongformThing(
   blocks: LongformBlock[],
   at: [number, number],
   text: string,
-  blockIndex: number,
+  /** Số dòng có chữ của dải đứng trên chỗ chèn — xem `linesThrough`. */
+  lines: number,
   thing: LongformBlock,
 ): LongformBlock[] {
-  const [before, after] = splitAfterBlock(text, blockIndex)
+  const [before, after] = splitAtLine(text, lines)
   return [
     ...blocks.slice(0, at[0]),
     ...markdownToRun(before),
