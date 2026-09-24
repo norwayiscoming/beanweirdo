@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { rootsOf } from '../lib/contentTree'
 import { watchModules } from './modulesChanged'
-import { byBandThenOrder } from '../lib/moduleOrder'
-export { byBandThenOrder } from '../lib/moduleOrder'
+import { bySiteOrder } from '../lib/moduleOrder'
+export { bySiteOrder } from '../lib/moduleOrder'
 import type { ModuleLayout } from '../content/layouts'
 export type { ModuleLayout }
 import { supabase } from '../lib/supabaseClient'
@@ -177,11 +177,11 @@ const isPublic = (m: ModuleRow) => m.visibility !== 'private'
  * `parent_id` is null this is the whole list, which is what it was before.
  */
 export const landingModules = (modules: ModuleRow[]) =>
-  rootsOf(modules.filter((m) => m.kind !== 'special' && isPublic(m))).sort(byBandThenOrder)
+  rootsOf(modules.filter((m) => m.kind !== 'special' && isPublic(m))).sort(bySiteOrder)
 
 /** Mục lục — everything public, the journals included, in sidebar order. */
 export const indexModules = (modules: ModuleRow[]) =>
-  modules.filter(isPublic).sort(byBandThenOrder)
+  modules.filter(isPublic).sort(bySiteOrder)
 
 /** The sidebar lists exactly what the index does. */
 export const sidebarModules = indexModules

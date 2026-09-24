@@ -2,7 +2,7 @@ import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, us
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { displayNumber } from '../lib/postText'
 import { onlyLive, orderPosts } from '../lib/postOrder'
-import { byBandThenOrder } from '../lib/moduleOrder'
+import { bySiteOrder } from '../lib/moduleOrder'
 import { resolveSite, SITE_DEFAULTS, type SiteCopy, type SiteOverrides } from '../content/site'
 import {
   createModule,
@@ -913,34 +913,30 @@ export function Cms() {
    * could see. Same class of bug as the post numbering below: a handle that
    * rearranges a list which is not the list on the page.
    *
-   * Writing 1..N back over this order also heals the stored numbers, since the
-   * bands come out already contiguous and `byBandThenOrder` then changes
-   * nothing.
+   * Writing 1..N back over this order also heals the stored numbers: after one
+   * drag no two modules share a number and `bySiteOrder` has nothing to break
+   * a tie on.
    */
-  const shownModules = useMemo(() => [...modules].sort(byBandThenOrder), [modules])
+  const shownModules = useMemo(() => [...modules].sort(bySiteOrder), [modules])
 
-  const kindOf = (id: string) => modules.find((m) => m.id === id)?.kind
+  const ghi01 = modules.find((m) => m.id === 'ghi01')
+  const quoteText =
+    withOverrides([QUOTE_CELL], ghi01?.feature_cells as FeatureOverride[] | null)[0]?.t ?? QUOTE_CELL.t
 
   const ghi01 = modules.find((m) => m.id === 'ghi01')
   const quoteText =
     withOverrides([QUOTE_CELL], ghi01?.feature_cells as FeatureOverride[] | null)[0]?.t ?? QUOTE_CELL.t
 
   /*
-   * A journal cannot be dragged in among the reading modules. The site sorts
-   * every `special` module below every `normal` one, so such a drop would write
-   * a number the page ignores and the thẻ would spring back on the next load —
-   * better to refuse the drop than to fake it.
-   *
-   * The rule was a caption standing permanently between the two bands. It is a
-   * toast instead: a line of print nobody is reading explains the refusal to
-   * everyone except the person who just ran into it.
+   * Ghi 01 may stand anywhere in the order now (owner, 2026-09-24), but a
+   * journal still does not go *inside* a reading module, nor the other way
+   * round: a journal has a page of its own at its own address, and nothing on
+   * a reading module's page knows how to introduce one as a sub-section.
    */
-  const BAND_RULE = 'Nhật ký — luôn xếp sau các module đọc'
-
-  const sameBand = (a: string, b: string) => {
-    const ka = kindOf(a)
-    return ka !== undefined && ka === kindOf(b)
-  }
+  const NEST_RULE = 'Nhật ký và module đọc không lồng vào nhau được'
+  const kindOf = (id: string) => modules.find((m) => m.id === id)?.kind
+  const nestsAcrossKinds = (src: string, targetId: string, where: DropWhere) =>
+    where === 'inside' && kindOf(src) !== kindOf(targetId)
 
   /**
    * Cây module đúng như màn hình bày nó: cha trước con, mỗi hàng mang độ sâu.
@@ -993,8 +989,8 @@ export function Cms() {
     setDragModule(null)
     setDropAt(null)
     if (!src || src === targetId) return
-    if (!sameBand(src, targetId)) {
-      toast.info(BAND_RULE)
+    if (nestsAcrossKinds(src, targetId, where)) {
+      toast.info(NEST_RULE)
       return
     }
 
@@ -1039,7 +1035,8 @@ export function Cms() {
    * lệch nhau.
    */
   const canDropHere = (src: string, targetId: string, where: DropWhere) =>
-    sameBand(src, targetId) && !('error' in planModuleMove(shownModules, src, targetId, where))
+    !nestsAcrossKinds(src, targetId, where) &&
+    !('error' in planModuleMove(shownModules, src, targetId, where))
 
   /**
    * Con trỏ đang ở phần nào của thẻ: mép trên, mép dưới, hay giữa.

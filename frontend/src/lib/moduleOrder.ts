@@ -9,15 +9,14 @@
 export type Banded = { kind: 'normal' | 'special'; sort_order: number }
 
 /**
- * Normal modules always sort above special ones; inside each band the order is
- * whatever the CMS set. Sorting on `sort_order` alone would let a renumbered
- * reading module fall below the journals.
+ * Whatever order the CMS set, journals included.
  *
- * The CMS arranges its drag list by exactly this rule too. It used to list
- * modules on `sort_order` alone, so a journal sat in one place in the editor
- * and another on the site, and dragging it moved a number the page ignored.
+ * This used to put every `special` module below every `normal` one, and the
+ * CMS refused a drag that would interleave them. The owner asked on 2026-09-24
+ * to drag Ghi 01 up among the reading modules, so the band is gone as a rule.
+ * It survives only as the tie-break: two modules sharing a number (data written
+ * before any drag renumbered it 1..N) still come out in the old band order
+ * rather than whichever the database happened to return first.
  */
-export const byBandThenOrder = (a: Banded, b: Banded) => {
-  const band = Number(a.kind === 'special') - Number(b.kind === 'special')
-  return band !== 0 ? band : a.sort_order - b.sort_order
-}
+export const bySiteOrder = (a: Banded, b: Banded) =>
+  a.sort_order - b.sort_order || Number(a.kind === 'special') - Number(b.kind === 'special')
