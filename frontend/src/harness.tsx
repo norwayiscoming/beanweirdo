@@ -45,8 +45,12 @@ const lfHeads = [
   { k: 'h1', runs: [{ t: 'Tiêu đề lớn' }] },
   { k: 'h2', runs: [{ t: 'Tiêu đề nhỏ' }] },
 ]
+// `?b=image` thêm một khối ảnh đã có ảnh — xoá khối có ảnh đi đường riêng.
+const picture = { type: 'image', id: 'i1', caption: '', imageUrl: 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2220%22/%3E' }
 const pick = <T,>(normal: T, empty: T, headings: T): T =>
-  variant === 'empty' ? empty : variant === 'heads' ? headings : normal
+  variant === 'empty' ? empty : variant === 'heads' ? headings
+  : variant === 'image' && Array.isArray(normal) && tpl !== 'article' && tpl !== 'longform' ? ([...normal, picture] as unknown as T)
+  : normal
 
 const body =
   tpl === 'report' ? pick(els, [] as unknown as typeof els, heads as unknown as typeof els)
