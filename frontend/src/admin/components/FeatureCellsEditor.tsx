@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from 'react'
-import { featureCells, withOverrides, type FeatureOverride } from '../../content/notes'
+import { featureCells, patchOverride, withOverrides, type FeatureOverride } from '../../content/notes'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { Hover } from '../../lib/Hover'
 import { useSlotSwap } from '../lib/useSlotSwap'
@@ -93,11 +93,7 @@ export function FeatureCellsEditor({
   }
 
 
-  const set = (n: number, patch: Partial<FeatureOverride>) => {
-    const rest = overrides.filter((o) => o.n !== n)
-    const current = overrides.find((o) => o.n === n) ?? { n }
-    onChange([...rest, { ...current, ...patch }].sort((a, b) => a.n - b.n))
-  }
+  const set = (n: number, patch: Partial<FeatureOverride>) => onChange(patchOverride(overrides, n, patch))
 
   const [linking, setLinking] = useState<number | null>(null)
   /*
@@ -177,6 +173,7 @@ export function FeatureCellsEditor({
                 <div style={{ minWidth: 0 }}>
                   <div style={cellName}>F{f.n} · câu trích</div>
                   <input
+                    key={f.t}
                     defaultValue={f.t}
                     onBlur={(e) => set(f.n, { t: e.target.value })}
                     placeholder="câu trích"

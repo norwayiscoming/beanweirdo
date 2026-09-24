@@ -172,3 +172,23 @@ export function withOverrides(
   })
 }
 
+
+/**
+ * One cell's override replaced, the rest kept, sorted by `n`.
+ *
+ * Two screens write into the same `feature_cells` array — the Ghi 01 module
+ * form and the page's own section under Cấu hình — so the merge lives here
+ * rather than being re-spelled in each.
+ */
+export function patchOverride(
+  overrides: readonly FeatureOverride[] | null | undefined,
+  n: number,
+  patch: Partial<FeatureOverride>,
+): FeatureOverride[] {
+  const list = overrides ?? []
+  const current = list.find((o) => o.n === n) ?? { n }
+  return [...list.filter((o) => o.n !== n), { ...current, ...patch, n }].sort((a, b) => a.n - b.n)
+}
+
+/** The page's one quotation cell — the line the owner calls the page's pin. */
+export const QUOTE_CELL = featureCells.find((c) => c.kind === 'quote')!

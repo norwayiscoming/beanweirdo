@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { noteFilterBar } from '../lib/notesFilter'
@@ -127,15 +127,27 @@ function Collapsed({
   mob: boolean
 }) {
   const [hovered, setHovered] = useState(false)
+  const card = useRef<HTMLDivElement>(null)
+  // Below this a portrait card's words no longer fit beside its photo — a
+  // 23px "governance" alone needs ~110px — so the photo goes on top instead.
+  const cramped = useNarrow(card, 300)
   if (post.template === 'bitesize') {
+    const data = toBitesizeData(post, { num })
     return (
-      <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
+      <div ref={card} onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
         <BitesizeCard
-          post={toBitesizeData(post, { num })}
+          post={data}
           hovered={hovered}
           aspect={aspect}
-          mediaWidth={mediaWidth}
-          mobile={mob}
+          /*
+           * A portrait card sets its photo BESIDE the words, so the slot's
+           * 72–94% width left the title a column 20px wide. Its words then
+           * spilled 100px out of the cell and over whatever stood next to it —
+           * on Ghi 01 that was the page's quotation. Portrait keeps the card's
+           * own width; the slot's width is for a photo standing above the text.
+           */
+          mediaWidth={data.portrait ? undefined : mediaWidth}
+          mobile={mob || (data.portrait && cramped)}
         />
       </div>
     )
@@ -384,6 +396,27 @@ export function Notes() {
     setOpenNoteState(v)
   }
 
+  /*
+   * Bring the unfolded post to the reader.
+   *
+   * Opening one reflows the grid: the post widens to nine columns and the
+   * dense flow packs the cells around it somewhere else, so from the second
+   * post on it tended to land below the fold — the reader clicked and saw the
+   * page merely dim. Scroll it to the top of the view once it has been laid
+   * out. `scrollIntoView` rather than `window.scrollTo` because the scroll may
+   * belong to a container, not the window.
+   */
+  useEffect(() => {
+    if (!openNote) return
+    const frame = requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`[data-note="${CSS.escape(openNote)}"]`)
+      if (!el) return
+      const still = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+      el.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [openNote])
+
 
   const noteFilters = bar.chips
   const shownPosts = bar.visiblePosts as typeof filed
@@ -513,6 +546,7 @@ export function Notes() {
             return (
               <Hover
                 key={p.id}
+                data-note={p.id}
                 onClick={(e) => {
                   e.stopPropagation()
                   setOpenNote((prev) => (prev === p.id ? null : p.id))
@@ -545,6 +579,8 @@ export function Notes() {
                         marginTop: open ? '40px' : place.mt,
                       }),
                   cursor: 'pointer',
+                  // Room above the post once it is scrolled to — see the effect on `openNote`.
+                  scrollMarginTop: mob ? 16 : 32,
                   opacity: openNote !== null && !open ? 0.18 : 1,
                   transition: 'opacity .45s ease',
                 }}
