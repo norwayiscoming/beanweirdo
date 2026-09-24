@@ -58,15 +58,33 @@ describe('ảnh của các ô ảnh cố định', () => {
     expect(d.detailPlate.imageUrl).toBeNull()
   })
 
-  it('hero vẫn ở cột riêng của nó, không lẫn vào plate_images', () => {
-    const d = toArticleData(
-      post({ hero_image_url: 'https://kho/bia.jpg', plate_images: { hero: 'https://kho/nham.jpg' } }),
+  /*
+   * Khung ảnh hồng của article: mặc định theo ảnh bìa, ảnh riêng đặt vào thì
+   * ảnh riêng thắng. Chủ site 2026-09-24: *"logic mặc định: sync từ ảnh bìa
+   * sang — logic bổ sung: cho phép tải + gắn link"*.
+   */
+  it('khung ảnh hồng mặc định mang ảnh bìa', () => {
+    const d = toArticleData(post({ hero_image_url: 'https://kho/bia.jpg' }), 'biochem', [], 0, undefined)
+    expect(d.heroPlate.imageUrl).toBe('https://kho/bia.jpg')
+  })
+
+  it('khung ảnh hồng có ảnh riêng thì ảnh riêng thắng, gỡ ra thì về ảnh bìa', () => {
+    const own = toArticleData(
+      post({ hero_image_url: 'https://kho/bia.jpg', plate_images: { hero: 'https://kho/rieng.jpg' } }),
       'biochem',
       [],
       0,
       undefined,
     )
-    expect(d.heroPlate.imageUrl).toBe('https://kho/bia.jpg')
+    expect(own.heroPlate.imageUrl).toBe('https://kho/rieng.jpg')
+    const cleared = toArticleData(
+      post({ hero_image_url: 'https://kho/bia.jpg', plate_images: { hero: '' } }),
+      'biochem',
+      [],
+      0,
+      undefined,
+    )
+    expect(cleared.heroPlate.imageUrl).toBe('https://kho/bia.jpg')
   })
 
   /* Gỡ ảnh ra ghi chuỗi rỗng; đọc ra phải là "chưa có ảnh", không phải "". */

@@ -19,12 +19,13 @@ const tpl = (new URLSearchParams(location.search).get('t') ?? 'report') as Tpl
  */
 const sections = [
   { h: 'Phần một', p: 'Một đoạn văn của phần một, dài vừa đủ để xuống dòng.' },
-  { h: 'Phần hai', p: 'Đoạn của phần hai.' },
+  { h: 'Phần hai', p: 'Đoạn của phần hai, **đậm *cả hai* đậm** và *nghiêng*.' },
   { h: 'Phần ba', p: 'Đoạn của phần ba.' },
 ]
 const longform = [
   { k: 'h2', runs: [{ t: 'Tiêu đề longform' }] },
-  { k: 'p', runs: [{ t: 'Đoạn một.' }] },
+  // Đậm, nghiêng, và cả hai lồng trong đậm — ba trường hợp từng đọc sai.
+  { k: 'p', runs: [{ t: 'Đoạn một ' }, { t: 'đậm ', w: '600', s: 'normal' }, { t: 'cả hai', w: '600', s: 'italic' }, { t: ' nghiêng', s: 'italic' }] },
   { k: 'p', runs: [{ t: 'Đoạn hai.' }] },
   { k: 'li', runs: [{ t: 'mục một' }], lvl: 1 },
   { k: 'p', runs: [{ t: 'Đoạn ba.' }] },
