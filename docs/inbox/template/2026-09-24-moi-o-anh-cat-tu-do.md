@@ -1,4 +1,4 @@
-# PR (số điền khi mở) · nhánh `claude/project-thread-2j8wz9` — mọi ô ảnh cắt tự do, ảnh bấm được
+# PR #42 · nhánh `claude/project-thread-2j8wz9` — mọi ô ảnh cắt tự do, ảnh bấm được
 
 ## [ĐỔI HÀNH VI] Ô ảnh cố định của mọi template mở hộp cắt tay thay cho khung căn
 - Trước: nút ở góc ô ảnh (Article, Bitesize, Long-form, ảnh bìa) mở `FocusPicker`: khung khoá theo hình ô, chỉ dời được điểm căn.
