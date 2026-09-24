@@ -86,10 +86,16 @@ describe('module surfaces', () => {
     }
   })
 
-  it('puts every reading module above every journal, whatever the CMS numbering', () => {
-    // sensory is numbered 20, well past Ghi 01's band, yet still sorts above it.
-    const ids = sidebarModules(all).map((m) => m.id)
-    expect(ids.indexOf('sensory')).toBeLessThan(ids.indexOf('ghi01'))
+  it('lets a journal sit among the reading modules when the CMS numbers it there', () => {
+    // The owner asked on 2026-09-24 to drag Ghi 01 up among the reading
+    // modules, so the numbering wins over the old journals-last band.
+    const ids = sidebarModules([...all, mod('ghi01b', 'special', 'public', 5)]).map((m) => m.id)
+    expect(ids.indexOf('ghi01b')).toBeLessThan(ids.indexOf('biochem'))
+  })
+
+  it('breaks a numbering tie the old way, reading module first', () => {
+    const tied = [mod('ghi01', 'special', 'public', 3), mod('sensory', 'normal', 'public', 3)]
+    expect(sidebarModules(tied).map((m) => m.id)).toEqual(['sensory', 'ghi01'])
   })
 
   it('keeps a module whose kind or visibility has not been set', () => {

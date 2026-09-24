@@ -220,14 +220,27 @@ describe('cây module trong CMS', () => {
     expect(shown()).toEqual(['bean', 'roasting', 'tu-duy', 'vi-giac', 'ghi-01'])
   })
 
-  it('luật hai nhóm vẫn giữ: không lồng nhật ký vào một module đọc', async () => {
+  it('nhật ký đứng cạnh được nhưng không lồng vào một module đọc', async () => {
     await openConfig()
     reorderModules.mockClear()
     updateModule.mockClear()
     drag('ghi-01', 'tu-duy', 0.5)
 
-    expect(await screen.findByText('Nhật ký — luôn xếp sau các module đọc')).toBeTruthy()
+    expect(await screen.findByText('Nhật ký và module đọc không lồng vào nhau được')).toBeTruthy()
     expect(reorderModules).not.toHaveBeenCalled()
+    expect(updateModule).not.toHaveBeenCalled()
+  })
+
+  it('kéo được Ghi 01 lên đứng cạnh một module đọc', async () => {
+    await openConfig()
+    reorderModules.mockClear()
+    updateModule.mockClear()
+    drag('ghi-01', 'tu-duy', 0.1)
+
+    await waitFor(() => expect(reorderModules).toHaveBeenCalledTimes(1))
+    expect(reorderModules.mock.calls[0][0]).toEqual([
+      'bean', 'roasting', 'ghi-01', 'tu-duy', 'vi-giac',
+    ])
     expect(updateModule).not.toHaveBeenCalled()
   })
 })
