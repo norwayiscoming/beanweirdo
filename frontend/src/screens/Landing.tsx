@@ -417,13 +417,23 @@ export function Landing() {
     }
     return map
   }, [allModules, modules, posts])
-  const { site } = useSiteCopy()
+  const { site, ready } = useSiteCopy()
   const title = splitAesc(site.lTitle1)
   const mob = useIsMobile()
 
   return (
     <div>
-      <div style={{ padding: mob ? '30px 20px 44px' : '80px 56px 64px', maxWidth: layout.page }}>
+      <div
+        style={{
+          padding: mob ? '30px 20px 44px' : '80px 56px 64px',
+          maxWidth: layout.page,
+          // Every line in this block is editable in the CMS. Until the owner's
+          // copy is known, drawing the shipped defaults means showing a
+          // headline that is then replaced in front of the reader. Hidden, not
+          // unmounted, so the page below does not jump when it appears.
+          visibility: ready === false ? 'hidden' : undefined,
+        }}
+      >
         {/*
           * Nhãn trên cùng ngắt dòng ngay sau dấu gạch ngang.
           *

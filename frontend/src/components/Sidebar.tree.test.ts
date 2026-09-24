@@ -77,10 +77,9 @@ describe('the sidebar rows', () => {
     expect(rowsOf(withPrivate)).toEqual([{ id: 'con', depth: 0 }])
   })
 
-  it('lets the tree win over the normal-before-special sort', () => {
-    // Sidebar order says reading modules come above the journals. A child
-    // cannot obey that and stay under its parent, and staying under its parent
-    // is the stronger promise — the indent is what says where it belongs.
+  it('keeps a child under its parent whatever the sort says', () => {
+    // tanman sorts first on its own number, but staying under its parent is
+    // the stronger promise — the indent is what says where it belongs.
     const mixed = [
       mod('ghi01', { kind: 'special', sort_order: 101 }),
       mod('tanman', { parent_id: 'ghi01', kind: 'normal', sort_order: 1 }),

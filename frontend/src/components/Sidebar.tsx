@@ -88,8 +88,21 @@ function Mark({ shape }: { shape: Glyph }) {
  * not another shelf of essays — it reads as a module of a different kind
  * before you have read its name (System conventions, group 05).
  */
-function ModuleMark({ m }: { m: ModuleRow }) {
+function ModuleMark({ m, dash }: { m: ModuleRow; dash?: boolean }) {
   const special = m.kind === 'special'
+  /*
+   * A sub-module on the closed rail: a short bar in the module's colour, the
+   * same width as its parent's dot and centred in the same slot, so the rail
+   * reads as dot, dash, dash — parent then children — without an indent.
+   */
+  if (dash)
+    return (
+      <div
+        data-kind={m.kind}
+        data-mark="dash"
+        style={{ width: 10, height: 2, borderRadius: 1, background: m.accent }}
+      />
+    )
   return (
     <div
       data-kind={m.kind}
@@ -111,6 +124,7 @@ function Row({
   depth = 0,
   muted,
   hoverBg,
+  collapsed,
   onClick,
 }: {
   glyph: ReactNode
@@ -129,11 +143,22 @@ function Row({
   depth?: number
   muted: string
   hoverBg: string
+  /**
+   * The 64px rail. Only the glyph column shows there, so an indent does not
+   * read as depth — it pushes the child's dot off the column its parent's dot
+   * stands in. Collapsed rows drop the indent and let the glyph say it.
+   */
+  collapsed?: boolean
   onClick: () => void
 }) {
   return (
     <Hover
-      style={{ ...row, color: muted, paddingLeft: 22 + depth * 15 }}
+      style={{
+        ...row,
+        color: muted,
+        paddingLeft: 22 + (collapsed ? 0 : depth * 15),
+        transition: 'padding-left .3s cubic-bezier(.4,0,.2,1)',
+      }}
       hoverStyle={{ background: hoverBg }}
       onClick={onClick}
     >
@@ -236,6 +261,8 @@ export function Sidebar() {
   const dark = nav.screen === 'notes' || nav.screen === 'hours'
   const t = theme(dark)
   const groups = visibleGroups(nav.area, authed)
+  // The mobile drawer is always drawn at full width.
+  const open = mobile || on
 
   /*
    * The count beside a name covers the whole branch, not just what is filed
@@ -271,9 +298,10 @@ export function Sidebar() {
               label={m.title}
               count={countFor(m)}
               depth={node.depth}
+              collapsed={!open}
               muted={t.muted}
               hoverBg={t.hover}
-              glyph={<ModuleMark m={m} />}
+              glyph={<ModuleMark m={m} dash={!open && node.depth > 0} />}
             />,
           )
         }
@@ -337,12 +365,25 @@ export function Sidebar() {
           * Nó là một wordmark chữ nhật nên không ép vào ô 20×20 được — chữ
           * "station" sẽ mất hẳn. Cho nó chiều cao 34px và tự co ngang.
           */}
+        {/*
+          * Closed, the rail is 64px and the logo at 34px tall is 56 wide —
+          * starting at the row's 22px inset it ran 14px under the page. It
+          * shrinks to 27px tall (45 wide) and steps out to a 10px inset, so it
+          * sits whole inside the rail and grows back as the sheet opens.
+          */}
         <img
           src="/logo-bean.png"
           alt="bean station"
           width={56}
           height={34}
-          style={{ height: 34, width: 'auto', flex: 'none', borderRadius: 3 }}
+          style={{
+            height: open ? 34 : 27,
+            width: 'auto',
+            marginLeft: open ? 0 : -12,
+            flex: 'none',
+            borderRadius: 3,
+            transition: 'height .3s cubic-bezier(.4,0,.2,1), margin-left .3s cubic-bezier(.4,0,.2,1)',
+          }}
         />
         <div style={{ fontFamily: serif, fontSize: 23, letterSpacing: '-.01em' }}>
           be
