@@ -10,7 +10,8 @@
  *
  * What jsdom can answer: the block sits inside a flow shell (which is where
  * the Enter / arrow / Backspace rules live), it has a place the keyboard can
- * land, and Cmd+Enter from inside it opens a text line after it. Typing into
+ * land, Esc selects it and Delete then removes it, and Cmd+Enter from inside
+ * it opens a text line after it. Typing into
  * Lexical is measured in Chromium instead — see `frontend/harness.html`.
  */
 import { act, fireEvent, render } from '@testing-library/react'
@@ -78,6 +79,24 @@ describe('mọi khối trong menu + giữ cùng một luật bàn phím', () => 
         expect(thing, 'khối không nằm trong vỏ data-flow="thing"').not.toBeNull()
         expect(thing!.closest('[data-flow-root]'), 'khối không nằm trong data-flow-root').not.toBeNull()
         expect(landing(thing!).length, 'khối không có chỗ nào cho bàn phím đứng').toBeGreaterThan(0)
+
+        // Esc anywhere in the block selects it (focus on the grip), and Delete
+        // there removes it — the only keyboard way out for a block full of text
+        // or one that is only buttons, like an image with nothing uploaded.
+        const inside = landing(thing!)[0]
+        onChange.mockClear()
+        act(() => inside.focus())
+        // A markdown field swaps its view for a textarea on focus; press the key
+        // where the focus actually is.
+        act(() => {
+          fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+        })
+        const grip = thing!.querySelector<HTMLElement>('.awc-grip')
+        expect(document.activeElement, 'Esc không chọn được khối').toBe(grip)
+        act(() => {
+          fireEvent.keyDown(grip!, { key: 'Delete' })
+        })
+        expect(onChange, 'Delete trên khối đã chọn không xoá khối').toHaveBeenCalled()
 
         // Cmd+Enter from any field of the block leaves it for a new text line.
         const field = typed(thing!)[0]

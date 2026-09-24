@@ -18,9 +18,9 @@ function mount(values: string[]) {
   return { stop, inputs }
 }
 
-function press(stop: HTMLElement, target: HTMLInputElement, key: string, remove = vi.fn()) {
+function press(stop: HTMLElement, target: HTMLElement, key: string, remove = vi.fn()) {
   target.focus()
-  target.setSelectionRange(target.value.length, target.value.length)
+  if (target instanceof HTMLInputElement) target.setSelectionRange(target.value.length, target.value.length)
   const native = new KeyboardEvent('keydown', { key })
   let prevented = false
   thingKeyDown(
@@ -82,5 +82,53 @@ describe('thingKeyDown', () => {
     const { stop, inputs } = mount(['', 'còn chữ'])
     const { remove } = press(stop, inputs[0], 'Backspace')
     expect(remove).not.toHaveBeenCalled()
+  })
+
+  /** Khối ảnh như màn sửa vẽ: tay nắm ở máng, ô chọn tệp, nút, ô chú thích. */
+  function image(withPicture: boolean) {
+    document.body.innerHTML = `<div data-flow-root><div data-flow="thing" data-flow-at="0">
+      <div class="awc-gutter"><button class="awc-grip">⠿</button></div>
+      ${withPicture ? '<img src="a.jpg" />' : ''}
+      <input type="file" /><button>tải ảnh lên</button><input value="" placeholder="chú thích ảnh" />
+    </div></div>`
+    const stop = document.querySelector<HTMLElement>('[data-flow=thing]')!
+    return {
+      stop,
+      grip: stop.querySelector<HTMLElement>('.awc-grip')!,
+      upload: stop.querySelectorAll<HTMLElement>('button')[1],
+      caption: stop.querySelector<HTMLInputElement>('input[placeholder]')!,
+    }
+  }
+
+  it('Esc chọn cả khối: con trỏ lên tay nắm', () => {
+    const { stop, caption, grip } = image(true)
+    const { prevented } = press(stop, caption, 'Escape')
+    expect(prevented).toBe(true)
+    expect(document.activeElement).toBe(grip)
+  })
+
+  it('Delete khi con trỏ đứng trên nút của khối thì xoá khối', () => {
+    const { stop, upload } = image(true)
+    const { remove } = press(stop, upload, 'Delete')
+    expect(remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('khối ảnh chưa có ảnh, chú thích trống: Backspace bỏ khối (ô chọn tệp không tính là chữ)', () => {
+    const { stop, caption } = image(false)
+    const { remove } = press(stop, caption, 'Backspace')
+    expect(remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('khối ảnh đã có ảnh: xoá hết chú thích không kéo tấm ảnh đi theo', () => {
+    const { stop, caption } = image(true)
+    const { remove } = press(stop, caption, 'Backspace')
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  it('Delete trong ô chữ còn chữ là xoá chữ, không đụng tới khối', () => {
+    const { stop, inputs } = mount(['còn chữ'])
+    const { remove, prevented } = press(stop, inputs[0], 'Delete')
+    expect(remove).not.toHaveBeenCalled()
+    expect(prevented).toBe(false)
   })
 })
