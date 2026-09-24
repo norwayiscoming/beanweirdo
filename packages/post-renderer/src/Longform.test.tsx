@@ -129,7 +129,7 @@ describe('lùi lề đoạn văn', () => {
         renderText={(text) => <span>{text}</span>}
       />,
     )
-    expect(screen.getByText('phần *đậm*')).toBeInTheDocument()
+    expect(screen.getByText('phần **đậm**')).toBeInTheDocument()
   })
 })
 

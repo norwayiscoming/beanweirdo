@@ -124,3 +124,23 @@ describe('Article', () => {
     expect(screen.getByTestId('fig-override')).toHaveTextContent('A chlorogenic acid molecule diagram')
   })
 })
+
+describe('đậm và nghiêng trong thân bài article', () => {
+  it('vẽ ra định dạng, không để lộ dấu sao', () => {
+    const p = 'thường **đậm** và *nghiêng* và **đậm *cả hai* đậm**'
+    const { container } = render(<Article post={{ ...post, sections: [{ h: 'H', p }] }} />)
+    expect(container.textContent).not.toContain('*')
+    const ems = Array.from(container.querySelectorAll('em')).map((el) => [
+      el.textContent,
+      (el as HTMLElement).style.fontWeight,
+      (el as HTMLElement).style.fontStyle,
+    ])
+    expect(ems).toEqual([
+      ['đậm', '600', 'normal'],
+      ['nghiêng', 'inherit', 'italic'],
+      ['đậm ', '600', 'normal'],
+      ['cả hai', '600', 'italic'],
+      [' đậm', '600', 'normal'],
+    ])
+  })
+})

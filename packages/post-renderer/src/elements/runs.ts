@@ -18,6 +18,7 @@
  * One notation for typing and for pasting means there is no import step to
  * forget.
  */
+import { parseStars, writeStars } from './stars'
 
 export type Run = {
   t: string
@@ -61,24 +62,30 @@ export type Run = {
 const MARKED =
   /(\[[^\]\n]*\]\(\s*[^()\s]+\s*\)|https?:\/\/[^\s<>[\]()]+|\*\*\*[^*\n]+\*\*\*|___[^_\n]+___|\*\*[^*\n]+\*\*|__[^_\n]+__|(?<![\p{L}\p{N}])\*[^*\n]+\*(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])_[^_\n]+_(?![\p{L}\p{N}]))/gu
 
+/**
+ * `MARKED` without the asterisks, which `parseStars` reads first so that they
+ * can nest — `**đậm *cả hai* đậm**` is what the live editor writes, and a
+ * pattern that forbids a star inside a star pair cannot read it.
+ */
+const UNSTARRED =
+  /(\[[^\]\n]*\]\(\s*[^()\s]+\s*\)|https?:\/\/[^\s<>[\]()]+|___[^_\n]+___|__[^_\n]+__|(?<![\p{L}\p{N}])_[^_\n]+_(?![\p{L}\p{N}]))/gu
+
+/** The star marks a stretch of text sits inside, from `parseStars`. */
+type Marks = Pick<Run, 'em' | 'b'>
+
 /** A bare address at the end of a sentence should not swallow the full stop. */
 const TRAILING = /[.,;:!?)]+$/
 
 /** Runs as one line, in the same notation `textToRuns` reads. */
 export function runsToText(runs: Run[] | undefined): string {
-  return (runs ?? [])
-    .map((r) => {
+  return writeStars(
+    (runs ?? []).map((r) => {
       let t = r.t
       if (r.href) t = r.href === r.t ? t : `[${t}](${r.href})`
       if (r.u) t = `_${t}_`
-      // Ba sao trước hai sao trước một: `***x***` là cả hai, không phải một
-      // dấu nhấn nằm trong một dấu nhấn khác.
-      if (r.em && r.b) t = `***${t}***`
-      else if (r.b) t = `**${t}**`
-      else if (r.em) t = `*${t}*`
-      return t
-    })
-    .join('')
+      return { t, b: !!r.b, i: !!r.em }
+    }),
+  )
 }
 
 /**
@@ -125,61 +132,49 @@ export function textToRuns(text: string): Run[] {
   const out: Run[] = []
 
   const push = (run: Run) => out.push(run)
-  /** Plain text joins the plain run before it, so a stray marker stays one
-   * character in a sentence rather than splitting the line. */
-  const pushPlain = (t: string) => {
+  /** Plain text joins the run before it when that carries the same marks, so a
+   * stray marker stays one character in a sentence rather than splitting it. */
+  const pushPlain = (t: string, base: Marks) => {
     if (!t) return
     const last = out[out.length - 1]
-    if (last && !last.em && !last.b && !last.u && !last.href) out[out.length - 1] = { t: last.t + t }
-    else out.push({ t })
+    if (last && !last.href && !last.u && !!last.em === !!base.em && !!last.b === !!base.b)
+      out[out.length - 1] = { ...last, t: last.t + t }
+    else out.push({ t, ...base })
   }
 
-  const marked = (part: string): boolean => {
+  const marked = (part: string, base: Marks): boolean => {
     const link = /^\[([^\]\n]*)\]\(\s*([^()\s]+)\s*\)$/.exec(part)
     if (link) {
-      push({ t: link[1], href: link[2] })
+      push({ t: link[1], href: link[2], ...base })
       return true
     }
     if (/^https?:\/\//.test(part)) {
       // The address keeps its own punctuation; the sentence keeps the rest.
       const tail = TRAILING.exec(part)?.[0] ?? ''
       const url = tail ? part.slice(0, -tail.length) : part
-      push({ t: url, href: url })
-      pushPlain(tail)
+      push({ t: url, href: url, ...base })
+      pushPlain(tail, base)
       return true
     }
     let t = part
-    let em = false
-    let b = false
+    let em = !!base.em
+    let b = !!base.b
     let u = false
-    /*
-     * Ký hiệu markdown chuẩn: một sao là nghiêng, hai sao là đậm, ba sao là
-     * cả hai. Dấu dài thử trước dấu ngắn, không thì `***x***` đọc thành một
-     * sao lẻ cộng `**x**` cộng một sao lẻ nữa.
-     */
-    if (t.length > 6 && t.startsWith('***') && t.endsWith('***')) {
+    // Gạch dưới: ba là cả hai, hai là đậm (cách viết thứ hai của `**`), một là
+    // số đo. Dấu sao đã do `parseStars` đọc trước, và lồng được.
+    if (t.length > 6 && t.startsWith('___') && t.endsWith('___')) {
       em = true
       b = true
       t = t.slice(3, -3)
-    } else if (t.length > 6 && t.startsWith('___') && t.endsWith('___')) {
-      em = true
-      b = true
-      t = t.slice(3, -3)
-    } else if (t.length > 4 && t.startsWith('**') && t.endsWith('**')) {
-      b = true
-      t = t.slice(2, -2)
     } else if (t.length > 4 && t.startsWith('__') && t.endsWith('__')) {
       b = true
       t = t.slice(2, -2)
-    } else if (t.length > 2 && t.startsWith('*') && t.endsWith('*')) {
-      em = true
-      t = t.slice(1, -1)
     }
     if (t.length > 2 && t.startsWith('_') && t.endsWith('_')) {
       u = true
       t = t.slice(1, -1)
     }
-    if (!em && !b && !u) return false
+    if (em === !!base.em && b === !!base.b && !u) return false
     push({
       t,
       ...(em ? { em: true } : null),
@@ -189,9 +184,12 @@ export function textToRuns(text: string): Run[] {
     return true
   }
 
-  for (const part of text.split(MARKED)) {
-    if (!part) continue
-    if (!marked(part)) pushPlain(part)
+  for (const seg of parseStars(text)) {
+    const base: Marks = { ...(seg.i ? { em: true } : null), ...(seg.b ? { b: true } : null) }
+    for (const part of seg.t.split(UNSTARRED)) {
+      if (!part) continue
+      if (!marked(part, base)) pushPlain(part, base)
+    }
   }
   return out.length > 0 ? out : [{ t: '' }]
 }
