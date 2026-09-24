@@ -87,6 +87,18 @@ describe('khối ảnh trong thân bài', () => {
     expect(within(drop).getByRole('button', { name: 'đặt vào khung' })).toBeInTheDocument()
   })
 
+  it('ảnh đã đặt thì có ô link đích để người đọc bấm vào ảnh; chưa có ảnh thì không', () => {
+    const { unmount } = render(
+      <FramingProvider>
+        <EditorCanvas template="memo" post={memo('https://x/a.jpg')} onChange={vi.fn()} onHeroDrop={vi.fn()} />
+      </FramingProvider>,
+    )
+    expect(document.body.innerHTML).toContain('link khi bấm vào ảnh (tuỳ chọn)')
+    unmount()
+    draw(null)
+    expect(document.body.innerHTML).not.toContain('link khi bấm vào ảnh')
+  })
+
   it('gỡ ảnh thì khối thành một đoạn chữ trống để viết tiếp', () => {
     const onChange = draw('https://x/a.jpg')
     fireEvent.click(within(screen.getByTestId('image-block-drop')).getByRole('button', { name: 'gỡ ảnh khỏi ô này' }))

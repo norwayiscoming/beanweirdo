@@ -64,6 +64,20 @@ describe('hộp cắt ghi gì ra', () => {
     expect(readCrop(onSave.mock.calls[0][0])).toEqual({ x: 0, y: 0, w: 100, h: 100, ratio: 2 })
   })
 
+  it('ô ảnh của khuôn bài mở với "Vừa ô" chọn sẵn, Xong ngay là đúng hình ô cũ', async () => {
+    vi.stubGlobal('Image', FakeImage)
+    const onSave = vi.fn()
+    render(<CropPicker url="https://x/a.jpg" name="Ô ảnh" cell={1} onCancel={vi.fn()} onSave={onSave} />)
+    expect(screen.getByRole('radio', { name: 'Vừa ô' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('radio', { name: '16:9' })).toBeInTheDocument()
+    const done = screen.getByRole('button', { name: 'Xong' })
+    await waitFor(() => expect(done).toBeEnabled())
+    fireEvent.click(done)
+    const c = readCrop(onSave.mock.calls[0][0])!
+    expect(c.ratio).toBeCloseTo(1)
+    expect(c.x).toBe(25)
+  })
+
   it('chọn 1:1 thì khung thành vuông trên trang', async () => {
     vi.stubGlobal('Image', FakeImage)
     const onSave = vi.fn()

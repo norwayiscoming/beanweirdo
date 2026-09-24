@@ -45,6 +45,7 @@ import { useNav } from '../../lib/nav'
 import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { ink, paper, sans, serif } from '../../design/tokens'
+import { IconLink } from '../../design/icons'
 import { useToast } from '../../design/Toaster'
 import { ThemePicker } from '../components/ThemePicker'
 import { CoverBand } from '../components/CoverBand'
@@ -79,6 +80,7 @@ import {
   paletteFrom,
   fillStyle,
   cropStyle,
+  safeHref,
   allElements,
   flatElements,
   htmlToMarkdown,
@@ -1229,22 +1231,6 @@ const ARTICLE_PLATE_NAME: Record<string, string> = {
   hero: 'Khung ảnh hồng · cạnh tiêu đề',
 }
 
-/**
- * Bài như khung sửa vẽ nó: không có ảnh bìa.
- *
- * Ảnh bìa đặt ở băng "trang bìa" trên đầu khung sửa, nên ô ảnh bìa mà template
- * vẽ đứng đó giữ chỗ chứ không vẽ lại tấm ảnh ấy — chủ site: *"hiện 1 chỗ thôi
- * chứ?"*. Đây là chỗ DUY NHẤT khung sửa cố ý khác trang thật, và cách biết nó
- * thật sự trông ra sao là bấm "xem trước".
- *
- * Bỏ địa chỉ chứ không bỏ hình dạng: dàn trang của bitesize ăn theo `body.media`
- * với `body.portrait` (xem `frameOf`), không ăn theo `hero_image_url`, nên ô ảnh
- * giữ đúng khổ nó sẽ có.
- */
-function withoutHero(post: PostDetail): PostDetail {
-  return { ...post, hero_image_url: null }
-}
-
 function platePatch(post: PostDetail, key: string, url: string | null): EditPatch {
   return { plate_images: { ...(post.plate_images ?? {}), [key]: url } }
 }
@@ -2367,7 +2353,9 @@ function MemoEditor({
   onChange: (patch: EditPatch) => void
 }) {
   const palette = paletteFrom(post.theme_color ?? module?.accent ?? REPORT_BLUE, post.theme_color ? undefined : module?.on_color)
-  const data = toMemoData(withoutHero(post), module)
+  // Ô features có nút tải lên nên phải thấy được ảnh vừa tải — cùng lý do
+  // Article và Bitesize đã thôi giấu ảnh bìa trong khung sửa.
+  const data = toMemoData(post, module)
   const elements = flatElements(post.body as { sections?: never[]; elements?: unknown[] }) as ReportBlock[]
 
   /** Một dòng thông số, sửa tại chỗ; phần còn lại của thân bài giữ nguyên. */
@@ -2392,6 +2380,19 @@ function MemoEditor({
     <PostRenderer
       template="memo"
       post={data}
+      /*
+       * Ô ảnh features của memo là ảnh bìa, nhưng trước đây nó không có nút
+       * nào: chỉ đổi được qua băng trang bìa ở trên đầu, và chưa có bìa thì ô
+       * chỉ là một mảng xám. Nay cùng bốn nút ở góc như mọi ô ảnh khác.
+       */
+      renderPlateAction={() => (
+        <PlateImageUpload
+          imageUrl={post.hero_image_url}
+          name="Ảnh features"
+          onUrl={(url) => onChange({ hero_image_url: url })}
+          onClear={() => onChange({ hero_image_url: '' })}
+        />
+      )}
       renderTitle={(title) => <EditableField value={title} onCommit={(v) => onChange({ en: v })} />}
       renderSubtitle={(subtitle) => (
         <EditableField
@@ -3769,6 +3770,7 @@ function ReportBlockFields({
         <ImageBlockEditor
           caption={block.caption}
           imageUrl={block.imageUrl}
+          href={block.href}
           palette={palette}
           onChange={(patch) => onChange({ ...block, ...patch })}
           onRemoveImage={() => onChange({ type: 'paragraph', text: '' } as ReportBlock)}
@@ -4008,14 +4010,16 @@ function TableEditor({ table, palette, onChange }: { table: ReportTable; palette
 function ImageBlockEditor({
   caption,
   imageUrl,
+  href,
   palette,
   onChange,
   onRemoveImage,
 }: {
   caption: string
   imageUrl?: string | null
+  href?: string | null
   palette: Palette
-  onChange: (patch: { caption?: string; imageUrl?: string | null }) => void
+  onChange: (patch: { caption?: string; imageUrl?: string | null; href?: string | null }) => void
   /**
    * Gỡ ảnh thì khối không còn là ảnh nữa. Chủ site: *"sau xoá layout thành cho
    * phép viết text trên nền trắng thông thường"* — một ô màu trống nằm lại giữa
@@ -4108,6 +4112,22 @@ function ImageBlockEditor({
         </div>
       </div>
       <EditableField value={caption} placeholder="chú thích ảnh" onCommit={(v) => onChange({ caption: v })} style={{ fontSize: 10, color: palette.ink, marginTop: 8 }} />
+      {/*
+        Link đích tách hẳn khỏi nút "đặt link" ở góc: nút ấy là địa chỉ của
+        chính tấm ảnh, còn ô này là chỗ người đọc tới khi bấm vào ảnh. Chủ site
+        chọn "ảnh bấm được" cho yêu cầu "lưu hyperlink".
+      */}
+      {imageUrl && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, color: ink.faint }}>
+          <IconLink size={12} />
+          <EditableField
+            value={href ?? ''}
+            placeholder="link khi bấm vào ảnh (tuỳ chọn)"
+            onCommit={(v) => onChange({ href: v.trim() === '' ? null : v.trim() })}
+            style={{ fontSize: 10, color: href && !safeHref(href) ? '#B03A2E' : palette.ink, flex: 1 }}
+          />
+        </div>
+      )}
     </div>
   )
 }

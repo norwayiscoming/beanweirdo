@@ -11,9 +11,14 @@
  * chỉ ảnh đã kèm điểm căn. Một hộp thoại cho cả màn, nên không bao giờ có hai
  * cái chồng nhau, và thêm một chỗ đăng ảnh mới thì không phải bê theo state
  * nào cả.
+ *
+ * Từ 2026-09-24 cả hai lối mở cùng một hộp cắt tay. Ô ảnh cố định từng chỉ cho
+ * dời điểm căn trong một khung do khuôn khoá sẵn; chủ site: *"sửa hết thành
+ * freesize, 16:9 hoặc gì gì bạn mới sửa đi. sửa hết rà tất cả các chỗ ảnh"*.
+ * Ô ấy nay mở với lựa chọn "Vừa ô" (đúng hình cũ) chọn sẵn, và chọn hình khác
+ * thì ô trên trang đổi theo (`fillStyle` trong post-renderer).
  */
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
-import { FocusPicker } from './FocusPicker'
 import { CropPicker } from './CropPicker'
 import { looksLikeVideo } from '../../lib/mediaShape'
 
@@ -55,7 +60,7 @@ export function useCropping(): CropFn {
   return useContext(CroppingContext)
 }
 
-type Pending = FrameRequest & { settle: (url: string) => void; mode: 'focus' | 'crop' }
+type Pending = FrameRequest & { settle: (url: string) => void; mode: 'cell' | 'crop' }
 
 export function FramingProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null)
@@ -74,7 +79,7 @@ export function FramingProvider({ children }: { children: ReactNode }) {
      */
     if (looksLikeVideo(req.url)) return Promise.resolve(req.url)
     return new Promise<string>((resolve) => {
-      const next: Pending = { ...req, settle: resolve, mode: 'focus' }
+      const next: Pending = { ...req, settle: resolve, mode: 'cell' }
       live.current = next
       setPending(next)
     })
@@ -99,20 +104,11 @@ export function FramingProvider({ children }: { children: ReactNode }) {
     <FramingContext.Provider value={frame}>
       <CroppingContext.Provider value={crop}>
         {children}
-        {pending?.mode === 'crop' && (
+        {pending && (
           <CropPicker
             url={pending.url}
             name={pending.name}
-            onCancel={() => close(pending.url)}
-            onSave={(url) => close(url)}
-          />
-        )}
-        {pending?.mode === 'focus' && (
-          <FocusPicker
-            url={pending.url}
-            name={pending.name}
-            ratio={pending.ratio}
-            previews={pending.previews}
+            cell={pending.mode === 'cell' ? pending.ratio : undefined}
             onCancel={() => close(pending.url)}
             onSave={(url) => close(url)}
           />
