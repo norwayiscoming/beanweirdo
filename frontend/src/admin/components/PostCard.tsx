@@ -50,6 +50,7 @@ function thumbColor(id: string) {
 type MenuItem = { label: string; danger?: true } & (
   | { kind: 'copy' }
   | { kind: 'move' }
+  | { kind: 'authors' }
   | { kind: 'status'; action: StatusAction }
 )
 
@@ -59,6 +60,7 @@ export function PostCard({
   onEdit,
   onCopy,
   onMove,
+  onAuthors,
   onPin,
 }: {
   post: PostSummary
@@ -68,6 +70,8 @@ export function PostCard({
   onCopy: (id: string) => void
   /** Mở hộp thoại chọn module đích; việc ghi là của nơi gọi. */
   onMove: (id: string) => void
+  /** Mở hộp thoại chọn tác giả; hộp thoại tự ghi. */
+  onAuthors: (id: string) => void
   /** Ghim bài lên đầu module của nó. Mọi module đều ghim được, không riêng Ghi 01. */
   onPin: (id: string, pinned: boolean) => void
 }) {
@@ -87,6 +91,7 @@ export function PostCard({
      * trước đây cách duy nhất là xoá bài rồi tạo lại và chép tay nội dung.
      */
     { kind: 'move', label: 'Chuyển sang module…' },
+    { kind: 'authors', label: 'Gán tác giả…' },
     ...ACTIONS_BY_STATUS[post.status].map((a) => ({ kind: 'status' as const, ...a })),
   ]
 
@@ -202,6 +207,7 @@ export function PostCard({
           onPick={(it) => {
             if (it.kind === 'copy') onCopy(post.id)
             else if (it.kind === 'move') onMove(post.id)
+            else if (it.kind === 'authors') onAuthors(post.id)
             else onAction(post.id, it.action)
           }}
         />
