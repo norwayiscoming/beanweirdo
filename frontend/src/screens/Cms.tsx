@@ -33,6 +33,7 @@ import {
 } from '../admin/lib/lists'
 import { tagColor } from '../lib/notesFilter'
 import { PostsPanel } from '../admin/components/PostsPanel'
+import { AuthorsPanel } from '../admin/components/AuthorsPanel'
 import { ModuleImages } from '../admin/components/ModuleImages'
 import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
@@ -151,9 +152,10 @@ function countLabel(id: string, live: number): string {
   return live ? `${live} bài` : 'chưa có bài nào trên trang'
 }
 
-/** The two tabs, named once so nothing else can drift from them. */
+/** The tabs, named once so nothing else can drift from them. */
 export const TABS = [
   { k: 'posts', t: 'Bài viết' },
+  { k: 'authors', t: 'Tác giả' },
   { k: 'config', t: 'Cấu hình' },
 ] as const
 
@@ -1207,6 +1209,12 @@ export function Cms() {
       {tab === 'posts' && (
         <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
           <PostsPanel onChanged={() => void load()} />
+        </div>
+      )}
+
+      {tab === 'authors' && (
+        <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
+          <AuthorsPanel />
         </div>
       )}
 

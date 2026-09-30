@@ -68,13 +68,20 @@ describe('GET /api/posts/:id', () => {
     expect(res.statusCode).toBe(400)
   })
 
-  it('returns the full post detail', async () => {
-    fromMock.mockReturnValue(queryBuilder({ data: SAMPLE_ROW, error: null }))
+  it('returns the full post detail, with its byline in order', async () => {
+    const byline = [
+      { position: 0, authors: { id: 'a2', name: 'Bình', slug: 'binh', avatar_url: null } },
+      { position: 1, authors: { id: 'a1', name: 'An', slug: 'an', avatar_url: null } },
+    ]
+    fromMock.mockImplementation((table: string) =>
+      queryBuilder({ data: table === 'post_authors' ? byline : SAMPLE_ROW, error: null }),
+    )
     const req = mockReq({ method: 'GET', headers: authHeaders(token), query: { id: 'p1' } })
     const res = mockRes()
     await handler(req, res)
     expect(res.statusCode).toBe(200)
     expect(res.body.post).toMatchObject({ id: 'p1', en: 'Title', status: 'draft' })
+    expect(res.body.post.authors.map((a: { id: string }) => a.id)).toEqual(['a2', 'a1'])
   })
 
   it('404s when the post does not exist', async () => {
@@ -363,6 +370,7 @@ describe('GET shows the editor the unpublished version', () => {
     fromMock
       .mockReturnValueOnce(queryBuilder({ data: { ...SAMPLE_ROW, status: 'published' }, error: null }))
       .mockReturnValueOnce(queryBuilder({ data: { data: { en: 'Tiêu đề mới' } }, error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
     const req = mockReq({ method: 'GET', headers: authHeaders(token), query: { id: 'p1' } })
     const res = mockRes()
     await handler(req, res)

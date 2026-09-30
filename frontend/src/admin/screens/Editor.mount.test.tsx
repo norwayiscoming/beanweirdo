@@ -33,6 +33,7 @@ const { Editor } = await import('./Editor')
 
 const post = {
   id: 'p1',
+  authors: [],
   module_id: 'ghi01',
   en: 'taste modality: sơn la',
   vi: 'mô tả',

@@ -49,6 +49,8 @@ import { ink, paper, sans, serif } from '../../design/tokens'
 import { IconLink } from '../../design/icons'
 import { useToast } from '../../design/Toaster'
 import { ThemePicker } from '../components/ThemePicker'
+import { AuthorPicker } from '../components/AuthorPicker'
+import type { AuthorRef } from 'api-contract'
 import { CoverBand } from '../components/CoverBand'
 import { FramingProvider, useCropping, useFraming } from '../components/framing'
 import { PlateImageUpload, PlateUpload } from '../components/PlateUpload'
@@ -203,6 +205,8 @@ function EditorContent({ postId }: { postId: string }) {
   const nav = useNav()
   const addresses = usePostAddresses()
   const [post, setPost] = useState<PostDetail | null>(null)
+  /** Dòng tác giả lúc tải bài; `AuthorPicker` tự giữ và tự ghi từ đó. */
+  const [byline, setByline] = useState<AuthorRef[]>([])
   const [modules, setModules] = useState<Module[]>([])
   /*
    * Phải đứng TRÊN chỗ `return` sớm bên dưới. State của khung căn ảnh từng
@@ -269,7 +273,8 @@ function EditorContent({ postId }: { postId: string }) {
   }
 
   useEffect(() => {
-    Promise.all([getPost(postId), listModulesCached()]).then(([p, mods]) => {
+    Promise.all([getPost(postId), listModulesCached()]).then(([{ authors, ...p }, mods]) => {
+      setByline(authors)
       setPost(p)
       setModules(mods)
     })
@@ -507,6 +512,10 @@ function EditorContent({ postId }: { postId: string }) {
             onChange={(theme_color) => applyPatch({ theme_color })}
           />
         </span>
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <AuthorPicker key={postId} postId={postId} initial={byline} />
       </div>
 
       <EditorCanvas

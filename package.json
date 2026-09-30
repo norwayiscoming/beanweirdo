@@ -24,7 +24,7 @@
   },
   "scripts": {
     "lint": "eslint . && knip --no-progress",
-    "typecheck": "tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p packages/post-renderer/tsconfig.json && tsc --noEmit -p backend/tsconfig.json",
+    "typecheck": "tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p packages/post-renderer/tsconfig.json && tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p packages/api-contract/tsconfig.json",
     "test:unit": "vitest run",
     "test": "npm run lint && npm run typecheck && vitest run"
   }

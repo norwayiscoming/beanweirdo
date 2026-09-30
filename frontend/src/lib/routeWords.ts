@@ -21,6 +21,7 @@ export type RouteWords = {
   /** Bảy trang con của khu quản trị — phần đứng sau `ad-`. */
   adPost: string
   adConfig: string
+  adAuthors: string
   /**
    * Hai trang con đã gộp lại thành `adConfig`. Chúng không còn được sinh ra,
    * nhưng vẫn đọc được: link cũ phải mở ra đúng chỗ.
@@ -50,6 +51,7 @@ export const DEFAULT_WORDS: RouteWords = {
   practice: 'practice',
   adPost: 'post',
   adConfig: 'config',
+  adAuthors: 'authors',
   adSitemap: 'sitemap',
   adPageContent: 'page-content',
   adArchive: 'archive',
@@ -74,6 +76,7 @@ export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'module
   practice: 'Nhật ký',
   adPost: 'Tạo bài đăng',
   adConfig: 'Cấu hình',
+  adAuthors: 'Tác giả',
   adSitemap: 'Sơ đồ trang',
   adPageContent: 'Sửa nội dung',
   adArchive: 'Archive',
@@ -106,7 +109,7 @@ const MUST_DIFFER: (keyof RouteWords)[][] = [
   // Đoạn đầu địa chỉ: mọi trang công khai và khu quản trị nằm cùng một chỗ.
   ['admin', 'post', 'module', 'index', 'notes', 'practice'],
   // Bảy trang con đứng cùng một chỗ, ngay sau `ad-`.
-  ['adPost', 'adConfig', 'adSitemap', 'adPageContent', 'adArchive'],
+  ['adPost', 'adConfig', 'adAuthors', 'adSitemap', 'adPageContent', 'adArchive'],
   // Ba động từ đứng cùng một chỗ, ngay sau `/ad-post/`.
   ['create', 'edit', 'view'],
 ]

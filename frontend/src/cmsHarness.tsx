@@ -63,6 +63,12 @@ let MODULES: Row[] = [
   mod('ghi-02', 'Ghi 02', 10, null, 'special'),
 ]
 
+let AUTHORS: Row[] = [
+  { id: 'a1', name: 'Norway', slug: 'norway', avatar_url: null, bio: 'Rang cà phê, viết về vị.', active: true, created_at: '', post_count: 12 },
+  { id: 'a2', name: 'Mai Anh', slug: 'mai-anh', avatar_url: null, bio: '', active: true, created_at: '', post_count: 0 },
+  { id: 'a3', name: 'Khách mời cũ', slug: 'khach-moi', avatar_url: null, bio: 'Viết hai bài về sensory năm ngoái.', active: false, created_at: '', post_count: 2 },
+]
+
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 
@@ -83,6 +89,17 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     console.log('PATCH', id, JSON.stringify(body))
     return json({ module: MODULES.find((m) => m.id === id) })
   }
+  if (url.includes('/api/authors') && method === 'POST') {
+    const author = { id: crypto.randomUUID(), slug: String(body.name).toLowerCase().replace(/\s+/g, '-'), avatar_url: null, bio: '', active: true, created_at: '', post_count: 0, ...body }
+    AUTHORS = [...AUTHORS, author]
+    return json({ author })
+  }
+  if (url.includes('/api/authors/') && method === 'PATCH') {
+    const id = url.split('/api/authors/')[1]
+    AUTHORS = AUTHORS.map((a) => (a.id === id ? { ...a, ...body } : a))
+    return json({ author: AUTHORS.find((a) => a.id === id) })
+  }
+  if (url.includes('/api/authors')) return json({ authors: AUTHORS })
   if (url.includes('/api/modules')) return json({ modules: MODULES })
   if (url.includes('/api/posts')) return json({ posts: [] })
   if (url.includes('/api/tags')) return json({ tags: [] })
@@ -98,7 +115,8 @@ const { ToastProvider } = await import('./design/Toaster')
 const nop = () => {}
 const nav = {
   screen: 'cms', area: 'admin', variant: 'a', moduleId: '', postId: null, articleFrom: 'admin',
-  cmsTab: 'config',
+  // `?tab=authors` mở thẳng tab khác; mặc định vẫn là Cấu hình.
+  cmsTab: new URLSearchParams(location.search).get('tab') ?? 'config',
   goLanding: nop, goHome: nop, goArchive: nop, goHours: nop, goNotes: nop, goCms: nop,
   openModule: nop, openArticle: nop, toggleVariant: nop,
   newPost: nop, editPost: nop, previewPost: nop,
