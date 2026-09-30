@@ -1,4 +1,5 @@
 import {
+  Component,
   Fragment,
   useCallback,
   useEffect,
@@ -45,6 +46,7 @@ import { TEMPLATE_LABEL } from '../../content/templates'
 import { useNav } from '../../lib/nav'
 import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
+import { radius } from '../../design/controls'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { IconLink } from '../../design/icons'
 import { useToast } from '../../design/Toaster'
@@ -518,14 +520,16 @@ function EditorContent({ postId }: { postId: string }) {
         <AuthorPicker key={postId} postId={postId} initial={byline} />
       </div>
 
-      <EditorCanvas
-        template={template}
-        post={post}
-        module={activeModule}
-        onChange={applyPatch}
-        onHeroDrop={setHero}
-        hero={heroActions}
-      />
+      <CanvasFailure key={postId}>
+        <EditorCanvas
+          template={template}
+          post={post}
+          module={activeModule}
+          onChange={applyPatch}
+          onHeroDrop={setHero}
+          hero={heroActions}
+        />
+      </CanvasFailure>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, maxWidth: 1320 }}>
         <span style={{ fontSize: 11, color: ink.muted }}>{saveNote}</span>
         <div>
@@ -840,6 +844,28 @@ function drawnIndexAt(root: HTMLElement, x: number, y: number): number {
     seen += text.textContent?.length ?? 0
   }
   return seen
+}
+
+/**
+ * A canvas that throws takes the whole screen down with it, and all the owner
+ * sees is an empty page while the network tab shows the post arriving fine.
+ * Saying what broke turns "it shows nothing" into a report someone can act on.
+ */
+class CanvasFailure extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null }
+  static getDerivedStateFromError(error: Error) {
+    return { error }
+  }
+  render() {
+    const { error } = this.state
+    if (!error) return this.props.children
+    return (
+      <div role="alert" style={{ padding: 24, border: `1px solid ${ink.border}`, borderRadius: radius, fontFamily: sans, fontSize: 13, color: ink.base }}>
+        Không vẽ được mặt soạn của bài này. Nội dung vẫn còn nguyên; hãy chụp dòng dưới đây gửi lại.
+        <pre style={{ marginTop: 12, fontSize: 12, color: ink.danger, whiteSpace: 'pre-wrap' }}>{error.message}</pre>
+      </div>
+    )
+  }
 }
 
 function EditableField({
@@ -2564,9 +2590,35 @@ function MemoEditor({
   )
 }
 
+/**
+ * The stored cards, in the shape the editing fields assume.
+ *
+ * The public page tolerates a card with no title or with its groups written as
+ * one string, so a deck written outside this screen can be live and still
+ * crash the editor on its first render — a blank screen with the post plainly
+ * published. Filling the gaps here costs nothing until something is edited,
+ * and then the card is written back whole.
+ */
+function editableCards(body: unknown): CardData[] {
+  const text = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v))
+  return (Array.isArray(body) ? body : [])
+    .filter((c): c is Record<string, unknown> => c !== null && typeof c === 'object')
+    .map((c) => {
+      const groups = Array.isArray(c.groups) ? c.groups.filter((g) => typeof g === 'string') : text(c.groups) ? [text(c.groups)] : []
+      return {
+        ...(c as CardData),
+        groups,
+        title: text(c.title),
+        sub: text(c.sub),
+        tag: text(c.tag),
+        parts: Array.isArray(c.parts) ? (c.parts as CardPart[]) : [],
+      }
+    })
+}
+
 function CardsEditor({ post, module, onChange }: { post: PostDetail; module?: Module; onChange: (patch: EditPatch) => void }) {
-  const data = toCardsData(post, module)
-  const cards = getBody<CardData>(post)
+  const cards = editableCards(post.body)
+  const data = toCardsData({ ...post, body: cards as never }, module)
   const setCards = (next: CardData[]) => {
     if (next !== cards) onChange({ body: next })
   }
