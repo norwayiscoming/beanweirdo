@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PostCard } from './PostCard'
 import { MovePostDialog } from './MovePostDialog'
+import { PostAuthorsDialog } from './PostAuthorsDialog'
 import {
   createPost,
   listPosts,
@@ -71,6 +72,7 @@ export function PostsPanel({
   const [failed, setFailed] = useState(false)
   /** Bài đang mở hộp thoại chuyển module; `null` là không có. */
   const [moving, setMoving] = useState<PostSummary | null>(null)
+  const [naming, setNaming] = useState<PostSummary | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -298,6 +300,7 @@ export function PostsPanel({
             onEdit={(id) => nav.editPost(id)}
             onCopy={handleCopy}
             onMove={(id) => setMoving(posts.find((x) => x.id === id) ?? null)}
+            onAuthors={(id) => setNaming(posts.find((x) => x.id === id) ?? null)}
             onPin={handlePin}
           />
         ))}
@@ -313,6 +316,7 @@ export function PostsPanel({
         onClose={() => setMoving(null)}
         onMoved={(module_id) => (moving ? handleMove(moving.id, module_id) : undefined)}
       />
+      <PostAuthorsDialog post={naming} onClose={() => setNaming(null)} />
     </div>
   )
 }
