@@ -1,9 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import type { AuthorRef } from 'api-contract'
 import { withCors } from '../../../lib/cors.js'
 import { requireAuth } from '../../../lib/auth.js'
 import { getSupabase } from '../../../lib/supabase.js'
 import { firstImageIn, POST_DETAIL_COLUMNS, toPostDetail, type PostRow } from '../../../lib/posts.js'
 import { readDraft, splitDraftPatch, stageDraft } from '../../../lib/drafts.js'
+import { AUTHOR_REF_COLUMNS, isMissingAuthorTables, toAuthorRef } from '../../../lib/authors.js'
 
 function getId(req: VercelRequest): string | null {
   const raw = req.query.id
@@ -21,9 +23,14 @@ function getId(req: VercelRequest): string | null {
  */
 async function handleGet(req: VercelRequest, res: VercelResponse, id: string): Promise<void> {
   const supabase = getSupabase()
-  const [{ data, error }, pending] = await Promise.all([
+  const [{ data, error }, pending, byline] = await Promise.all([
     supabase.from('posts').select(POST_DETAIL_COLUMNS).eq('id', id).maybeSingle(),
     readDraft(supabase, id),
+    supabase
+      .from('post_authors')
+      .select(`position, authors(${AUTHOR_REF_COLUMNS})`)
+      .eq('post_id', id)
+      .order('position', { ascending: true }),
   ])
 
   if (error) {
@@ -39,8 +46,16 @@ async function handleGet(req: VercelRequest, res: VercelResponse, id: string): P
     return
   }
 
+  // Before migration 0030 there is no byline to read, and the editor must
+  // still open; any other failure is a real one.
+  if (byline.error && !isMissingAuthorTables(byline.error)) {
+    res.status(500).json({ error: byline.error.message })
+    return
+  }
+  const authors = ((byline.data ?? []) as unknown as { authors: AuthorRef }[]).map((r) => toAuthorRef(r.authors))
+
   const post = toPostDetail({ ...(data as PostRow), ...(pending.data ?? {}) } as PostRow)
-  res.status(200).json({ post: { ...post, has_draft: pending.data !== null } })
+  res.status(200).json({ post: { ...post, has_draft: pending.data !== null, authors } })
 }
 
 interface PatchPostBody {

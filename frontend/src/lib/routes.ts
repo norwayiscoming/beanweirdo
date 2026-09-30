@@ -45,12 +45,13 @@ function moduleFromUrl(name: string, w: RouteWords = activeWords()): string {
 const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adPost}`]: 'cms',
   [`${w.admin}-${w.adConfig}`]: 'cms',
+  [`${w.admin}-${w.adAuthors}`]: 'cms',
   [`${w.admin}-${w.adSitemap}`]: 'cms',
   [`${w.admin}-${w.adPageContent}`]: 'cms',
   [`${w.admin}-${w.adArchive}`]: 'archive',
 })
 
-export type CmsTab = 'posts' | 'config'
+export type CmsTab = 'posts' | 'authors' | 'config'
 
 /**
  * Which tab of Content management an `/ad-…` address opens on.
@@ -66,11 +67,13 @@ export type CmsTab = 'posts' | 'config'
 const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
   [`${w.admin}-${w.adPost}`]: 'posts',
   [`${w.admin}-${w.adConfig}`]: 'config',
+  [`${w.admin}-${w.adAuthors}`]: 'authors',
   [`${w.admin}-${w.adSitemap}`]: 'config',
   [`${w.admin}-${w.adPageContent}`]: 'config',
 })
 const pageOfTab = (w: RouteWords): Record<CmsTab, string> => ({
   posts: `${w.admin}-${w.adPost}`,
+  authors: `${w.admin}-${w.adAuthors}`,
   config: `${w.admin}-${w.adConfig}`,
 })
 

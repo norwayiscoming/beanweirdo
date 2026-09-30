@@ -7,6 +7,17 @@
  * authenticated call.
  */
 import type { SectionData } from 'post-renderer'
+import type {
+  Author,
+  AuthorCreateRequest,
+  AuthorDeleteResponse,
+  AuthorListResponse,
+  AuthorRef,
+  AuthorResponse,
+  AuthorUpdateRequest,
+  PostAuthorsRequest,
+  PostAuthorsResponse,
+} from 'api-contract'
 import { supabase } from '../../lib/supabaseClient'
 import type { SiteOverrides } from '../../content/site'
 import type { LogEntry } from '../../content/hours'
@@ -268,10 +279,44 @@ export async function deleteTag(
   })
 }
 
-/** GET /api/posts/:id — full post detail. */
-export async function getPost(id: string): Promise<PostDetail> {
-  const result = await request<{ post: PostDetail }>(`/api/posts/${id}`)
+/** GET /api/posts/:id — full post detail, with its byline in order. */
+export async function getPost(id: string): Promise<PostDetail & { authors: AuthorRef[] }> {
+  const result = await request<{ post: PostDetail & { authors: AuthorRef[] } }>(`/api/posts/${id}`)
   return result.post
+}
+
+/** PUT /api/posts/:id/authors — thay cả danh sách tác giả của bài, theo thứ tự. */
+export async function setPostAuthors(id: string, author_ids: string[]): Promise<AuthorRef[]> {
+  const body: PostAuthorsRequest = { author_ids }
+  const result = await request<PostAuthorsResponse>(`/api/posts/${id}/authors`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+  return result.authors
+}
+
+/** GET /api/authors — mọi tác giả, người đang hoạt động trước. */
+export async function listAuthors(): Promise<Author[]> {
+  return (await request<AuthorListResponse>('/api/authors')).authors
+}
+
+/** POST /api/authors — bỏ trống `slug` thì máy chủ tự đặt theo tên. */
+export async function createAuthor(input: AuthorCreateRequest): Promise<Author> {
+  return (await request<AuthorResponse>('/api/authors', { method: 'POST', body: JSON.stringify(input) })).author
+}
+
+/** PATCH /api/authors/:id */
+export async function updateAuthor(id: string, patch: AuthorUpdateRequest): Promise<Author> {
+  return (await request<AuthorResponse>(`/api/authors/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }))
+    .author
+}
+
+/**
+ * DELETE /api/authors/:id — máy chủ từ chối (409, `details.post_count`) khi
+ * còn bài đứng tên người này; khi ấy tắt họ đi thay vì xoá.
+ */
+export async function deleteAuthor(id: string): Promise<AuthorDeleteResponse> {
+  return request<AuthorDeleteResponse>(`/api/authors/${id}`, { method: 'DELETE' })
 }
 
 /**
