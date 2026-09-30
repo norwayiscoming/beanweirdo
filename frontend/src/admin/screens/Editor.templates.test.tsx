@@ -63,6 +63,22 @@ describe('EditorCanvas', () => {
     expect(screen.getAllByDisplayValue('Tiêu đề').length).toBeGreaterThan(0)
   })
 
+  /*
+   * A glossary written outside this screen was live on the site and blank in
+   * the editor: the public page shrugs off a card with no title or with its
+   * groups as one string, the editing fields did not.
+   */
+  it('opens a cards deck the public page accepts, whatever gaps it has', () => {
+    const body = [
+      { n: '01', hue: '#8A6420', groups: 'Roasty', title: 'Rang', sub: 's', tag: 't', parts: [] },
+      { n: '02', hue: '#8A6420', groups: ['Roasty'] },
+    ]
+    render(
+      <EditorCanvas template={'cards' as never} post={{ ...post('cards'), body } as never} onChange={vi.fn()} onHeroDrop={vi.fn()} />,
+    )
+    expect(screen.getAllByDisplayValue('Rang').length).toBeGreaterThan(0)
+  })
+
   it('does not edit a long-form post as an article', () => {
     render(
       <EditorCanvas template={'longform' as never} post={post('longform')} onChange={vi.fn()} onHeroDrop={vi.fn()} />,
