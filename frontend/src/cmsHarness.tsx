@@ -89,17 +89,17 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     console.log('PATCH', id, JSON.stringify(body))
     return json({ module: MODULES.find((m) => m.id === id) })
   }
-  if (url.includes('/api/authors') && method === 'POST') {
+  if (url.includes('vocab=authors') && method === 'POST') {
     const author = { id: crypto.randomUUID(), slug: String(body.name).toLowerCase().replace(/\s+/g, '-'), avatar_url: null, bio: '', active: true, created_at: '', post_count: 0, ...body }
     AUTHORS = [...AUTHORS, author]
     return json({ author })
   }
-  if (url.includes('/api/authors/') && method === 'PATCH') {
-    const id = url.split('/api/authors/')[1]
+  if (url.includes('vocab=authors') && method === 'PATCH') {
+    const id = decodeURIComponent(url.split('id=')[1])
     AUTHORS = AUTHORS.map((a) => (a.id === id ? { ...a, ...body } : a))
     return json({ author: AUTHORS.find((a) => a.id === id) })
   }
-  if (url.includes('/api/authors')) return json({ authors: AUTHORS })
+  if (url.includes('vocab=authors')) return json({ authors: AUTHORS })
   if (url.includes('/api/modules')) return json({ modules: MODULES })
   if (url.includes('/api/posts')) return json({ posts: [] })
   if (url.includes('/api/tags')) return json({ tags: [] })

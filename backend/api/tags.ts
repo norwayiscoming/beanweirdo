@@ -3,6 +3,7 @@ import { withCors } from '../lib/cors.js'
 import { requireAuth } from '../lib/auth.js'
 import { getSupabase } from '../lib/supabase.js'
 import { slug } from '../lib/tags.js'
+import { handleAuthors } from '../lib/authorsApi.js'
 
 /**
  * Tags — what a post is, in the owner's own words.
@@ -11,6 +12,7 @@ import { slug } from '../lib/tags.js'
  *   POST   /api/tags            add one
  *   PATCH  /api/tags?id=…       rename one, and everything wearing it
  *   DELETE /api/tags?id=…       remove one, after saying where its things go
+ *   ?vocab=authors              author profiles (lib/authorsApi.ts)
  *
  * This replaces `kind`, which was four words a programmer picked — note,
  * essay, ref, log — with no way to add a fifth short of editing a database
@@ -30,6 +32,9 @@ import { slug } from '../lib/tags.js'
 
 async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (!requireAuth(req, res)) return
+  // Author profiles ride on this endpoint: the plan caps the backend at 12
+  // functions (see lib/authorsApi.ts).
+  if (req.query.vocab === 'authors') return handleAuthors(req, res)
   const supabase = getSupabase()
 
   if (req.method === 'GET') {
@@ -157,6 +162,16 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
        */
       if (!said) {
         res.status(400).json({ error: 'to is required while posts or notes still wear this tag', wearing })
+        return
+      }
+      /*
+       * `to: null` cannot be honoured: `posts.kind` and `notes.k` are both
+       * NOT NULL (migration 0001; later migrations only dropped their CHECKs),
+       * so the update below would fail halfway with a 500. Refuse before any
+       * write, and hand back `wearing` so the caller can ask for a replacement.
+       */
+      if (to === null) {
+        res.status(400).json({ error: 'posts and notes cannot be left without a tag; pass a replacement in to', wearing })
         return
       }
       const moves = []

@@ -10,7 +10,7 @@ import { useIsMobile } from './lib/useIsMobile'
 import { AREA_HOME, isPrivate, screenAllowed } from './lib/area'
 import { useRoute } from './lib/useRoute'
 import { adoptWords } from './lib/routeWords'
-import type { CmsTab, Where } from './lib/routes'
+import type { CmsTab, PortTab, Where } from './lib/routes'
 import {
   NavContext,
   SettingsContext,
@@ -29,6 +29,8 @@ import { Cms } from './screens/Cms'
 import { Hours } from './screens/Hours'
 import { IndexScreen } from './screens/IndexScreen'
 import { Landing } from './screens/Landing'
+import { PortfolioAbout, PortfolioHome, PortfolioPage } from './screens/PortfolioPage'
+import { Portfolio } from './admin/screens/Portfolio'
 import { ModuleScreen } from './screens/ModuleScreen'
 import { Notes } from './screens/Notes'
 
@@ -145,12 +147,15 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       articleFrom,
       templateId: where.templateId ?? null,
       cmsTab: where.tab ?? 'posts',
+      portTab: where.portTab ?? 'pages',
+      slug: where.slug ?? null,
       goLanding: () => at({ screen: 'landing' }),
       goHome: () => at({ screen: 'home' }),
       goArchive: () => at({ screen: 'archive' }),
       goHours: () => at({ screen: 'hours' }),
       goNotes: () => at({ screen: 'notes' }),
       goCms: (tab?: CmsTab) => at({ screen: 'cms', tab }),
+      goPortfolio: (portTab?: PortTab) => at({ screen: 'portfolio', portTab }),
       openModule,
       openArticle,
       newPost: () => setNewPostOpen(true),
@@ -169,6 +174,18 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
   const shown: Screen = screenAllowed(area, where.screen) ? where.screen : (AREA_HOME[area] as Screen)
   const mobile = useIsMobile()
 
+  // The public port page is full width: it has its own topbar and footer, so it
+  // skips the site's left rail.
+  if (shown === 'portfolioPage' || shown === 'portfolioHome' || shown === 'portfolioAbout') {
+    return (
+      <NavContext.Provider value={nav}>
+        {shown === 'portfolioPage' && <PortfolioPage />}
+        {shown === 'portfolioHome' && <PortfolioHome />}
+        {shown === 'portfolioAbout' && <PortfolioAbout />}
+      </NavContext.Provider>
+    )
+  }
+
   const body = (
     /*
      * Trên mobile không có rail bên trái để tránh, mà có thanh dưới để tránh.
@@ -184,6 +201,7 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       {shown === 'article' && <Article />}
       {shown === 'archive' && <Archive />}
       {shown === 'cms' && <Cms />}
+      {shown === 'portfolio' && <Portfolio />}
       {shown === 'postEdit' && postId && <Editor postId={postId} />}
       {shown === 'postPreview' && postId && <Preview postId={postId} />}
     </div>
