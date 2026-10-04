@@ -1,16 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const listModules = vi.fn()
-const listTags = vi.fn()
-const listTemplates = vi.fn()
 
 vi.mock('./apiClient', () => ({
   listModules: (...a: unknown[]) => listModules(...a),
-  listTags: (...a: unknown[]) => listTags(...a),
-  listTemplates: (...a: unknown[]) => listTemplates(...a),
 }))
 
-const { listModulesCached, listTagsCached, forgetModules, forgetAllLists } = await import('./lists')
+const { listModulesCached, forgetModules, forgetAllLists } = await import('./lists')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -56,15 +52,5 @@ describe('danh sách dùng chung', () => {
     forgetModules()
     await listModulesCached()
     expect(listModules).toHaveBeenCalledTimes(2)
-  })
-
-  it('ba danh sách độc lập với nhau', async () => {
-    listModules.mockResolvedValue([])
-    listTags.mockResolvedValue([])
-    await listModulesCached()
-    forgetModules()
-    await listTagsCached()
-    await listTagsCached()
-    expect(listTags).toHaveBeenCalledTimes(1)
   })
 })

@@ -7,6 +7,8 @@
  * every page has them.
  */
 
+import { newest } from '../lib/listingRule'
+
 export type Source =
   | { mode: 'latest'; limit: number }
   | { mode: 'module'; moduleId: string; limit: number }
@@ -59,10 +61,15 @@ export type PortPost = {
   pinned: boolean
   hero_image_url: string | null
   published_at: string | null
+  /**
+   * Every page whose rule lists this post, by id and old address (migration
+   * 0028) — so a block that takes "a module" takes what that page shows.
+   */
+  pages?: string[]
 }
 
-const newestFirst = (a: PortPost, b: PortPost) =>
-  (b.published_at ?? b.date_label).localeCompare(a.published_at ?? a.date_label)
+// The same "newest" every site page uses: the date on the post, then publish time.
+const newestFirst = newest
 
 /** The posts a block shows, in display order. Published posts only. */
 export function resolvePosts(source: Source, posts: PortPost[]): PortPost[] {
@@ -72,7 +79,10 @@ export function resolvePosts(source: Source, posts: PortPost[]): PortPost[] {
       return source.ids.map((id) => byId.get(id)).filter((p): p is PortPost => !!p)
     }
     case 'module':
-      return posts.filter((p) => p.module_id === source.moduleId).sort(newestFirst).slice(0, source.limit)
+      return posts
+        .filter((p) => (p.pages ? p.pages.includes(source.moduleId) : p.module_id === source.moduleId))
+        .sort(newestFirst)
+        .slice(0, source.limit)
     case 'tag':
       return posts.filter((p) => p.kind === source.tag).sort(newestFirst).slice(0, source.limit)
     case 'pinned':

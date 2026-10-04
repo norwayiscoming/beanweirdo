@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
-import { type Module, type Tag, type TemplateSummary } from '../lib/apiClient'
-import { listModulesCached, listTagsCached, listTemplatesCached } from '../lib/lists'
-import { ink } from '../../design/tokens'
+import {
+  listModules,
+  listTemplates,
+  listTopics,
+  type Module,
+  type TemplateSummary,
+  type Topic,
+} from '../lib/apiClient'
+import { topicOptions } from '../components/PostPlacement'
+import { ink, paper } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
 
 /**
@@ -13,11 +20,10 @@ import { ThemePicker } from '../components/ThemePicker'
  */
 export type Metadata = {
   module_id: string
-  /**
-   * Tag đúng như chủ site vừa gõ. Máy chủ tự tính `id` và tự ghi tag xuống
-   * cùng lúc với bài — xem `kindLabel` trong backend/api/posts/index.ts.
-   */
-  kindLabel: string
+  /** Chỗ trên cây chủ đề (migration 0027). */
+  topic_id: string
+  /** Dạng bài, stored in `posts.kind` (the `tags` vocabulary). */
+  kind: string
   en: string
   vi: string
   templateId: string
@@ -36,10 +42,10 @@ const fieldLabelStyle = {
 
 export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void }) {
   const [modules, setModules] = useState<Module[]>([])
-  const [tags, setTags] = useState<Tag[]>([])
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
   const [module_id, setModuleId] = useState('')
-  const [tag, setTag] = useState('')
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [topic_id, setTopicId] = useState('')
   const [templateId, setTemplateId] = useState('')
   const [en, setEn] = useState('')
   const [vi, setVi] = useState('')
@@ -47,36 +53,27 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    listModulesCached().then((mods) => {
+    listModules().then((mods) => {
       setModules(mods)
       if (mods.length > 0) setModuleId(mods[0].id)
     })
-    listTagsCached().then((ts) => {
-      setTags(ts)
-      if (ts.length > 0) setTag(ts[0].label)
-    })
-    listTemplatesCached().then((ts) => {
+    listTopics().then(setTopics)
+    listTemplates().then((ts) => {
       setTemplates(ts)
       if (ts.length > 0) setTemplateId(ts[0].id)
     })
   }, [])
 
-  const canContinue = module_id !== '' && templateId !== '' && en.trim() !== '' && !busy
+  const canContinue = module_id !== '' && topic_id !== '' && templateId !== '' && en.trim() !== '' && !busy
 
-  /*
-   * Một tag gõ lần đầu vẫn được ghi xuống để lần sau có sẵn — nhưng không phải
-   * ở đây nữa.
-   *
-   * Chỗ này từng gọi `createTag` và **chờ** nó xong mới sang bước tạo bài: hai
-   * lượt mạng nối tiếp, mỗi lượt kèm một preflight, cho một cái nút mà việc của
-   * nó chỉ là mở màn soạn ra. Nay nhãn đi kèm bài và máy chủ lo phần còn lại.
-   */
-  function submit() {
+  async function submit() {
     setBusy(true)
     try {
       onContinue({
         module_id,
-        kindLabel: tag.trim(),
+        topic_id,
+        // Dạng bài is retired — the template says what a post is.
+        kind: '',
         en: en.trim(),
         vi: vi.trim(),
         templateId,
@@ -88,14 +85,7 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
   }
 
   return (
-    /*
-     * Chỉ có các ô, không có khung.
-     *
-     * Trước đây khối này tự vẽ nền trắng, viền và bo góc, vì nó là thứ duy
-     * nhất trên một trang trống. Nay nó nằm trong hộp thoại, và một cái khung
-     * trong một cái khung là hai đường viền cách nhau hai chục pixel.
-     */
-    <div>
+    <div style={{ maxWidth: 560, background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: 10, padding: 24 }}>
       <label htmlFor="module" style={{ ...fieldLabelStyle, marginTop: 0 }}>
         Module
       </label>
@@ -123,23 +113,22 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
         </optgroup>
       </select>
 
-      <label htmlFor="tag" style={fieldLabelStyle}>
-        Tag
+      <label htmlFor="topic" style={fieldLabelStyle}>
+        Chủ đề
       </label>
-      <input
-        id="tag"
-        aria-label="Tag"
-        list="tag-list"
-        value={tag}
-        onChange={(e) => setTag(e.target.value)}
-        className="admin-field"
-        placeholder="chọn hoặc gõ tag mới"
-      />
-      <datalist id="tag-list">
-        {tags.map((t) => (
-          <option key={t.id} value={t.label} />
+      <select id="topic" aria-label="Chủ đề" value={topic_id} onChange={(e) => setTopicId(e.target.value)} className="admin-field">
+        <option value="">—</option>
+        {topicOptions(topics).map(({ subject, children }) => (
+          <optgroup key={subject.id} label={subject.title}>
+            <option value={subject.id}>{subject.title}</option>
+            {children.map((t) => (
+              <option key={t.id} value={t.id}>
+                {subject.title} › {t.title}
+              </option>
+            ))}
+          </optgroup>
         ))}
-      </datalist>
+      </select>
 
       <label style={fieldLabelStyle}>Màu bài</label>
       <ThemePicker

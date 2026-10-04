@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Sidebar } from './components/Sidebar'
-import { ModulesProvider } from './data/useModules'
+import { ModulesProvider, findPage, useModules } from './data/useModules'
 import { PostAddressProvider, usePostAddresses } from './data/usePostAddresses'
 import { SiteCopyProvider, useSiteCopy } from './data/useSiteCopy'
+import { useBlogDesign } from './design/blogDesign'
 import { ink, layout, paper, sans } from './design/tokens'
 import { ToastProvider } from './design/Toaster'
 import { AuthGate, AuthProvider } from './lib/auth'
@@ -10,7 +11,7 @@ import { useIsMobile } from './lib/useIsMobile'
 import { AREA_HOME, isPrivate, screenAllowed } from './lib/area'
 import { useRoute } from './lib/useRoute'
 import { adoptWords } from './lib/routeWords'
-import type { CmsTab, PortTab, Where } from './lib/routes'
+import { toPath, type CmsTab, type PortTab, type Where } from './lib/routes'
 import {
   NavContext,
   SettingsContext,
@@ -30,7 +31,6 @@ import { Hours } from './screens/Hours'
 import { IndexScreen } from './screens/IndexScreen'
 import { Landing } from './screens/Landing'
 import { PortfolioAbout, PortfolioHome, PortfolioPage } from './screens/PortfolioPage'
-import { Portfolio } from './admin/screens/Portfolio'
 import { ModuleScreen } from './screens/ModuleScreen'
 import { Notes } from './screens/Notes'
 
@@ -109,6 +109,8 @@ function RouteWordsSync({ onAdopt }: { onAdopt: () => void }) {
  */
 function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
   const area = where.area
+  // The owner's blog design dresses the reader's site and Practice; the CMS keeps the shipped look.
+  useBlogDesign(area !== 'admin')
   const posts = usePostAddresses()
   const [variant, setVariant] = useState<Variant>('A')
   /*
@@ -125,6 +127,35 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
   const moduleId = where.moduleId ?? FIRST_MODULE
   // The address carries the post's slug; the screens below work in ids.
   const postId = where.slug ? posts.idOf(where.slug) : null
+
+  /*
+   * An address a post used to have still opens it, and the bar is then
+   * straightened to the address it has now — with `replace`, since following
+   * an old link is not a step the reader took.
+   */
+  // The same for a page reached by an address it used to have (a module id).
+  const { data: pageList } = useModules()
+  useEffect(() => {
+    if (where.screen !== 'module' || !where.moduleId) return
+    const page = findPage(pageList, where.moduleId)
+    if (!page || page.id === where.moduleId || !page.aliases.includes(where.moduleId)) return
+    // An old id can read back from the address it already has (`biochem` ↔
+    // `/module/biochemistry`); only a different address is worth replacing.
+    const next = toPath({ ...where, moduleId: page.id })
+    if (next === window.location.pathname) return
+    window.history.replaceState({}, '', next)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, [where, pageList])
+
+  useEffect(() => {
+    if (!where.slug || !postId || !posts.forwards(where.slug)) return
+    // The old addresses can arrive before the current ones; until the book
+    // knows this post's address there is nothing better to show than the old.
+    const current = posts.slugOf(postId)
+    if (current === postId) return
+    window.history.replaceState({}, '', toPath({ ...where, slug: current }))
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }, [where, postId, posts])
   const articleFrom: Origin = where.from ?? 'admin'
 
   const openModule = useCallback((id: string) => at({ screen: 'module', moduleId: id }), [at])
@@ -201,7 +232,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       {shown === 'article' && <Article />}
       {shown === 'archive' && <Archive />}
       {shown === 'cms' && <Cms />}
-      {shown === 'portfolio' && <Portfolio />}
       {shown === 'postEdit' && postId && <Editor postId={postId} />}
       {shown === 'postPreview' && postId && <Preview postId={postId} />}
     </div>

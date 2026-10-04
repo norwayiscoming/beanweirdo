@@ -1,5 +1,5 @@
 import type { Author, AuthorCreateRequest, AuthorRef } from 'api-contract'
-import { slug as slugOf } from './tags.js'
+import { slug as slugOf } from './vocab.js'
 
 /** The columns `Author` is built from, plus the embedded post count. */
 export const AUTHOR_COLUMNS = 'id, name, slug, avatar_url, bio, active, created_at, post_authors(count)'

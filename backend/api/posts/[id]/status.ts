@@ -7,6 +7,7 @@ import {
   computeStatusTransition,
   fixedStatusPatch,
   InvalidStatusTransitionError,
+  SLUG_RE,
   STATUS_ACTIONS,
   type PostRow,
   type StatusAction,
@@ -33,7 +34,14 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
     return
   }
 
-  const body = (req.body ?? {}) as { action?: unknown }
+  /*
+   * `slug` rides along with 'publish': the address the post is published at,
+   * written once and kept from then on (migration 0027). The browser works it
+   * out with the same rules every other address uses (lib/postSlug.ts), which
+   * the server has no copy of; the server only checks its shape and that it
+   * is free.
+   */
+  const body = (req.body ?? {}) as { action?: unknown; slug?: unknown }
   const action = body.action
 
   if (typeof action !== 'string' || !(STATUS_ACTIONS as string[]).includes(action)) {
@@ -88,6 +96,24 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
    * bài về nháp thì màn sửa lại ghi thẳng vào `posts`, và những gì đang chờ
    * không được mất ở đó.
    */
+  /*
+   * A first publish fixes the post's address (migration 0027). Only a post
+   * with no stored address takes one — republishing keeps the address its
+   * readers already have, hence the `is null` guard. A clash (the address was
+   * taken meanwhile) is shrugged off: publishing matters more than the
+   * address, and the post keeps a derived one. False when it already answered.
+   */
+  const fixAddress = async (): Promise<boolean> => {
+    const fresh = action === 'publish' && typeof body.slug === 'string' && SLUG_RE.test(body.slug) ? body.slug : null
+    if (!fresh) return true
+    const { error } = await supabase.from('posts').update({ slug: fresh }).eq('id', id).is('slug', null)
+    if (error && error.code !== '23505') {
+      res.status(500).json({ error: error.message })
+      return false
+    }
+    return true
+  }
+
   if (action === 'publish' || action === 'unpublish') {
     const folded = await foldDraft(supabase, id, nowIso)
     if (folded.error) {
@@ -100,6 +126,7 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
     }
     // Already live: the fold was the whole of it, one round trip.
     if (action === 'publish' && folded.status === 'published') {
+      if (!(await fixAddress())) return
       res.status(200).json({ post: { id, status: 'published' }, applied: folded.applied })
       return
     }
@@ -123,6 +150,7 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
       await explainMiss(supabase, res, id, action as StatusAction, allowedFrom)
       return
     }
+    if (!(await fixAddress())) return
     res.status(200).json({ post: data })
     return
   }

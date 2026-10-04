@@ -113,6 +113,14 @@ export type SiteOverrides = Partial<SiteCopy> & {
    * chữ hiện ra đâu cả: `resolveSite` không đụng tới, chỉ `overrides` mang nó.
    */
   routes?: Partial<RouteWords>
+  /**
+   * Practice — a section of its own, not a page of the blog: the name and
+   * colour its journal wears in the sidebar. Before this it borrowed both from
+   * the blog page `ghi-02` (once the special module Ghi 02).
+   */
+  practice?: { title?: string; accent?: string }
+  /** The blog's design system: only what the owner changed, keyed `group.name` — see `design/blogDesign.ts`. */
+  design?: Record<string, string | null | undefined>
 }
 
 /**

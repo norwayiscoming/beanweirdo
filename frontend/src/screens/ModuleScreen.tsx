@@ -1,18 +1,17 @@
-import { useMemo, type CSSProperties } from 'react'
-import { displayNumber } from '../lib/postText'
+import { Fragment, type CSSProperties } from 'react'
+import { templateName } from '../lib/templateNames'
+import { displayNumber, postDescription } from '../lib/postText'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import type { ModuleRow } from '../data/useModules'
-import { MODULE_LAYOUTS, type ModuleLayout } from '../content/layouts'
-import { indexModules, useModules } from '../data/useModules'
-import { usePublishedPosts } from '../data/usePublishedPosts'
+import { findPage, indexModules, useModules, usePagePosts } from '../data/useModules'
+import type { PostRow } from '../data/usePublishedPosts'
+import type { PostGroup } from '../lib/listingRule'
 import { ink, layout, paper, prose, sans, serif, wrapTitle } from '../design/tokens'
 import { pageCaption, pageFill, pageImage } from '../lib/modulePageImages'
 import { Hover } from '../lib/Hover'
-import type { EntryView } from '../lib/moduleEntries'
-import { entriesOf, entryViews } from '../lib/moduleEntries'
-import { openModule } from '../lib/moduleTarget'
 import { useNav, useSettings } from '../lib/nav'
 import { openPost } from '../lib/openPost'
+import { postThumbnail } from '../lib/postThumb'
 import { useIsMobile } from '../lib/useIsMobile'
 import { coverStyle } from '../lib/imageFocus'
 
@@ -37,28 +36,47 @@ const rowHover: CSSProperties = { background: paper.white }
 const statusLabel: CSSProperties = { ...kicker, padding: '120px 56px' }
 
 /** `01`, `02`, `03` — position of the module in the running order. */
-
 /**
- * What the three layouts are handed.
- *
- * They used to take `posts` and read a post's fields directly, which is why a
- * module holding other modules had nowhere to appear: three layouts, three
- * hand-written post rows, and nothing in any of them able to say "this row is
- * a section". `EntryView` is that row, decided in `lib/moduleEntries`; here a
- * layout only decides how it looks. Opening a row is the screen's job for the
- * same reason — a post opens a post, a branch opens a module page.
+ * The heading of a group when the page's rule groups its posts (by subject,
+ * topic, tag…). An unnamed group — a rule that does not group — has none, so
+ * the page reads exactly as an ungrouped list.
  */
-type LayoutProps = {
-  m: ModuleRow
-  rows: EntryView[]
-  onOpen: (row: EntryView, index: number) => void
+function GroupHead({ label, inset = 0 }: { label: string; inset?: number }) {
+  const mob = useIsMobile()
+  if (!label) return null
+  return (
+    <div
+      style={{
+        fontFamily: sans,
+        fontSize: 11,
+        fontWeight: 500,
+        letterSpacing: '.2em',
+        textTransform: 'uppercase',
+        color: ink.base,
+        borderBottom: `2px solid ${ink.base}`,
+        padding: mob ? `30px ${inset}px 8px` : `40px ${inset}px 10px`,
+        gridColumn: '1 / -1',
+        // Specimen's tray has no side margin of its own; the heading takes the
+        // cells' inner padding and the page colour so it does not sit on the rules.
+        background: inset ? paper.cream : undefined,
+      }}
+    >
+      {label}
+    </div>
+  )
 }
+
+/** Alternate the two tints down a list so consecutive thumbnails differ. */
+type TintedPost = PostRow & { tint: string }
+const withTints = (posts: PostRow[], m: ModuleRow): TintedPost[] =>
+  posts.map((p, i) => ({ ...p, tint: i % 2 === 0 ? m.tint : m.tint2 }))
 
 /**
  * Band — a colour block across the head, one wide hero, then the contents in
  * two columns with a thumbnail apiece.
  */
-function Band({ m, rows, onOpen }: LayoutProps) {
+function Band({ m, groups }: { m: ModuleRow; groups: PostGroup<PostRow>[] }) {
+  const nav = useNav()
   const mob = useIsMobile()
   const { showPlates } = useSettings()
 
@@ -96,71 +114,76 @@ function Band({ m, rows, onOpen }: LayoutProps) {
       )}
 
       <div style={{ padding: mob ? '26px 20px 40px' : '36px 56px 120px', maxWidth: 1240 }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: mob ? 'minmax(0,1fr)' : 'repeat(2,minmax(0,1fr))',
-            gap: mob ? 0 : '0 44px',
-          }}
-        >
-          {rows.map((e, i) => (
-            <Hover
-              key={e.id}
-              onClick={() => onOpen(e, i)}
+        {groups.map((g) => (
+          <Fragment key={g.key}>
+            <GroupHead label={g.label} />
+            <div
               style={{
-                display: 'flex',
-                gap: 16,
-                padding: '18px 10px',
-                borderTop: `1px solid ${paper.rule}`,
-                cursor: 'pointer',
-                alignItems: 'flex-start',
+                display: 'grid',
+                gridTemplateColumns: mob ? 'minmax(0,1fr)' : 'repeat(2,minmax(0,1fr))',
+                gap: mob ? 0 : '0 44px',
               }}
-              hoverStyle={rowHover}
             >
-              <div
-                style={{
-                  width: mob ? 112 : 172,
-                  height: mob ? 84 : 130,
-                  flex: 'none',
-                  /*
-                   * Điểm căn của ảnh bìa đi theo đường dẫn (`#focus=`), và
-                   * `center/cover` viết tay thì bỏ qua nó — chủ site căn xong
-                   * mà danh sách vẫn cắt giữa. `coverStyle` là chỗ duy nhất
-                   * biết đọc nó.
-                   */
-                  ...(e.image ? coverStyle(e.image) : { background: e.tint }),
-                }}
-              />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
+              {withTints(g.posts, m).map((e, i) => (
+                <Hover
+                  key={e.id}
+                  onClick={() => openPost(nav, e)}
                   style={{
-                    fontFamily: serif,
-                    fontSize: mob ? 22 : 24,
-                    letterSpacing: '-.018em',
-                    lineHeight: 1.15,
+                    display: 'flex',
+                    gap: 16,
+                    padding: '18px 10px',
+                    borderTop: `1px solid ${paper.rule}`,
+                    cursor: 'pointer',
+                    alignItems: 'flex-start',
                   }}
+                  hoverStyle={rowHover}
                 >
-                  {e.title}
-                </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: ink.soft,
-                    lineHeight: 1.25,
-                    margin: '5px 0 8px',
-                  }}
-                >
-                  {e.description}
-                </div>
-                <div style={{ display: 'flex', gap: 12, ...meta }}>
-                  <div>{displayNumber(i)}</div>
-                  <div>{e.label}</div>
-                  <div>{e.trailing}</div>
-                </div>
-              </div>
-            </Hover>
-          ))}
-        </div>
+                  <div
+                    style={{
+                      width: mob ? 112 : 172,
+                      height: mob ? 84 : 130,
+                      flex: 'none',
+                      /*
+                       * Điểm căn của ảnh bìa đi theo đường dẫn (`#focus=`), và
+                       * `center/cover` viết tay thì bỏ qua nó — chủ site căn xong
+                       * mà danh sách vẫn cắt giữa. `coverStyle` là chỗ duy nhất
+                       * biết đọc nó.
+                       */
+                      ...(postThumbnail(e) ? coverStyle(postThumbnail(e)!) : { background: e.tint }),
+                    }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: serif,
+                        fontSize: mob ? 22 : 24,
+                        letterSpacing: '-.018em',
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      {e.en}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: ink.soft,
+                        lineHeight: 1.25,
+                        margin: '5px 0 8px',
+                      }}
+                    >
+                      {postDescription(e)}
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, ...meta }}>
+                      <div>{displayNumber(i)}</div>
+                      <div>{templateName(e.template)}</div>
+                      <div>{e.date_label}</div>
+                    </div>
+                  </div>
+                </Hover>
+              ))}
+            </div>
+          </Fragment>
+        ))}
       </div>
     </div>
   )
@@ -170,7 +193,8 @@ function Band({ m, rows, onOpen }: LayoutProps) {
  * Specimen — the colour block takes the left half, a tray of square plates the
  * right; the contents below sit in a three-column grid like a specimen drawer.
  */
-function Specimen({ m, rows, onOpen }: LayoutProps) {
+function Specimen({ m, groups }: { m: ModuleRow; groups: PostGroup<PostRow>[] }) {
+  const nav = useNav()
   const mob = useIsMobile()
   const { showPlates } = useSettings()
 
@@ -217,88 +241,93 @@ function Specimen({ m, rows, onOpen }: LayoutProps) {
       </div>
 
       <div style={{ padding: '0 0 120px' }}>
-        <div
-          style={{
-            display: 'grid',
-            // Hẹp: khay ba cột xuống HAI, không phải một. Một cột thì khay
-            // tiêu bản thành đúng layout Band, và khác biệt giữa hai module
-            // biến mất.
-            gridTemplateColumns: mob ? 'repeat(2,minmax(0,1fr))' : 'repeat(3,minmax(0,1fr))',
-            gap: 1,
-            background: paper.rule,
-            borderBottom: `1px solid ${paper.rule}`,
-          }}
-        >
-          {rows.map((e, i) => (
-            <Hover
-              key={e.id}
-              onClick={() => onOpen(e, i)}
+        {groups.map((g) => (
+          <Fragment key={g.key}>
+            <GroupHead label={g.label} inset={mob ? 14 : 18} />
+            <div
               style={{
-                background: paper.cream,
-                padding: mob ? '14px 14px 16px' : '18px 18px 20px',
-                cursor: 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: mob ? 200 : 230,
+                display: 'grid',
+                // Hẹp: khay ba cột xuống HAI, không phải một. Một cột thì khay
+                // tiêu bản thành đúng layout Band, và khác biệt giữa hai module
+                // biến mất.
+                gridTemplateColumns: mob ? 'repeat(2,minmax(0,1fr))' : 'repeat(3,minmax(0,1fr))',
+                gap: 1,
+                background: paper.rule,
+                borderBottom: `1px solid ${paper.rule}`,
               }}
-              hoverStyle={rowHover}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 11,
-                }}
-              >
-                <div style={{ fontFamily: sans, fontSize: 10, color: ink.faint }}>{displayNumber(i)}</div>
-                <div
+              {withTints(g.posts, m).map((e, i) => (
+                <Hover
+                  key={e.id}
+                  onClick={() => openPost(nav, e)}
                   style={{
-                    fontFamily: sans,
-                    fontSize: 9.5,
-                    color: ink.muted,
-                    textTransform: 'uppercase',
-                    letterSpacing: '.08em',
+                    background: paper.cream,
+                    padding: mob ? '14px 14px 16px' : '18px 18px 20px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    minHeight: mob ? 200 : 230,
                   }}
+                  hoverStyle={rowHover}
                 >
-                  {e.label}
-                </div>
-              </div>
-              {showPlates && (
-                <div
-                  style={{
-                    aspectRatio: '3/2',
-                    marginBottom: 13,
-                    ...(e.image ? coverStyle(e.image) : { background: e.tint }),
-                  }}
-                />
-              )}
-              <div
-                style={{
-                  fontFamily: serif,
-                  fontSize: mob ? 19 : 25,
-                  letterSpacing: '-.02em',
-                  lineHeight: 1.14,
-                  marginBottom: 7,
-                }}
-              >
-                {e.title}
-              </div>
-              <div style={{ fontSize: 13, color: ink.soft, lineHeight: 1.3 }}>{e.description}</div>
-              <div
-                style={{
-                  marginTop: 'auto',
-                  paddingTop: 11,
-                  fontFamily: sans,
-                  fontSize: 10,
-                  color: ink.faint,
-                }}
-              >
-                {e.trailing}
-              </div>
-            </Hover>
-          ))}
-        </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 11,
+                    }}
+                  >
+                    <div style={{ fontFamily: sans, fontSize: 10, color: ink.faint }}>{displayNumber(i)}</div>
+                    <div
+                      style={{
+                        fontFamily: sans,
+                        fontSize: 9.5,
+                        color: ink.muted,
+                        textTransform: 'uppercase',
+                        letterSpacing: '.08em',
+                      }}
+                    >
+                      {templateName(e.template)}
+                    </div>
+                  </div>
+                  {showPlates && (
+                    <div
+                      style={{
+                        aspectRatio: '3/2',
+                        marginBottom: 13,
+                        ...(postThumbnail(e) ? coverStyle(postThumbnail(e)!) : { background: e.tint }),
+                      }}
+                    />
+                  )}
+                  <div
+                    style={{
+                      fontFamily: serif,
+                      fontSize: mob ? 19 : 25,
+                      letterSpacing: '-.02em',
+                      lineHeight: 1.14,
+                      marginBottom: 7,
+                    }}
+                  >
+                    {e.en}
+                  </div>
+                  <div style={{ fontSize: 13, color: ink.soft, lineHeight: 1.3 }}>{postDescription(e)}</div>
+                  <div
+                    style={{
+                      marginTop: 'auto',
+                      paddingTop: 11,
+                      fontFamily: sans,
+                      fontSize: 10,
+                      color: ink.faint,
+                    }}
+                  >
+                    {e.date_label}
+                  </div>
+                </Hover>
+              ))}
+            </div>
+          </Fragment>
+        ))}
       </div>
     </div>
   )
@@ -537,7 +566,8 @@ const roastStrip = [
  * Sequence — an oversized title on the apricot block, the roast strip shifting
  * cream → yellow → earth → cinnamon, then the contents as big numbered rows.
  */
-function Sequence({ m, rows, onOpen }: LayoutProps) {
+function Sequence({ m, groups }: { m: ModuleRow; groups: PostGroup<PostRow>[] }) {
+  const nav = useNav()
   const mob = useIsMobile()
   const { showPlates } = useSettings()
 
@@ -577,42 +607,47 @@ function Sequence({ m, rows, onOpen }: LayoutProps) {
       )}
 
       <div style={{ padding: mob ? '26px 20px 40px' : '34px 56px 120px', maxWidth: 1240 }}>
-        {rows.map((e, i) => (
-          <Hover
-            key={e.id}
-            onClick={() => onOpen(e, i)}
-            style={{
-              display: 'grid',
-              // Hẹp: bốn cột thành hai — số lớn bên trái, phần còn lại xếp
-              // dọc bên phải. Số serif là bản sắc của layout này nên nó giữ
-              // cột riêng thay vì tụt xuống thành một dòng chữ nhỏ.
-              gridTemplateColumns: mob ? '44px minmax(0,1fr)' : '70px minmax(0,1.1fr) minmax(0,1.3fr) 88px',
-              gap: mob ? '4px 14px' : 24,
-              alignItems: mob ? 'baseline' : 'center',
-              padding: mob ? '18px 8px' : '20px 10px',
-              borderBottom: `1px solid ${paper.rule}`,
-              cursor: 'pointer',
-            }}
-            hoverStyle={rowHover}
-          >
-            <div style={{ fontFamily: serif, fontSize: mob ? 34 : 38, color: '#D99C55', gridArea: mob ? '1 / 1 / 4 / 2' : undefined }}>{displayNumber(i)}</div>
-            <div
-              style={{
-                fontFamily: serif,
-                fontSize: mob ? 24 : 27,
-                letterSpacing: '-.02em',
-                lineHeight: 1.15,
-              }}
-            >
-              {e.title}
-            </div>
-            <div style={{ fontSize: 13.5, color: ink.soft, lineHeight: 1.3 }}>{e.description}</div>
-            <div style={{ ...meta, textAlign: 'right' }}>
-              {e.label}
-              <br />
-              {e.trailing}
-            </div>
-          </Hover>
+        {groups.map((g) => (
+          <Fragment key={g.key}>
+            <GroupHead label={g.label} />
+            {g.posts.map((e, i) => (
+              <Hover
+                key={e.id}
+                onClick={() => openPost(nav, e)}
+                style={{
+                  display: 'grid',
+                  // Hẹp: bốn cột thành hai — số lớn bên trái, phần còn lại xếp
+                  // dọc bên phải. Số serif là bản sắc của layout này nên nó giữ
+                  // cột riêng thay vì tụt xuống thành một dòng chữ nhỏ.
+                  gridTemplateColumns: mob ? '44px minmax(0,1fr)' : '70px minmax(0,1.1fr) minmax(0,1.3fr) 88px',
+                  gap: mob ? '4px 14px' : 24,
+                  alignItems: mob ? 'baseline' : 'center',
+                  padding: mob ? '18px 8px' : '20px 10px',
+                  borderBottom: `1px solid ${paper.rule}`,
+                  cursor: 'pointer',
+                }}
+                hoverStyle={rowHover}
+              >
+                <div style={{ fontFamily: serif, fontSize: mob ? 34 : 38, color: '#D99C55', gridArea: mob ? '1 / 1 / 4 / 2' : undefined }}>{displayNumber(i)}</div>
+                <div
+                  style={{
+                    fontFamily: serif,
+                    fontSize: mob ? 24 : 27,
+                    letterSpacing: '-.02em',
+                    lineHeight: 1.15,
+                  }}
+                >
+                  {e.en}
+                </div>
+                <div style={{ fontSize: 13.5, color: ink.soft, lineHeight: 1.3 }}>{postDescription(e)}</div>
+                <div style={{ ...meta, textAlign: 'right' }}>
+                  {templateName(e.template)}
+                  <br />
+                  {e.date_label}
+                </div>
+              </Hover>
+            ))}
+          </Fragment>
         ))}
       </div>
     </div>
@@ -621,27 +656,12 @@ function Sequence({ m, rows, onOpen }: LayoutProps) {
 
 /** Picks the layout the module declares — band, specimen or sequence. */
 export function ModuleScreen() {
-  const nav = useNav()
-  const { moduleId } = nav
-  const { data: modules, loading: modulesLoading } = useModules()
-  const m = modules.find((x) => x.id === moduleId) ?? modules[0]
-  const { data: posts, loading: postsLoading } = usePublishedPosts({
-    moduleId: m?.id,
-    enabled: Boolean(m),
-  })
-
-  /*
-   * `m` comes from the unfiltered list so a private module still renders when
-   * its address is typed in, but what is *listed* on the page goes through
-   * `indexModules` — public only, in the site's own order. A private branch
-   * must not be advertised by the page above it.
-   */
-  const listable = useMemo(() => indexModules(modules), [modules])
-  const entries = useMemo(
-    () => (m ? entriesOf(m.id, listable, posts) : []),
-    [m, listable, posts],
-  )
-  const rows = useMemo(() => (m ? entryViews(entries, m) : []), [entries, m])
+  const { moduleId } = useNav()
+  const { data: modules, loading: modulesLoading, groupsOf } = useModules()
+  // An address a page used to have (a module id) still opens it; an unknown
+  // one falls back to the first page in the navigation.
+  const m = findPage(modules, moduleId) ?? indexModules(modules)[0] ?? modules[0]
+  const { loading: postsLoading } = usePagePosts(m?.id)
 
   if (modulesLoading || !m) {
     return <div style={statusLabel}>Đang tải…</div>
@@ -650,30 +670,8 @@ export function ModuleScreen() {
     return <div style={statusLabel}>Đang tải…</div>
   }
 
-  // Index rather than id: a row knows how it reads, not what opening it means.
-  // `openModule` is the one that knows Ghi 01 has a screen of its own.
-  const onOpen = (_row: EntryView, i: number) => {
-    const e = entries[i]
-    if (!e) return
-    if (e.type === 'module') openModule(nav, e.module)
-    else openPost(nav, e.post)
-  }
-
-  const Layout = LAYOUT_SCREENS[m.layout] ?? LAYOUT_SCREENS[MODULE_LAYOUTS[0].key]
-  return <Layout m={m} rows={rows} onOpen={onOpen} />
-}
-
-/**
- * Which component draws which layout.
- *
- * `Record<ModuleLayout, …>` is the whole point: add a row to
- * `content/layouts.ts` without adding a component here and the compiler says
- * so, at the one place that would otherwise fail silently by falling through
- * to `Sequence`. The old `if / if / return` had no such check — a fourth
- * layout would simply have drawn as the third.
- */
-const LAYOUT_SCREENS: Record<ModuleLayout, (p: LayoutProps) => JSX.Element> = {
-  band: Band,
-  specimen: Specimen,
-  sequence: Sequence,
+  const groups = groupsOf(m.id)
+  if (m.layout === 'band') return <Band m={m} groups={groups} />
+  if (m.layout === 'specimen') return <Specimen m={m} groups={groups} />
+  return <Sequence m={m} groups={groups} />
 }

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { templateName } from '../lib/templateNames'
 import { postDescription } from '../lib/postText'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { PostExcerpt } from '../components/PostExcerpt'
-import { useModules } from '../data/useModules'
+import { findPage, useModules } from '../data/useModules'
 import { usePublishedPosts } from '../data/usePublishedPosts'
 import { ink, layout, paper, sans, serif, wrapTitle } from '../design/tokens'
 import { Hover } from '../lib/Hover'
@@ -71,7 +72,7 @@ export function Archive() {
       </div>
 
       {posts.map((p) => {
-        const mod = modules.find((m) => m.id === p.module_id)
+        const mod = findPage(modules, p.module_id)
         const archived = p.status === 'archived'
         const open = openId === p.id
         return (
@@ -122,7 +123,7 @@ export function Archive() {
                 textTransform: 'uppercase',
               }}
             >
-              {archived ? 'lưu trữ' : open ? 'thu ↑' : p.kind}
+              {archived ? 'lưu trữ' : open ? 'thu ↑' : templateName(p.template)}
             </div>
           </Hover>
 

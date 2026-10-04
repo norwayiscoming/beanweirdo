@@ -18,7 +18,10 @@ const ROUNDTRIP: Where[] = [
   { area: 'practice', screen: 'hours' },
   { area: 'admin', screen: 'cms' },
   { area: 'admin', screen: 'cms', tab: 'posts' },
-  { area: 'admin', screen: 'cms', tab: 'config' },
+  { area: 'admin', screen: 'cms', tab: 'pages' },
+  { area: 'admin', screen: 'cms', tab: 'display' },
+  { area: 'admin', screen: 'cms', tab: 'authors' },
+  { area: 'public', screen: 'module', moduleId: 'tag-heat' },
   { area: 'admin', screen: 'archive' },
   { area: 'admin', screen: 'postEdit', slug: 'biochemistry-p260817' },
   { area: 'admin', screen: 'postPreview', slug: 'biochemistry-p260817' },
@@ -73,15 +76,18 @@ describe('routes — tên trong địa chỉ', () => {
   })
 
   it('opens each Content management tab at its own address', () => {
-    for (const p of ['/ad-post', '/ad-config', '/ad-sitemap', '/ad-page-content', '/ad']) {
+    for (const p of ['/ad-post', '/ad-config', '/ad-sitemap', '/ad-page-content', '/ad-taxonomy', '/ad-display', '/ad-authors', '/ad']) {
       expect(parsePath(p).screen, p).toBe('cms')
     }
-    expect(parsePath('/ad-config').tab).toBe('config')
-    expect(toPath({ area: 'admin', screen: 'cms', tab: 'config' })).toBe('/ad-config')
-    // Hai nửa cũ của tab ấy. Không còn được sinh ra, nhưng link đã phát ra rồi
-    // thì vẫn phải mở đúng chỗ — người cầm link không biết chúng đã gộp.
-    expect(parsePath('/ad-sitemap').tab).toBe('config')
-    expect(parsePath('/ad-page-content').tab).toBe('config')
+    expect(parsePath('/ad-sitemap').tab).toBe('pages')
+    // Cấu hình and Nội dung trang folded into Quản lý trang; their old addresses still land there.
+    expect(parsePath('/ad-config').tab).toBe('pages')
+    expect(parsePath('/ad-page-content').tab).toBe('pages')
+    // Phân loại folded into Nội dung; its old address still lands there.
+    expect(parsePath('/ad-taxonomy').tab).toBe('posts')
+    expect(parsePath('/ad-display').tab).toBe('display')
+    expect(parsePath('/ad-authors').tab).toBe('authors')
+    expect(toPath({ area: 'public', screen: 'module', moduleId: 'tag-heat' })).toBe('/tag/heat')
     // `/ad` names the screen and not a tab, so it opens on the first one
     // without rewriting itself to another address on arrival.
     expect(parsePath('/ad').tab).toBeUndefined()

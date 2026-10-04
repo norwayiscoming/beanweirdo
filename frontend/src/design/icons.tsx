@@ -22,7 +22,8 @@ type IconProps = {
 }
 
 /**
- * `filled` swaps the stroke for a solid shape. One mark needs it — see IconPin.
+ * `filled` swaps the stroke for a solid shape — the menu's three dots, which
+ * as outlines at 16px close into blobs.
  */
 function svg(size: number, style: CSSProperties | undefined, children: JSX.Element, filled = false) {
   return (
@@ -57,47 +58,6 @@ export const IconTrash = ({ size = 16, style }: IconProps) =>
       <path d="M10.5 10.5v6M13.5 10.5v6" />
     </>,
   )
-
-export const IconDrag = ({ size = 16, style }: IconProps) => (
-  <svg
-    viewBox="0 0 24 24"
-    width={size}
-    height={size}
-    fill="currentColor"
-    aria-hidden="true"
-    focusable="false"
-    style={{ display: 'block', flex: 'none', ...style }}
-  >
-    <rect x="8" y="5" width="2.6" height="2.6" />
-    <rect x="13.4" y="5" width="2.6" height="2.6" />
-    <rect x="8" y="10.7" width="2.6" height="2.6" />
-    <rect x="13.4" y="10.7" width="2.6" height="2.6" />
-    <rect x="8" y="16.4" width="2.6" height="2.6" />
-    <rect x="13.4" y="16.4" width="2.6" height="2.6" />
-  </svg>
-)
-
-/**
- * One chevron, turned by `open`, replacing four characters that all meant the
- * same thing in different places: `▾`, `▸`, `+` and `−`.
- */
-export const IconChevron = ({ size = 16, open = false, style }: IconProps & { open?: boolean }) =>
-  svg(size, { transform: open ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform .15s ease', ...style },
-    <path d="M5 9l7 7 7-7" />)
-
-/*
- * The one solid mark in the set, and the reason is size.
- *
- * A thumbtack was outlined first — angled shoulders, a 6-unit head. Rendered
- * at the 16px it is actually used at, a 2.2 stroke is 1.5px wide and the
- * interior closes into a blob. Redrawing it as three strokes was worse: with
- * the contour gone it read as a dagger. Five candidates were rendered at 16px
- * side by side and compared; the solid silhouette was the only one still
- * legible, because at this size a shape survives where a line drawing does
- * not. It sits a touch heavier than its neighbours, which is the trade.
- */
-export const IconPin = ({ size = 16, style }: IconProps) =>
-  svg(size, style, <path d="M7 3h10v2.5h-2l2 7H7l2-7H7V3zM11 13h2l-1 8z" />, true)
 
 export const IconUpload = ({ size = 16, style }: IconProps) =>
   svg(

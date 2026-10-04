@@ -56,6 +56,7 @@ import type { AuthorRef } from 'api-contract'
 import { CoverBand } from '../components/CoverBand'
 import { FramingProvider, useCropping, useFraming } from '../components/framing'
 import { PlateImageUpload, PlateUpload } from '../components/PlateUpload'
+import { PostPlacement, type PlacementPatch } from '../components/PostPlacement'
 import { blankReportBlock, getBody, ORDERED_LIST, resolveTemplate } from '../lib/postData'
 import {
   addColumn,
@@ -142,7 +143,8 @@ type EditPatch = Partial<{
   plate_images: Record<string, string | null>
   /** Màu riêng của bài; null trả nó về theo màu module. */
   theme_color: string | null
-}>
+}> &
+  PlacementPatch
 
 /**
  * Những việc chỉ ảnh bìa mới làm được, gom một chỗ.
@@ -520,6 +522,27 @@ function EditorContent({ postId }: { postId: string }) {
         <AuthorPicker key={postId} postId={postId} initial={byline} />
       </div>
 
+      <PostPlacement
+        post={post}
+        modules={modules}
+        derivedSlug={addresses.slugOf(postId)}
+        onPatch={applyPatch}
+        onSlug={async (slug) => {
+          try {
+            const saved = await updatePost(postId, { slug })
+            setPost((prev) => (prev ? { ...prev, slug: saved.slug ?? null, old_slugs: saved.old_slugs } : prev))
+            return null
+          } catch (e) {
+            return (e as Error).message
+          }
+        }}
+        onForget={(slug) =>
+          void updatePost(postId, { forget_slugs: [slug] }).then((saved) =>
+            setPost((prev) => (prev ? { ...prev, old_slugs: saved.old_slugs } : prev)),
+          )
+        }
+      />
+
       <CanvasFailure key={postId}>
         <EditorCanvas
           template={template}
@@ -561,7 +584,7 @@ function EditorContent({ postId }: { postId: string }) {
               const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
               try {
                 await Promise.allSettled([...inFlight.current])
-                await transitionStatus(postId, 'publish')
+                await transitionStatus(postId, 'publish', addresses.slugToPublish(postId))
                 card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
                 nav.goCms()
               } catch (e) {

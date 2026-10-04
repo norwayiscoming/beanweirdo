@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { indexModules, type ModuleRow } from '../data/useModules'
 import { buildTree, flattenTree } from '../lib/contentTree'
-import { countUnder } from '../lib/postGroups'
-import type { PostRow } from '../data/usePublishedPosts'
 
 /**
  * The rows the sidebar draws, without drawing them.
@@ -26,8 +24,6 @@ const mod = (
     visibility: o.visibility ?? 'public',
     sort_order: o.sort_order ?? 1,
   }) as unknown as ModuleRow
-
-const post = (module_id: string) => ({ module_id }) as unknown as PostRow
 
 /** Exactly what `section()` walks. */
 const rowsOf = (modules: ModuleRow[]) =>
@@ -90,26 +86,5 @@ describe('the sidebar rows', () => {
       { id: 'ghi01', depth: 0 },
       { id: 'tanman', depth: 1 },
     ])
-  })
-})
-
-describe('the count beside a name', () => {
-  const tree = [
-    mod('bean', { sort_order: 1 }),
-    mod('roasting', { parent_id: 'bean', sort_order: 2 }),
-    mod('heat', { parent_id: 'roasting', sort_order: 3 }),
-  ]
-
-  it('covers the whole branch, not just what is filed directly under it', () => {
-    const posts = [post('roasting'), post('roasting'), post('heat')]
-    // A heading that holds everything one level down used to read "0 bài".
-    expect(countUnder(posts, tree, 'bean')).toBe(3)
-    expect(countUnder(posts, tree, 'roasting')).toBe(3)
-    expect(countUnder(posts, tree, 'heat')).toBe(1)
-  })
-
-  it('still shows zero for a module that genuinely holds nothing', () => {
-    // Rule 05: a public module always shows, count and all, even at nothing.
-    expect(countUnder([], tree, 'bean')).toBe(0)
   })
 })

@@ -10,7 +10,9 @@ const useNav = vi.fn()
 vi.mock('../lib/nav', () => ({ useNav: (...args: unknown[]) => useNav(...args) }))
 
 const useModules = vi.fn()
-vi.mock('../data/useModules', () => ({ useModules: (...args: unknown[]) => useModules(...args) }))
+vi.mock('../data/useModules', async (orig) =>
+  (await import('../test/pagesMock')).pagesModule(orig, (...a: unknown[]) => useModules(...a), () => usePublishedPosts().data ?? []),
+)
 
 const usePublishedPosts = vi.fn()
 vi.mock('../data/usePublishedPosts', () => ({
@@ -60,7 +62,8 @@ describe('Article', () => {
     const title = await screen.findByTestId('article-title')
     expect(title.textContent).toBe('Chlorogenic Acids (CGA)')
     // '01', not the stored n of '03': it is the only published post in biochem.
-    expect(screen.getByText('01 — essay — 2026.02')).toBeInTheDocument()
+    // The eyebrow names the template — dạng bài is retired.
+    expect(screen.getByText('01 — article — 2026.02')).toBeInTheDocument()
     expect(screen.getByText('Một họ hợp chất phenolic.')).toBeInTheDocument()
 
     await userEvent.click(screen.getByText('← biochemistry 101'))
@@ -129,7 +132,7 @@ describe('Article', () => {
     usePublishedPosts.mockReturnValue({ data: [], loading: false, error: null })
     usePost.mockReturnValue({ data: cgaPost, loading: false, error: null })
     render(<Article />)
-    expect(await screen.findByText('essay — 2026.02')).toBeInTheDocument()
+    expect(await screen.findByText('article — 2026.02')).toBeInTheDocument()
     expect(screen.queryByText(/^\d\d — essay/)).not.toBeInTheDocument()
   })
 
