@@ -18,6 +18,8 @@ export type RouteWords = {
   index: string
   notes: string
   practice: string
+  /** Public port page: `/portfolio/<slug>`. */
+  portfolio: string
   /** Bảy trang con của khu quản trị — phần đứng sau `ad-`. */
   adPost: string
   adConfig: string
@@ -29,6 +31,10 @@ export type RouteWords = {
   adSitemap: string
   adPageContent: string
   adArchive: string
+  /** Portfolio's two tabs: `/ad-portfolio`, `/ad-portfolio-design`. */
+  adPortfolio: string
+  adPortContent: string
+  adPortDesign: string
   /** Ba động từ soạn bài: `/ad-post/edit=<slug>`. */
   create: string
   edit: string
@@ -49,12 +55,16 @@ export const DEFAULT_WORDS: RouteWords = {
   index: 'muc-luc',
   notes: 'ghi',
   practice: 'practice',
+  portfolio: 'portfolio',
   adPost: 'post',
   adConfig: 'config',
   adAuthors: 'authors',
   adSitemap: 'sitemap',
   adPageContent: 'page-content',
   adArchive: 'archive',
+  adPortfolio: 'portfolio',
+  adPortContent: 'portfolio-content',
+  adPortDesign: 'portfolio-design',
   create: 'create',
   edit: 'edit',
   view: 'view',
@@ -74,12 +84,16 @@ export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'module
   index: 'Mục lục',
   notes: 'Ghi 01',
   practice: 'Nhật ký',
+  portfolio: 'Portfolio',
   adPost: 'Tạo bài đăng',
   adConfig: 'Cấu hình',
   adAuthors: 'Tác giả',
   adSitemap: 'Sơ đồ trang',
   adPageContent: 'Sửa nội dung',
   adArchive: 'Archive',
+  adPortfolio: 'Portfolio · Quản lý port',
+  adPortContent: 'Portfolio · Nội dung trang',
+  adPortDesign: 'Portfolio · Cài đặt hiển thị',
   create: 'Tạo bài',
   edit: 'Sửa bài',
   view: 'Xem trước',
@@ -107,9 +121,9 @@ const SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
  */
 const MUST_DIFFER: (keyof RouteWords)[][] = [
   // Đoạn đầu địa chỉ: mọi trang công khai và khu quản trị nằm cùng một chỗ.
-  ['admin', 'post', 'module', 'index', 'notes', 'practice'],
+  ['admin', 'post', 'module', 'index', 'notes', 'practice', 'portfolio'],
   // Bảy trang con đứng cùng một chỗ, ngay sau `ad-`.
-  ['adPost', 'adConfig', 'adAuthors', 'adSitemap', 'adPageContent', 'adArchive'],
+  ['adPost', 'adConfig', 'adAuthors', 'adSitemap', 'adPageContent', 'adArchive', 'adPortfolio', 'adPortContent', 'adPortDesign'],
   // Ba động từ đứng cùng một chỗ, ngay sau `/ad-post/`.
   ['create', 'edit', 'view'],
 ]

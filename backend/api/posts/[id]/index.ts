@@ -6,6 +6,7 @@ import { getSupabase } from '../../../lib/supabase.js'
 import { firstImageIn, POST_DETAIL_COLUMNS, toPostDetail, type PostRow } from '../../../lib/posts.js'
 import { readDraft, splitDraftPatch, stageDraft } from '../../../lib/drafts.js'
 import { AUTHOR_REF_COLUMNS, isMissingAuthorTables, toAuthorRef } from '../../../lib/authors.js'
+import { handlePostAuthors } from '../../../lib/authorsApi.js'
 
 function getId(req: VercelRequest): string | null {
   const raw = req.query.id
@@ -225,6 +226,9 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
     return
   }
 
+  // The byline lives here rather than in a function of its own: the plan caps
+  // the backend at 12 functions (see lib/authorsApi.ts).
+  if (req.query.part === 'authors') return handlePostAuthors(req, res)
   if (req.method === 'GET') {
     await handleGet(req, res, id)
     return

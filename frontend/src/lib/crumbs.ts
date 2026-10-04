@@ -3,6 +3,7 @@ import { navLabel } from '../content/navItems'
 import { ancestorsOf } from './contentTree'
 import { SECTION_NAMES } from '../content/site'
 import { goToArea } from './area'
+import { openModule } from './moduleTarget'
 import type { Nav } from './nav'
 
 type Crumb = {
@@ -64,11 +65,16 @@ export function buildCrumbs(
   const atCms = nav.screen === 'cms'
   const admin: Crumb = atCms ? { label: SECTION_NAMES.Admin } : { label: SECTION_NAMES.Admin, go: nav.goCms }
   const backend: Crumb = atCms ? { label: 'Backend' } : { label: 'Backend', go: nav.goCms }
+  // Through moduleTarget: Ghi 01 and Ghi 02 have their own screens, and the
+  // generic module page is a second, wrong door into them.
   const titleOf = (id: string) => modules.find((m) => m.id === id)?.title ?? id
-  const mod = (id: string): Crumb => ({
-    label: titleOf(id),
-    go: toPublic('landing', () => nav.openModule(id)),
-  })
+  const mod = (id: string): Crumb => {
+    const row = modules.find((m) => m.id === id)
+    return {
+      label: titleOf(id),
+      go: toPublic('landing', () => (row ? openModule(nav, row) : nav.openModule(id))),
+    }
+  }
 
   /**
    * The branches a module hangs from, outermost first.
@@ -115,6 +121,8 @@ export function buildCrumbs(
       return [admin, { label: 'Notes', go: nav.goCms }, { label: navLabel('archive') }]
     case 'cms':
       return [admin, backend, { label: navLabel('cms') }]
+    case 'portfolio':
+      return [admin, backend, { label: navLabel('portfolio') }]
     default:
       return [landing]
   }
@@ -151,6 +159,9 @@ export function crumbBack(
   const out = nav.area === 'public' ? nav.goLanding : () => goToArea('public')
 
   switch (nav.screen) {
+    // Inside admin the step back is admin's own front door, not the public journal.
+    case 'portfolio':
+      return nav.goCms
     case 'module': {
       // One step back out of Roasting is bean weirdo, not the index. The arrow
       // used to skip every branch in between, because it only knew about a
@@ -161,7 +172,11 @@ export function crumbBack(
     case 'article':
       // Back goes to the module this post is actually filed under. It used to
       // go to 'biochem' whatever you were reading.
-      if (nav.articleFrom === 'module') return () => nav.openModule(moduleId ?? nav.moduleId)
+      if (nav.articleFrom === 'module') {
+        const id = moduleId ?? nav.moduleId
+        const row = modules.find((m) => m.id === id)
+        return () => (row ? openModule(nav, row) : nav.openModule(id))
+      }
       if (nav.articleFrom === 'archive') return nav.goArchive
       return out
     /*

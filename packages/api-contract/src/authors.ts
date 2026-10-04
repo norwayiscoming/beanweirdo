@@ -1,13 +1,16 @@
 /**
  * Authors and who wrote which post — migration 0030.
  *
- *   GET    /api/authors                  → AuthorListResponse
- *   POST   /api/authors                  AuthorCreateRequest → AuthorResponse   (201)
- *   PATCH  /api/authors/:id              AuthorUpdateRequest → AuthorResponse
- *   DELETE /api/authors/:id              → AuthorDeleteResponse, or 409 `conflict`
+ *   GET    /api/tags?vocab=authors        → AuthorListResponse
+ *   POST   /api/tags?vocab=authors        AuthorCreateRequest → AuthorResponse   (201)
+ *   PATCH  /api/tags?vocab=authors&id=…   AuthorUpdateRequest → AuthorResponse
+ *   DELETE /api/tags?vocab=authors&id=…   → AuthorDeleteResponse, or 409 `conflict`
  *                                          with `details.post_count` while posts
  *                                          still carry the author
- *   PUT    /api/posts/:id/authors        PostAuthorsRequest → PostAuthorsResponse
+ *   PUT    /api/posts/:id?part=authors    PostAuthorsRequest → PostAuthorsResponse
+ *
+ * Hosted on existing endpoints because the Vercel plan caps the backend at
+ * 12 functions — see backend/lib/authorsApi.ts.
  *
  * `GET /api/posts/:id` carries the same ordered list as `authors` on the post.
  */

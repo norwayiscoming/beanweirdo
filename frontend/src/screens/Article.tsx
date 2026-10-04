@@ -17,6 +17,7 @@ import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useNav } from '../lib/nav'
 import { usePostAuthors } from '../data/usePostAuthors'
 import { Byline } from '../components/Byline'
+import { openModule } from '../lib/moduleTarget'
 
 const status = {
   fontFamily: sans,
@@ -116,7 +117,9 @@ export function Article() {
       post={toArticleData(post, moduleTitle, related, position, module_)}
       breadcrumb={crumbs}
       renderEyebrow={(eyebrowModuleTitle) => (
-        <span onClick={() => nav.openModule(post.module_id)} style={{ cursor: 'pointer' }}>
+        // Through moduleTarget, like the index: Ghi 01 and Ghi 02 have their
+        // own screens, and the generic module page is a second, wrong door.
+        <span onClick={() => (module_ ? openModule(nav, module_) : nav.openModule(post.module_id))} style={{ cursor: 'pointer' }}>
           ← {eyebrowModuleTitle}
         </span>
       )}

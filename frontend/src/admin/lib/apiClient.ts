@@ -285,38 +285,38 @@ export async function getPost(id: string): Promise<PostDetail & { authors: Autho
   return result.post
 }
 
-/** PUT /api/posts/:id/authors — thay cả danh sách tác giả của bài, theo thứ tự. */
+/** PUT /api/posts/:id?part=authors — thay cả danh sách tác giả của bài, theo thứ tự. */
 export async function setPostAuthors(id: string, author_ids: string[]): Promise<AuthorRef[]> {
   const body: PostAuthorsRequest = { author_ids }
-  const result = await request<PostAuthorsResponse>(`/api/posts/${id}/authors`, {
+  const result = await request<PostAuthorsResponse>(`/api/posts/${id}?part=authors`, {
     method: 'PUT',
     body: JSON.stringify(body),
   })
   return result.authors
 }
 
-/** GET /api/authors — mọi tác giả, người đang hoạt động trước. */
+/** GET /api/tags?vocab=authors — mọi tác giả, người đang hoạt động trước. */
 export async function listAuthors(): Promise<Author[]> {
-  return (await request<AuthorListResponse>('/api/authors')).authors
+  return (await request<AuthorListResponse>('/api/tags?vocab=authors')).authors
 }
 
-/** POST /api/authors — bỏ trống `slug` thì máy chủ tự đặt theo tên. */
+/** POST /api/tags?vocab=authors — bỏ trống `slug` thì máy chủ tự đặt theo tên. */
 export async function createAuthor(input: AuthorCreateRequest): Promise<Author> {
-  return (await request<AuthorResponse>('/api/authors', { method: 'POST', body: JSON.stringify(input) })).author
+  return (await request<AuthorResponse>('/api/tags?vocab=authors', { method: 'POST', body: JSON.stringify(input) })).author
 }
 
-/** PATCH /api/authors/:id */
+/** PATCH /api/tags?vocab=authors&id=… */
 export async function updateAuthor(id: string, patch: AuthorUpdateRequest): Promise<Author> {
-  return (await request<AuthorResponse>(`/api/authors/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }))
+  return (await request<AuthorResponse>(`/api/tags?vocab=authors&id=${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) }))
     .author
 }
 
 /**
- * DELETE /api/authors/:id — máy chủ từ chối (409, `details.post_count`) khi
+ * DELETE /api/tags?vocab=authors&id=… — máy chủ từ chối (409, `details.post_count`) khi
  * còn bài đứng tên người này; khi ấy tắt họ đi thay vì xoá.
  */
 export async function deleteAuthor(id: string): Promise<AuthorDeleteResponse> {
-  return request<AuthorDeleteResponse>(`/api/authors/${id}`, { method: 'DELETE' })
+  return request<AuthorDeleteResponse>(`/api/tags?vocab=authors&id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 /**
@@ -586,4 +586,52 @@ export type TemplateSummary = {
 export async function listTemplates(): Promise<TemplateSummary[]> {
   const result = await request<{ templates: TemplateSummary[] }>('/api/templates')
   return result.templates
+}
+
+// ── Portfolio ───────────────────────────────────────────────────────────────
+
+/** Portfolio page lifecycle — see migrations 0025 and 0026. */
+export type PortStatus = 'draft' | 'published' | 'archived'
+
+export type PortPageInput = {
+  slug: string
+  title: string
+  intro?: string
+  palette?: string
+  blocks?: unknown[]
+  status?: PortStatus
+  sortOrder?: number
+}
+
+export type PortPageRecord = Required<PortPageInput> & { id: string; updatedAt: string }
+
+/** GET /api/portfolio — every port page (drafts included) and the saved design tokens. */
+export async function getPortfolio(): Promise<{ pages: PortPageRecord[]; design: Record<string, unknown> }> {
+  return request<{ pages: PortPageRecord[]; design: Record<string, unknown> }>('/api/portfolio')
+}
+
+export async function createPortPage(input: PortPageInput): Promise<PortPageRecord> {
+  const r = await request<{ page: PortPageRecord }>('/api/portfolio', { method: 'POST', body: JSON.stringify(input) })
+  return r.page
+}
+
+export async function updatePortPage(id: string, patch: Partial<PortPageInput>): Promise<PortPageRecord> {
+  const r = await request<{ page: PortPageRecord }>(`/api/portfolio?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return r.page
+}
+
+export async function deletePortPage(id: string): Promise<void> {
+  await request(`/api/portfolio?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** PATCH /api/portfolio?part=design — merges one level deep; `null` resets a key to its default. */
+export async function updatePortDesign(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const r = await request<{ design: Record<string, unknown> }>('/api/portfolio?part=design', {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  return r.design
 }

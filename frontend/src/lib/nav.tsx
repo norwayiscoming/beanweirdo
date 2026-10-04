@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Area } from './area'
-import type { CmsTab } from './routes'
+import type { CmsTab, PortTab } from './routes'
 
 export type Screen =
   | 'landing'
@@ -11,6 +11,13 @@ export type Screen =
   | 'hours'
   | 'notes'
   | 'cms'
+  /** Admin › Portfolio — port pages and the design system. */
+  | 'portfolio'
+  /** Public port page, /portfolio/<slug>. */
+  | 'portfolioPage'
+  /** /portfolio — the main page, and /portfolio/about. */
+  | 'portfolioHome'
+  | 'portfolioAbout'
   | 'cards'
   | 'report'
   // The post-authoring flow, reached from Content management's first tab.
@@ -51,12 +58,17 @@ export type Nav = {
   /** The template open under Admin › Templates — null on the list itself. */
   /** Which tab of Content management is open. */
   cmsTab: CmsTab
+  /** Which tab of Portfolio is open. */
+  portTab: PortTab
+  /** Slug of the public port page currently open. */
+  slug: string | null
   goLanding(): void
   goHome(): void
   goArchive(): void
   goHours(): void
   goNotes(): void
   goCms(tab?: CmsTab): void
+  goPortfolio(tab?: PortTab): void
   /**
    * Open one template, or `null` for the list.
    *
