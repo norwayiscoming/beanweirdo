@@ -1,10 +1,13 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { rootsOf } from '../lib/contentTree'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { watchModules } from './modulesChanged'
 import { bySiteOrder } from '../lib/moduleOrder'
+import { rootsOf } from '../lib/contentTree'
+import { supabase } from '../lib/supabaseClient'
+import { groupPosts, resolveRule, toRule, type ListingRule, type PostGroup, type RuleTopic } from '../lib/listingRule'
+import type { PostRow } from './usePublishedPosts'
+import { TAG_PAGE } from '../lib/routes'
 import type { ModuleLayout } from '../content/layouts'
 export type { ModuleLayout }
-import { supabase } from '../lib/supabaseClient'
 
 
 /** A row from the public `modules` table — see backend/supabase/migrations/0001 and 0007. */
@@ -67,118 +70,414 @@ export type ModuleRow = {
   visibility: 'public' | 'private'
 }
 
+
+/**
+ * A page the site can show: a module as the screens have always drawn it, now
+ * built from the feature layer (migration 0028) — a tier template or a curated
+ * page, its listing rule, and its place in the navigation.
+ *
+ * The screens keep reading the same shape (`ModuleRow`), so moving them onto
+ * rules changes where a page's posts come from, not how a page is drawn.
+ */
+export type PageRow = ModuleRow & {
+  /** Earlier addresses that still open this page — a module id, a module's URL name. */
+  aliases: string[]
+  /** A page with a screen of its own instead of the module screen. */
+  screen?: 'notes' | 'hours'
+  /** Where the page comes from. `module` = a module not yet moved onto rules. */
+  source: 'curated' | 'topic' | 'keyword' | 'module'
+  /** The tree node or tag a tier page stands for. */
+  node: string | null
+  rule: ListingRule | null
+  inSidebar: boolean
+  onHome: boolean
+}
+
 type UseModulesResult = {
-  data: ModuleRow[]
+  /** Every page: the navigation's, and every tier page whether listed or not. */
+  data: PageRow[]
   loading: boolean
   error: string | null
+  /** The posts a page lists, in its rule's order. */
+  postsOf: (pageId: string) => PostRow[]
+  /**
+   * The page's posts as its rule groups them; one unnamed group when it does
+   * not group.
+   */
+  groupsOf: (pageId: string) => PostGroup<PostRow>[]
+  /** A post's theme tags, by name, in the order they were given. Optional so stubs need not care. */
+  tagsOf?: (postId: string) => { id: string; label: string }[]
+  /** Read everything again — after the CMS changes a rule or a page. */
+  reload: () => void
+}
+
+type Override = { node_type: 'topic' | 'keyword'; node_id: string; rule_id: string | null; presentation: Record<string, unknown>; aliases: string[] }
+type PageRecord = {
+  id: string
+  kind: 'curated' | 'template_subject' | 'template_topic' | 'template_keyword' | 'nav'
+  title: string
+  presentation: Record<string, unknown>
+  blocks: string[]
+  aliases: string[]
+  visibility: 'public' | 'private'
+}
+type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
+type TopicRecord = RuleTopic & { intro: string; accent: string | null; on_color: string | null; tint: string | null; tint2: string | null; visibility: string }
+type KeywordRecord = { id: string; label: string }
+
+export type Store = {
+  modules: ModuleRow[]
+  topics: TopicRecord[]
+  keywords: KeywordRecord[]
+  pages: PageRecord[]
+  overrides: Override[]
+  rules: Map<string, ListingRule>
+  postKeywords: Map<string, string[]>
+  posts: PostRow[]
+}
+
+export const EMPTY: Store = { modules: [], topics: [], keywords: [], pages: [], overrides: [], rules: new Map(), postKeywords: new Map(), posts: [] }
+
+/** A page record's rows, ready to draw: blank strings rather than nulls where the screens expect text. */
+const BLANK: Omit<ModuleRow, 'id' | 'title'> = {
+  accent: '#8C8674',
+  on_color: '#23211A',
+  tint: '',
+  tint2: '',
+  layout: 'band',
+  concept: '',
+  blurb: '',
+  long_desc: '',
+  treatment: '',
+  layout_note: '',
+  shot1: '',
+  shot2: '',
+  shot3: '',
+  img1: null,
+  img2: null,
+  img3: null,
+  feature_cells: [],
+  page_img1: null,
+  page_img2: null,
+  page_img3: null,
+  page_img4: null,
+  page_shot1: '',
+  page_shot2: '',
+  page_shot3: '',
+  page_shot4: '',
+  sort_order: 0,
+  kind: 'normal',
+  visibility: 'public',
+}
+
+/**
+ * How a page looks: the template's defaults, then what its node says about
+ * itself, then a linked module's live row (while the CMS still edits modules),
+ * then the page's own settings.
+ */
+function present(
+  base: Partial<ModuleRow>,
+  layers: (Record<string, unknown> | undefined)[],
+  modules: ModuleRow[],
+): Omit<ModuleRow, 'id'> & { screen?: 'notes' | 'hours' } {
+  let out: Record<string, unknown> = { ...BLANK, ...base }
+  for (const layer of layers) {
+    if (!layer) continue
+    const { module: linked, ...own } = layer as { module?: string }
+    const row = linked ? modules.find((m) => m.id === linked) : undefined
+    if (row) {
+      const { id: _id, sort_order: _o, kind: _k, visibility: _v, ...looks } = row
+      out = { ...out, ...looks }
+    }
+    out = { ...out, ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== null && v !== undefined)) }
+  }
+  return out as Omit<ModuleRow, 'id'>
+}
+
+/** Builds every page from the store. Exported for tests. */
+export function buildPages(store: Store): PageRow[] {
+  const { modules, topics, keywords, pages, overrides, rules } = store
+  const ruleOf = (id: string | null | undefined) => (id ? rules.get(id) ?? null : null)
+  const template = (kind: PageRecord['kind']) => pages.find((p) => p.kind === kind)
+  const override = (type: Override['node_type'], id: string) => overrides.find((o) => o.node_type === type && o.node_id === id)
+  const out: PageRow[] = []
+
+  // Until the feature layer is set up, the modules are the pages, exactly as
+  // they were — so the site cannot shift between running the migration and
+  // filling it in.
+  if (pages.length === 0) {
+    return arrange(
+      modules.map((m) => ({ ...m, aliases: [], source: 'module' as const, node: null, rule: null, inSidebar: false, onHome: false })),
+      undefined,
+      topics,
+      modules,
+    ).map(withScreen)
+  }
+
+  for (const t of topics) {
+    const tpl = template(t.parent_id === null ? 'template_subject' : 'template_topic')
+    const own = override('topic', t.id)
+    const parent = t.parent_id ? topics.find((p) => p.id === t.parent_id) : undefined
+    const look = present(
+      {
+        title: t.title,
+        blurb: t.intro,
+        // A topic with no colour of its own wears its subject's.
+        accent: t.accent ?? parent?.accent ?? BLANK.accent,
+        on_color: t.on_color ?? parent?.on_color ?? BLANK.on_color,
+        tint: t.tint ?? parent?.tint ?? '',
+        tint2: t.tint2 ?? parent?.tint2 ?? '',
+      },
+      [tpl?.presentation, own?.presentation],
+      modules,
+    )
+    out.push({
+      ...look,
+      id: t.id,
+      visibility: t.visibility === 'private' ? 'private' : 'public',
+      aliases: own?.aliases ?? [],
+      source: 'topic',
+      node: t.id,
+      rule: ruleOf(own?.rule_id) ?? ruleOf(tpl?.blocks[0]),
+      inSidebar: false,
+      onHome: false,
+    })
+  }
+
+  for (const k of keywords) {
+    const tpl = template('template_keyword')
+    const own = override('keyword', k.id)
+    out.push({
+      ...present({ title: k.label }, [tpl?.presentation, own?.presentation], modules),
+      id: `${TAG_PAGE}${k.id}`,
+      aliases: own?.aliases ?? [],
+      source: 'keyword',
+      node: k.id,
+      rule: ruleOf(own?.rule_id) ?? ruleOf(tpl?.blocks[0]),
+      inSidebar: false,
+      onHome: false,
+    })
+  }
+
+  for (const p of pages.filter((x) => x.kind === 'curated')) {
+    const look = present({ title: p.title }, [p.presentation], modules)
+    out.push({
+      ...look,
+      id: p.id,
+      visibility: p.visibility,
+      aliases: p.aliases,
+      source: 'curated',
+      node: null,
+      rule: ruleOf(p.blocks[0]),
+      inSidebar: false,
+      onHome: false,
+    })
+  }
+
+  // A module no page or tier page has taken over yet is still a page of its
+  // own, listing its posts the way it always did — Ghi 02 is one.
+  const taken = new Set(out.flatMap((p) => [p.id, ...p.aliases]))
+  for (const m of modules) {
+    if (taken.has(m.id)) continue
+    out.push({ ...m, aliases: [], source: 'module', node: null, rule: null, inSidebar: false, onHome: false })
+  }
+
+  return arrange(out.map(withScreen), pages.find((p) => p.kind === 'nav'), topics, modules)
+}
+
+/** Ghi 01 keeps the screen written for it. (Ghi 02 is Practice's, not a blog page.) */
+function withScreen(p: PageRow): PageRow {
+  if (p.screen) return p
+  if (p.id === 'ghi01' || p.aliases.includes('ghi01')) return { ...p, screen: 'notes' }
+  return p
+}
+
+/**
+ * The navigation as a rule: every subject in tree order is listed unless the
+ * owner placed or hid it, and the owner's list comes first. With no navigation
+ * stored yet, the modules' own order and flags stand in for it.
+ */
+function arrange(pages: PageRow[], nav: PageRecord | undefined, topics: TopicRecord[], modules: ModuleRow[]): PageRow[] {
+  const byRef = (ref: string) => {
+    const [type, id] = ref.split(':')
+    return pages.find((p) => (type === 'tag' ? p.id === `${TAG_PAGE}${id}` : p.id === id))
+  }
+
+  if (!nav) {
+    // Reading modules before journals, each band in the CMS order (rule 05).
+    const ordered = [...modules].sort(
+      (a, b) => Number(a.kind === 'special') - Number(b.kind === 'special') || a.sort_order - b.sort_order,
+    )
+    for (const p of pages) {
+      const m = modules.find((x) => x.id === p.id || p.aliases.includes(x.id))
+      if (!m) continue
+      p.sort_order = ordered.indexOf(m) + 1
+      p.inSidebar = m.visibility !== 'private'
+      p.onHome = m.kind !== 'special' && m.visibility !== 'private'
+    }
+    return pages
+  }
+
+  const items = ((nav.presentation.items ?? []) as NavItem[]).filter((i) => byRef(i.ref))
+  const listed = new Set(items.map((i) => i.ref))
+  const subjects = [...topics].filter((t) => t.parent_id === null).sort((a, b) => a.sort_order - b.sort_order)
+  const auto = subjects.filter((s) => !listed.has(`topic:${s.id}`)).map((s) => ({ ref: `topic:${s.id}`, sidebar: true, home: true }))
+  ;[...items, ...auto].forEach((item, i) => {
+    const page = byRef(item.ref)!
+    page.sort_order = i + 1
+    page.inSidebar = item.sidebar !== false && page.visibility !== 'private'
+    page.onHome = item.home !== false && page.visibility !== 'private'
+  })
+  return pages
+}
+
+/** A page by its id, or by an address it used to have. */
+export function findPage<T extends { id: string; aliases?: string[] }>(pages: readonly T[], idOrAlias: string | null | undefined): T | undefined {
+  if (!idOrAlias) return undefined
+  return pages.find((p) => p.id === idOrAlias) ?? pages.find((p) => p.aliases?.includes(idOrAlias))
+}
+
+/** The posts a page lists. Exported for tests. */
+export function pagePosts(page: PageRow | undefined, store: Pick<Store, 'posts' | 'topics' | 'postKeywords'>): PostRow[] {
+  if (!page) return []
+  if (!page.rule) {
+    // Not on rules yet: the module's posts in the posts table's order.
+    return resolveRule(toRule({ sort: 'manual' }), store.posts.filter((p) => p.module_id === page.id), { topics: store.topics }).posts
+  }
+  return resolveRule(page.rule, store.posts, {
+    topics: store.topics,
+    keywordsOf: (id) => store.postKeywords.get(id) ?? [],
+    node: page.node,
+  }).posts
 }
 
 const ModulesContext = createContext<UseModulesResult | null>(null)
 
-/** The actual query. `enabled` is false for consumers already covered by a provider. */
+async function loadStore(): Promise<Store> {
+  // Modules and posts are what the site cannot draw without; the feature
+  // layer's tables may simply not exist yet (before migration 0028), and the
+  // site then draws from the modules as it always did.
+  const all = <T,>(q: PromiseLike<{ data: unknown; error: unknown }>, required = false) =>
+    Promise.resolve(q).then(({ data, error }) => {
+      if (error && required) throw new Error((error as { message?: string }).message ?? 'query failed')
+      return (data ?? []) as T[]
+    })
+  const [modules, topics, keywords, pages, overrides, rules, postKeywords, posts] = await Promise.all([
+    all<ModuleRow>(supabase.from('modules').select('*').order('sort_order', { ascending: true }), true),
+    all<TopicRecord>(supabase.from('topics').select('*')),
+    all<KeywordRecord>(supabase.from('keywords').select('id, label')),
+    all<PageRecord>(supabase.from('pages').select('*')),
+    all<Override>(supabase.from('page_overrides').select('*')),
+    all<ListingRule>(supabase.from('listing_rules').select('*')),
+    all<{ post_id: string; keyword_id: string }>(supabase.from('post_keywords').select('post_id, keyword_id')),
+    all<PostRow>(supabase.from('posts').select('*').eq('status', 'published'), true),
+  ])
+  const worn = new Map<string, string[]>()
+  for (const { post_id, keyword_id } of postKeywords) worn.set(post_id, [...(worn.get(post_id) ?? []), keyword_id])
+  return {
+    modules,
+    topics,
+    keywords,
+    pages,
+    overrides,
+    rules: new Map(rules.map((r) => [r.id!, toRule(r)])),
+    postKeywords: worn,
+    posts,
+  }
+}
+
 function useModulesQuery(enabled: boolean): UseModulesResult {
-  const [data, setData] = useState<ModuleRow[]>([])
+  const [store, setStore] = useState<Store>(EMPTY)
   const [loading, setLoading] = useState(enabled)
   const [error, setError] = useState<string | null>(null)
-  const [epoch, setEpoch] = useState(0)
+  const [round, setRound] = useState(0)
 
-  // Khu quản trị ghi module qua một API khác hẳn đường đọc này, nên không có
-  // gì báo cho nó biết thứ tự vừa đổi. Nghe `modulesChanged` là chỗ duy nhất
-  // nối hai đường lại.
+  // The admin writes modules through a different API from this read path, so
+  // nothing tells it the order just changed. `modulesChanged` is the one link.
   useEffect(() => {
     if (!enabled) return
-    return watchModules(() => setEpoch((n) => n + 1))
+    return watchModules(() => setRound((n) => n + 1))
   }, [enabled])
 
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
-    // Chỉ lần đầu mới bật `loading`. Lượt hỏi lại chạy ngay trước mắt người
-    // đang nhìn thanh bên, mà xoá trắng danh sách một nhịp thì trông như hỏng
-    // chứ không như vừa cập nhật.
-    if (epoch === 0) setLoading(true)
-
-    supabase
-      .from('modules')
-      .select('*')
-      .order('sort_order', { ascending: true })
-      .then(({ data, error }) => {
+    // Only the first load shows as loading; a reload keeps the page drawn.
+    if (round === 0) setLoading(true)
+    loadStore()
+      .then((s) => {
         if (cancelled) return
-        setLoading(false)
-        if (error) {
-          setError(error.message)
-          setData([])
-          return
-        }
+        setStore(s)
         setError(null)
-        setData((data ?? []) as ModuleRow[])
       })
-
+      .catch((e: Error) => !cancelled && setError(e.message))
+      .finally(() => !cancelled && setLoading(false))
     return () => {
       cancelled = true
     }
-  }, [enabled, epoch])
+  }, [enabled, round])
 
-  return { data, loading, error }
+  return useMemo(() => {
+    const data = buildPages(store)
+    const cache = new Map<string, PostRow[]>()
+    const postsOf = (pageId: string) => {
+      const page = findPage(data, pageId)
+      const key = page?.id ?? pageId
+      if (!cache.has(key)) cache.set(key, pagePosts(page, store))
+      return cache.get(key)!
+    }
+    const groupsOf = (pageId: string) => {
+      const page = findPage(data, pageId)
+      const posts = postsOf(pageId)
+      if (!page?.rule) return [{ key: '', label: '', posts }]
+      return groupPosts(page.rule, posts, {
+        topics: store.topics,
+        keywordsOf: (id) => store.postKeywords.get(id) ?? [],
+        labelOf: (_g, key) => store.keywords.find((k) => k.id === key)?.label ?? key,
+      })
+    }
+    const labels = new Map(store.keywords.map((k) => [k.id, k.label]))
+    const tagsOf = (postId: string) => (store.postKeywords.get(postId) ?? []).map((id) => ({ id, label: labels.get(id) ?? id }))
+    return { data, loading, error, postsOf, groupsOf, tagsOf, reload: () => setRound((r) => r + 1) }
+  }, [store, loading, error])
 }
 
-/**
- * Fetched once for the whole app. The sidebar, the breadcrumb bar and the
- * screen underneath all want the same module list on every screen — without
- * this each `useModules()` was its own request.
- */
 export function ModulesProvider({ children }: { children: ReactNode }) {
   const value = useModulesQuery(true)
   return <ModulesContext.Provider value={value}>{children}</ModulesContext.Provider>
 }
 
-/**
- * Every module, ordered the way they're meant to read. Public/anon-readable,
- * no status filtering needed (unlike posts).
- *
- * Uses the provider's copy when there is one, and falls back to fetching its
- * own so a screen mounted on its own (unit tests) still works.
- */
 export function useModules(): UseModulesResult {
   const shared = useContext(ModulesContext)
   const own = useModulesQuery(shared === null)
   return shared ?? own
 }
 
-/**
- * The modules the reader is shown.
- *
- * Everything written points at a module, but the journals have pages of their
- * own — listing them again beside the reading modules would introduce them
- * twice under different names.
+/** A page's posts, in its rule's order; empty while loading. */
+export function usePagePosts(pageId: string | null | undefined): { data: PostRow[]; loading: boolean } {
+  const { postsOf, loading } = useModules()
+  return useMemo(() => ({ data: pageId ? postsOf(pageId) : [], loading }), [postsOf, pageId, loading])
+}
+
+/*
+ * Which pages each surface lists. The navigation decides — its order, and its
+ * two flags: on the sidebar, on the homepage.
  */
-/**
- * Which modules each surface lists.
- *
- * Two classifications, deliberately kept apart: `kind` says what a module is,
- * `visibility` says whether it may be listed at all. Collapsing them is the
- * bug these three functions exist to prevent — a special module is still a
- * module, and only a private one disappears.
- */
+type Listable = ModuleRow & Partial<Pick<PageRow, 'inSidebar' | 'onHome'>>
 
-/** Anything a signed-out reader may see listed. */
-const isPublic = (m: ModuleRow) => m.visibility !== 'private'
+// A bare module row (no navigation flags) is placed in the order the CMS set,
+// journals included (owner, 2026-09-24); private ones nowhere.
+const isPublic = (m: Listable) => m.visibility !== 'private'
+const byNav = (a: Listable, b: Listable) => (a.inSidebar === undefined ? bySiteOrder(a, b) : a.sort_order - b.sort_order)
 
+export const landingModules = <T extends Listable>(pages: T[]): T[] => {
+  const flagged = pages.filter((p) => p.onHome !== undefined && p.onHome)
+  // A bare module filed inside another is introduced by its parent's page;
+  // listing it here too would put the same thing on the front page twice.
+  const bare = rootsOf(pages.filter((p) => p.onHome === undefined && p.kind !== 'special' && isPublic(p)))
+  return [...flagged, ...bare].sort(byNav)
+}
 
-/**
- * Trang chủ — the gallery of reading modules, one full-bleed colour block
- * each. Special modules are left out because they are not reading modules,
- * not because they are hidden.
- *
- * Only the top level of the tree: a module filed inside another one is
- * introduced by its parent's page, and showing it here as well would put the
- * same thing on the front page twice under two different headings. While every
- * `parent_id` is null this is the whole list, which is what it was before.
- */
-export const landingModules = (modules: ModuleRow[]) =>
-  rootsOf(modules.filter((m) => m.kind !== 'special' && isPublic(m))).sort(bySiteOrder)
-
-/** Mục lục and the sidebar — everything public, the journals included, in site order. */
-export const indexModules = (modules: ModuleRow[]) =>
-  modules.filter(isPublic).sort(bySiteOrder)
+export const indexModules = <T extends Listable>(pages: T[]): T[] =>
+  pages.filter((p) => (p.inSidebar === undefined ? isPublic(p) : p.inSidebar)).sort(byNav)
 

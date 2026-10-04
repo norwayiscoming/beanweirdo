@@ -1,10 +1,10 @@
 import type { CSSProperties } from 'react'
+import { templateName } from '../lib/templateNames'
 import { displayNumber, postDescription } from '../lib/postText'
 import { useMemo } from 'react'
 import type { ModuleRow } from '../data/useModules'
 import { indexModules, useModules } from '../data/useModules'
 import type { PostRow } from '../data/usePublishedPosts'
-import { usePublishedPosts } from '../data/usePublishedPosts'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { coverStyle } from '../lib/imageFocus'
@@ -12,7 +12,6 @@ import { garden, ink, paper, prose, sans, serif, wrapTitle } from '../design/tok
 import { Hover } from '../lib/Hover'
 import { rowPad, useNav, useSettings } from '../lib/nav'
 import { openPost } from '../lib/openPost'
-import { groupByModule } from '../lib/postGroups'
 import { ancestorsOf, buildTree, flattenTree } from '../lib/contentTree'
 import { openModule } from '../lib/moduleTarget'
 import { useIsMobile } from '../lib/useIsMobile'
@@ -244,7 +243,7 @@ function Ledger({ modules, postsByModule }: ModulesProps) {
                     gridArea: mob ? '3 / 2' : undefined,
                   }}
                 >
-                  {e.kind}
+                  {templateName(e.template)}
                 </div>
                 <div
                   style={{ fontFamily: sans, fontSize: 10, color: ink.faint, textAlign: 'right', gridArea: mob ? '3 / 3' : undefined }}
@@ -438,10 +437,10 @@ function Columns({ modules, postsByModule }: ModulesProps) {
 /** Mục lục — the table of contents, in whichever shape is selected. */
 export function IndexScreen() {
   const { variant } = useNav()
-  const { data: allModules } = useModules()
+  const { data: allModules, postsOf } = useModules()
   const modules = indexModules(allModules)
-  const { data: posts } = usePublishedPosts()
-  const postsByModule = useMemo(() => groupByModule(posts), [posts])
+  // Each page lists what its rule pulls (migration 0028), not what is filed under it.
+  const postsByModule = useMemo(() => new Map(modules.map((m) => [m.id, postsOf(m.id)])), [modules, postsOf])
 
   return variant === 'A' ? (
     <Ledger modules={modules} postsByModule={postsByModule} />

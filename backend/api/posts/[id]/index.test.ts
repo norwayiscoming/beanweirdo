@@ -371,6 +371,8 @@ describe('GET shows the editor the unpublished version', () => {
       .mockReturnValueOnce(queryBuilder({ data: { ...SAMPLE_ROW, status: 'published' }, error: null }))
       .mockReturnValueOnce(queryBuilder({ data: { data: { en: 'Tiêu đề mới' } }, error: null }))
       .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
     const req = mockReq({ method: 'GET', headers: authHeaders(token), query: { id: 'p1' } })
     const res = mockRes()
     await handler(req, res)

@@ -28,7 +28,7 @@
  * Structural, so `ModuleRow` satisfies it without importing anything, and a
  * test can pass `{ id: 'a', parent_id: null }` instead of building a module.
  */
-export type TreeRow = {
+type TreeRow = {
   id: string
   /**
    * Absent, not just null, because a row read before migration 0025 has run

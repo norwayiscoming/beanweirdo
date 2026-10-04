@@ -2,7 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { withCors } from '../lib/cors.js'
 import { requireAuth } from '../lib/auth.js'
 import { getSupabase } from '../lib/supabase.js'
-import { slug } from '../lib/tags.js'
+import { handleKeywords, handleTopics, slug, vocabOf } from '../lib/vocab.js'
+import { handleLayout } from '../lib/layout.js'
 import { handleAuthors } from '../lib/authorsApi.js'
 
 /**
@@ -12,7 +13,13 @@ import { handleAuthors } from '../lib/authorsApi.js'
  *   POST   /api/tags            add one
  *   PATCH  /api/tags?id=…       rename one, and everything wearing it
  *   DELETE /api/tags?id=…       remove one, after saying where its things go
+ *
+ *   ?vocab=topics | keywords    the topic tree and theme tags (lib/vocab.ts)
+ *   ?vocab=layout | rules | pages | overrides   the feature layer (lib/layout.ts)
  *   ?vocab=authors              author profiles (lib/authorsApi.ts)
+ *
+ * Since migration 0027 this vocabulary means dạng bài — what form a post
+ * takes — and theme tags live in `keywords` instead.
  *
  * This replaces `kind`, which was four words a programmer picked — note,
  * essay, ref, log — with no way to add a fifth short of editing a database
@@ -32,22 +39,30 @@ import { handleAuthors } from '../lib/authorsApi.js'
 
 async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (!requireAuth(req, res)) return
-  // Author profiles ride on this endpoint: the plan caps the backend at 12
-  // functions (see lib/authorsApi.ts).
-  if (req.query.vocab === 'authors') return handleAuthors(req, res)
   const supabase = getSupabase()
 
+  // The content layer's two vocabularies live on this endpoint too.
+  const vocab = vocabOf(req)
+  if (vocab === 'topics') return handleTopics(req, res, supabase)
+  if (vocab === 'keywords') return handleKeywords(req, res, supabase)
+  const layout = typeof req.query.vocab === 'string' ? req.query.vocab : ''
+  if (['layout', 'rules', 'pages', 'overrides'].includes(layout)) return handleLayout(req, res, supabase, layout)
+  if (layout === 'authors') return handleAuthors(req, res)
+
   if (req.method === 'GET') {
-    const { data, error } = await supabase
-      .from('tags')
-      .select('id, label')
-      .order('created_at', { ascending: true })
+    const [{ data, error }, { data: kinds }] = await Promise.all([
+      supabase.from('tags').select('id, label').order('created_at', { ascending: true }),
+      supabase.from('posts').select('kind').neq('status', 'deleted'),
+    ])
 
     if (error) {
       res.status(500).json({ error: error.message })
       return
     }
-    res.status(200).json({ tags: data })
+    // How many posts wear each one, so Phân loại can show what is used and what is not.
+    const counts = new Map<string, number>()
+    for (const { kind } of (Array.isArray(kinds) ? kinds : []) as { kind: string }[]) counts.set(kind, (counts.get(kind) ?? 0) + 1)
+    res.status(200).json({ tags: (data ?? []).map((t) => ({ ...t, posts: counts.get((t as { id: string }).id) ?? 0 })) })
     return
   }
 

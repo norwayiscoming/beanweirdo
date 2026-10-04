@@ -13,7 +13,6 @@ import {
   type PostRow,
   type PostTemplate,
 } from '../../lib/posts.js'
-import { slug } from '../../lib/tags.js'
 import { isDraftTableUnreadable, readDraft } from '../../lib/drafts.js'
 
 const LIST_FILTERS = [...POST_STATUSES, 'all'] as const
@@ -34,7 +33,11 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
     query = query.eq('status', statusParam)
   }
 
-  const { data, error } = await query
+  const [{ data, error }, { data: drafts, error: draftError }, { data: worn }] = await Promise.all([
+    query,
+    supabase.from('post_drafts').select('post_id'),
+    supabase.from('post_keywords').select('post_id, keyword_id'),
+  ])
   if (error) {
     res.status(500).json({ error: error.message })
     return
@@ -45,33 +48,32 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
    * extra read of a table that holds a row only per published post being
    * edited — cheaper than a join PostgREST cannot express without a foreign
    * key embed on every summary. A missing table (0028 not run) means none.
+   * It runs alongside the list itself, not after it.
    */
-  const { data: drafts, error: draftError } = await supabase.from('post_drafts').select('post_id')
   if (draftError && !isDraftTableUnreadable(draftError)) {
     res.status(500).json({ error: draftError.message })
     return
   }
   const pending = new Set(((drafts ?? []) as { post_id: string }[]).map((d) => d.post_id))
 
+  // The content workspace filters and bulk-edits by theme tag, so the list
+  // carries each post's tags; one query for all of them, not one per post.
+  const tags = new Map<string, string[]>()
+  for (const r of (Array.isArray(worn) ? worn : []) as { post_id?: unknown; keyword_id?: unknown }[]) {
+    if (typeof r.post_id !== 'string' || typeof r.keyword_id !== 'string') continue
+    tags.set(r.post_id, [...(tags.get(r.post_id) ?? []), r.keyword_id])
+  }
   res.status(200).json({
-    posts: (data as PostRow[]).map((row) => ({ ...toPostSummary(row), has_draft: pending.has(row.id) })),
+    posts: (data as PostRow[]).map((row) => ({ ...toPostSummary(row), keywords: tags.get(row.id) ?? [], has_draft: pending.has(row.id) })),
   })
 }
 
 interface CreatePostBody {
   module_id?: unknown
-  /** An existing tag's id. Ignored when `kindLabel` is sent. */
+  /** Dạng bài — retired; stored as given, empty when absent. */
   kind?: unknown
-  /**
-   * A tag as the owner typed it, which this route writes down for them.
-   *
-   * "Bài mới" used to be two calls: POST /api/tags to get an id, then POST
-   * /api/posts carrying it. Two calls from a browser is two preflights and two
-   * cold starts before the editor can even open, for a screen whose whole job
-   * is "start writing". The label comes along with the post now and the id is
-   * derived from it, so the wizard is one call.
-   */
-  kindLabel?: unknown
+  /** Place on the topic tree (migration 0027). */
+  topic_id?: unknown
   en?: unknown
   vi?: unknown
   /** The stored template to start from — its body is copied into the new post. */
@@ -104,9 +106,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
   const body = (req.body ?? {}) as CreatePostBody
 
   const module_id = body.module_id
-  const kindLabel = typeof body.kindLabel === 'string' ? body.kindLabel.trim() : ''
-  // A label sent by the caller wins: it is what the owner actually typed.
-  const kind = kindLabel ? slug(kindLabel) : body.kind
+  const kind = body.kind
   const en = body.en
   const vi = body.vi
   const templateId = typeof body.templateId === 'string' ? body.templateId : null
@@ -124,14 +124,12 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
     return
   }
   /*
-   * `kind` holds a tag now. It was four words fenced by a database constraint —
-   * note, essay, ref, log — with no way to add a fifth, and migration 0020 took
-   * the fence down. What is left to check is that there is something there.
+   * `kind` (dạng bài) is retired: the template says what a post is. The column
+   * is still NOT NULL until a migration drops it, so a post that names no kind
+   * gets an empty one rather than a refusal.
    */
-  if (typeof kind !== 'string' || kind.length === 0) {
-    res.status(400).json({
-      error: kindLabel ? 'kindLabel must contain a letter or a number' : 'kind is required',
-    })
+  if (kind !== undefined && typeof kind !== 'string') {
+    res.status(400).json({ error: 'kind must be a string' })
     return
   }
 
@@ -156,6 +154,14 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
     return
   }
 
+  // The post's place on the topic tree (migration 0027). Optional here so
+  // older callers still work; the CMS always sends one.
+  if (body.topic_id != null && typeof body.topic_id !== 'string') {
+    res.status(400).json({ error: 'topic_id must be a string' })
+    return
+  }
+  let topic_id: string | null = typeof body.topic_id === 'string' && body.topic_id ? body.topic_id : null
+
   if (!(POST_TEMPLATES as string[]).includes(template as string)) {
     res.status(400).json({ error: `template must be one of: ${POST_TEMPLATES.join(', ')}` })
     return
@@ -169,18 +175,6 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
   const supabase = getSupabase()
 
   /*
-   * Ghi tag xuống song song với ghi bài.
-   *
-   * `posts.kind` không có khoá ngoại trỏ sang `tags` (migration 0020 chỉ bỏ
-   * ràng buộc bốn chữ đi, cột vẫn là text thường), và `id` của tag tính được
-   * ngay tại chỗ từ nhãn — nên bài không phải đợi tag ghi xong. Hai câu đi
-   * cùng lúc, và `upsert` khiến việc gõ lại một chữ đã dùng không phải là lỗi.
-   */
-  const tagWrite = kindLabel
-    ? supabase.from('tags').upsert({ id: kind, label: kindLabel }, { onConflict: 'id' })
-    : null
-
-  /*
    * Copying a post takes its content, not its place in the world. Status,
    * pinning, publication date and order stay behind: a copy is a draft nobody
    * has published or positioned yet, and inheriting any of that would put a
@@ -189,7 +183,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
   if (fromPostId) {
     const { data: src, error: srcError } = await supabase
       .from('posts')
-      .select('template, body, lead, pull_quote, further_reading')
+      .select('template, body, lead, pull_quote, further_reading, topic_id')
       .eq('id', fromPostId)
       .maybeSingle()
 
@@ -220,6 +214,9 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
     // Pictures stay with the original — see `withoutImages`.
     startingBody = withoutImages(row.body ?? null)
     copied = merged
+    // What a post is about is part of its content, so a copy keeps its topic
+    // unless the caller filed it somewhere else.
+    topic_id = topic_id ?? ((copied.topic_id as string | null) ?? null)
   }
 
   if (templateId) {
@@ -253,7 +250,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
     .from('posts')
     .insert({
       module_id: module_id,
-      kind: kind as PostKind,
+      kind: (kind ?? '') as PostKind,
       en,
       vi,
       template: template as PostTemplate,
@@ -265,6 +262,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
       thumbnail_url: firstImageIn(startingBody),
       lead: copied?.lead ?? null,
       theme_color,
+      topic_id,
       // The cover and the line describing it both belong to the original's photo.
       hero_image_url: null,
       hero_caption: null,
@@ -274,27 +272,12 @@ async function handleCreate(req: VercelRequest, res: VercelResponse): Promise<vo
     .select('id')
     .single()
 
-  /*
-   * Hai câu đi cùng lúc, thật sự.
-   *
-   * Builder của supabase-js chỉ gửi request lúc nó được `then` — nên dựng câu
-   * lệnh ra biến rồi `await` lần lượt vẫn là nối tiếp. `Promise.all` gọi `then`
-   * của cả hai trong cùng một nhịp, đó mới là thứ khiến chúng chồng lên nhau.
-   */
-  const [{ data, error }, tagResult] = await Promise.all([
-    insert,
-    tagWrite ?? Promise.resolve({ error: null }),
-  ])
-
-  if (tagResult?.error) {
-    res.status(500).json({ error: tagResult.error.message })
-    return
-  }
+  const { data, error } = await insert
 
   if (error) {
     // 23503 = foreign key violation, i.e. module_id doesn't exist.
     if (error.code === '23503') {
-      res.status(400).json({ error: `Module '${module_id}' does not exist` })
+      res.status(400).json({ error: `Module '${module_id}' or topic '${topic_id}' does not exist` })
       return
     }
     res.status(500).json({ error: error.message })

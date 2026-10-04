@@ -51,6 +51,8 @@ export const POST_COLUMNS = [
   'plate_images',
   'thumbnail_url',
   'theme_color',
+  'topic_id',
+  'visibility',
   'pull_quote',
   'further_reading',
   'published_at',
@@ -59,6 +61,16 @@ export const POST_COLUMNS = [
   'updated_at',
 ] as const
 export const POST_STATUSES: PostStatus[] = ['draft', 'published', 'archived', 'deleted']
+
+/** Who may read a post (migration 0027). The narrower of post and topic wins. */
+export type PostVisibility = 'public' | 'private'
+export const POST_VISIBILITIES: PostVisibility[] = ['public', 'private']
+
+/**
+ * A stored address: lowercase words joined by hyphens. Stored slugs belong to
+ * published or archived posts, so they never carry the `.draft` mark.
+ */
+export const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 export interface PostRow {
   id: string
@@ -99,6 +111,8 @@ export interface PostRow {
   thumbnail_url: string | null
   /** Màu riêng của bài; rỗng nghĩa là theo màu module. */
   theme_color: string | null
+  topic_id: string | null
+  visibility: PostVisibility
   published_at: string | null
   deleted_at: string | null
   previous_status: string | null
@@ -120,7 +134,7 @@ export interface PostRow {
  * and cannot see the real schema.
  */
 export const POST_SUMMARY_COLUMNS =
-  'id, module_id, en, vi, lead, kind, date_label, status, template, hero_image_url, thumbnail_url, theme_color, sort_order, pinned, created_at, updated_at, published_at'
+  'id, module_id, en, vi, lead, kind, date_label, status, template, hero_image_url, thumbnail_url, theme_color, topic_id, visibility, slug, sort_order, pinned, created_at, updated_at, published_at'
 
 export const POST_DETAIL_COLUMNS = '*'
 
@@ -202,6 +216,11 @@ interface PostSummary {
    * default: a module recoloured later should carry its posts with it.
    */
   theme_color: string | null
+  /** The post's place on the topic tree (migration 0027); null until filed. */
+  topic_id: string | null
+  visibility: PostVisibility
+  /** The stored address; null for drafts, which are addressed by derivation. */
+  slug: string | null
   /**
    * The picture that stands for the post in a listing: its cover if it has
    * one, otherwise the first image inside it.
@@ -217,7 +236,8 @@ interface PostSummary {
 }
 
 interface PostDetail extends PostSummary {
-  slug: string | null
+  /** Tag theme ids (post_keywords). */
+  keywords: string[]
   body: unknown | null
   hero_caption: string | null
   plate_images: Record<string, string | null> | null
@@ -242,6 +262,9 @@ export function toPostSummary(row: PostRow): PostSummary {
     template: row.template,
     hero_image_url: row.hero_image_url,
     theme_color: row.theme_color,
+    topic_id: row.topic_id ?? null,
+    visibility: row.visibility ?? 'public',
+    slug: row.slug ?? null,
     /*
      * Cover first, then whatever the post has inside it.
      *
@@ -259,10 +282,10 @@ export function toPostSummary(row: PostRow): PostSummary {
   }
 }
 
-export function toPostDetail(row: PostRow): PostDetail {
+export function toPostDetail(row: PostRow, keywords: string[] = []): PostDetail {
   return {
     ...toPostSummary(row),
-    slug: row.slug,
+    keywords,
     body: row.body,
     hero_caption: row.hero_caption,
     // `?? null` chứ không phải `row.plate_images`: database chưa chạy 0027 thì

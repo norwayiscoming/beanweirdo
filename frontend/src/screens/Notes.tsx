@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { noteFilterBar } from '../lib/notesFilter'
-import { useTags } from '../data/useTags'
 import { useIsMobile } from '../lib/useIsMobile'
 import { useNarrow } from '../lib/useNarrow'
 import { BLOCK_SIZE, byTimeNewestFirst, placePosts } from '../lib/notesBlocks'
@@ -13,11 +12,11 @@ import {
   type FeatureCell,
   type FeatureOverride,
 } from '../content/notes'
-import { usePublishedPosts, type PostRow } from '../data/usePublishedPosts'
+import type { PostRow } from '../data/usePublishedPosts'
 import { postDescription } from '../lib/postText'
 import { postThumbnail } from '../lib/postThumb'
 import { coverStyle } from '../lib/imageFocus'
-import { useModules } from '../data/useModules'
+import { findPage, useModules, usePagePosts } from '../data/useModules'
 import { BitesizeCard, PostRenderer } from 'post-renderer'
 import {
   toArticleData,
@@ -64,6 +63,7 @@ function OpenedPost({
    * ở bề ngang 390.
    */
   const mobile = useIsMobile()
+  const { tagsOf } = useModules()
   /*
    * Bài mở ra chỉ chiếm ba phần tư lưới, nên trên màn 905 nó còn 561 — hẹp hơn
    * ngưỡng 899 trong khi cửa sổ thì không. Hỏi cửa sổ ở đây là hỏi sai chỗ:
@@ -73,17 +73,18 @@ function OpenedPost({
   const box = useRef<HTMLDivElement>(null)
   const narrow = useNarrow(box)
   const tight = mobile || narrow
-  return <div ref={box}>{draw(post, mod, tight)}</div>
+  return <div ref={box}>{draw(post, mod, tight, tagsOf?.(post.id)[0]?.label)}</div>
 }
 
 function draw(
   post: PostRow,
   mod: { title: string; accent: string; on_color: string } | undefined,
   mobile: boolean,
+  tag: string | undefined,
 ) {
   switch (post.template) {
     case 'bitesize':
-      return <PostRenderer template="bitesize" post={toBitesizeData(post, { mod })} mobile={mobile} />
+      return <PostRenderer template="bitesize" post={toBitesizeData(post, { mod, tag })} mobile={mobile} />
     case 'memo':
       return <PostRenderer template="memo" post={toMemoData(post, mod)} mobile={mobile} />
     case 'longform':
@@ -165,11 +166,12 @@ const MOB_BIG = 92
  */
 function Collapsed({ post, num }: { post: PostRow; num: string }) {
   const [hovered, setHovered] = useState(false)
+  const { tagsOf } = useModules()
   if (post.template === 'bitesize') {
     return (
       <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
         <BitesizeCard
-          post={toBitesizeData(post, { num })}
+          post={toBitesizeData(post, { num, tag: tagsOf?.(post.id)[0]?.label })}
           hovered={hovered}
           aspect={CARD_AR}
           mediaWidth="100%"
@@ -384,25 +386,32 @@ export function Notes() {
   const { site } = useSiteCopy()
   // Ghi 01's own colours, so an unfolded post wears them the way it would on a
   // page of its own.
-  const { data: allModules } = useModules()
-  const ghi01 = allModules.find((m) => m.id === 'ghi01')
+  const { data: allModules, error, tagsOf } = useModules()
+  // The page that was module Ghi 01 (migration 0028 keeps its old id as an alias).
+  const ghi01 = findPage(allModules, 'ghi01')
   // The design's cells, carrying whatever photos and words the CMS has set.
   const drawnCells = useMemo(
     () => withOverrides(featureCells, ghi01?.feature_cells as FeatureOverride[] | undefined),
     [ghi01?.feature_cells],
   )
-  // Posts filed under Ghi 01 — the memo lives here, as a post like any other.
-  // `withBody` bật ở đúng màn này: bài filed dưới Ghi 01 mở ra **ngay tại chỗ**
-  // (xem `OpenedPost`), nên danh sách phải cầm sẵn nội dung. Mọi màn khác dẫn
-  // sang trang riêng của bài, và trang ấy tự đọc bằng `usePost`.
-  const { data: filed, loading, error } = usePublishedPosts({ moduleId: 'ghi01', withBody: true })
-  const { tags } = useTags()
+  // What the Ghi page's rule pulls — the memo lives here, as a post like any other.
+  const { data: filed, loading } = usePagePosts(ghi01?.id ?? 'ghi01')
   // Tag là chữ chủ site tự đặt, nên không còn là bốn giá trị đóng nữa.
   const [noteFilter, setNoteFilter] = useState<string>('tất cả')
   const [openNote, setOpenNoteState] = useState<string | null>(null)
 
   // Phép lọc và phép đếm để riêng ở `lib/notesFilter` — xem chú thích ở đó.
-  const bar = useMemo(() => noteFilterBar(filed, tags, noteFilter), [filed, tags, noteFilter])
+  // The theme tags the filed posts wear are the chips; dạng bài is retired.
+  const { tagged, tags } = useMemo(() => {
+    const seen = new Map<string, { id: string; label: string }>()
+    const tagged = filed.map((p) => {
+      const own = tagsOf?.(p.id) ?? []
+      for (const t of own) seen.set(t.id, t)
+      return { ...p, tags: own.map((t) => t.id) }
+    })
+    return { tagged, tags: [...seen.values()] }
+  }, [filed, tagsOf])
+  const bar = useMemo(() => noteFilterBar(tagged, tags, noteFilter), [tagged, tags, noteFilter])
 
   function setOpenNote(v: string | ((prev: string | null) => string | null)) {
     setOpenNoteState(v)
@@ -432,7 +441,7 @@ export function Notes() {
 
   const noteFilters = bar.chips
   // Ordered by time alone, so a post keeps its slot — see `byTimeNewestFirst`.
-  const shownPosts = useMemo(() => byTimeNewestFirst(bar.visiblePosts as typeof filed), [bar.visiblePosts])
+  const shownPosts = useMemo(() => byTimeNewestFirst(bar.visiblePosts as typeof tagged), [bar.visiblePosts])
   const layout = useMemo(() => blockLayout(shownPosts, drawnCells), [shownPosts, drawnCells])
 
   return (

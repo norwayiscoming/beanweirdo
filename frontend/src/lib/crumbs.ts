@@ -12,6 +12,12 @@ type Crumb = {
   go?: () => void
 }
 
+/** A page by id, or by an address it used to have (a module id, migration 0028). */
+function byIdOrAlias(modules: readonly ModuleRow[], id: string | null | undefined): ModuleRow | undefined {
+  if (!id) return undefined
+  return modules.find((m) => m.id === id) ?? modules.find((m) => (m as { aliases?: string[] }).aliases?.includes(id))
+}
+
 /**
  * The breadcrumb trail, per screen.
  *
@@ -67,11 +73,10 @@ export function buildCrumbs(
   const backend: Crumb = atCms ? { label: 'Backend' } : { label: 'Backend', go: nav.goCms }
   // Through moduleTarget: Ghi 01 and Ghi 02 have their own screens, and the
   // generic module page is a second, wrong door into them.
-  const titleOf = (id: string) => modules.find((m) => m.id === id)?.title ?? id
   const mod = (id: string): Crumb => {
-    const row = modules.find((m) => m.id === id)
+    const row = byIdOrAlias(modules, id)
     return {
-      label: titleOf(id),
+      label: row?.title ?? id,
       go: toPublic('landing', () => (row ? openModule(nav, row) : nav.openModule(id))),
     }
   }
@@ -91,7 +96,7 @@ export function buildCrumbs(
     case 'home':
       return [landing, { label: navLabel('home') }]
     case 'module':
-      return [landing, index, ...branches(nav.moduleId), { label: titleOf(nav.moduleId) }]
+      return [landing, index, ...branches(nav.moduleId), { label: byIdOrAlias(modules, nav.moduleId)?.title ?? nav.moduleId }]
     case 'article':
       // The trail ends on the post's own name. 'Bài viết' told the reader
       // nothing they could not already see.
@@ -146,7 +151,7 @@ export function crumbBack(
    * arrow did before modules could hold modules, and is still right for a
    * module at the top.
    */
-  modules: ModuleRow[] = [],
+  modules: readonly ModuleRow[] = [],
 ): () => void {
   /*
    * A screen holding a layer of its own owns the first step back: from an open
@@ -159,7 +164,11 @@ export function crumbBack(
   const out = nav.area === 'public' ? nav.goLanding : () => goToArea('public')
 
   switch (nav.screen) {
-    // Inside admin the step back is admin's own front door, not the public journal.
+    /*
+     * Inside admin the step back is to admin's own front door. It used to leave
+     * the area entirely, so `←` from Templates landed on the public journal —
+     * a long way from one step back.
+     */
     case 'portfolio':
       return nav.goCms
     case 'module': {
@@ -174,7 +183,7 @@ export function crumbBack(
       // go to 'biochem' whatever you were reading.
       if (nav.articleFrom === 'module') {
         const id = moduleId ?? nav.moduleId
-        const row = modules.find((m) => m.id === id)
+        const row = byIdOrAlias(modules, id)
         return () => (row ? openModule(nav, row) : nav.openModule(id))
       }
       if (nav.articleFrom === 'archive') return nav.goArchive

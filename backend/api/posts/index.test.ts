@@ -74,6 +74,7 @@ describe('GET /api/posts', () => {
     fromMock
       .mockReturnValueOnce(queryBuilder({ data: [SAMPLE_ROW, { ...SAMPLE_ROW, id: 'p2' }], error: null }))
       .mockReturnValueOnce(queryBuilder({ data: [{ post_id: 'p2' }], error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
     const res = mockRes()
     await handler(mockReq({ method: 'GET', headers: authHeaders(token), query: {} }), res)
     expect(fromMock).toHaveBeenNthCalledWith(2, 'post_drafts')
@@ -84,6 +85,7 @@ describe('GET /api/posts', () => {
     fromMock
       .mockReturnValueOnce(queryBuilder({ data: [SAMPLE_ROW], error: null }))
       .mockReturnValueOnce(queryBuilder({ data: null, error: { code: 'PGRST205', message: 'post_drafts not found' } }))
+      .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
     const res = mockRes()
     await handler(mockReq({ method: 'GET', headers: authHeaders(token), query: {} }), res)
     expect(res.statusCode).toBe(200)
@@ -128,29 +130,14 @@ describe('POST /api/posts', () => {
    * that vocabulary into the `tags` table, so any tag the owner has written is
    * valid — what is left to reject is nothing at all.
    */
-  it('accepts a tag it has never seen, and rejects an empty one', async () => {
+  it('takes a post with no dạng bài — the template says what it is now', async () => {
     const insert = queryBuilder({ data: { id: 'new-id' }, error: null })
-    fromMock.mockReturnValueOnce(insert)
+    fromMock.mockReturnValue(insert)
     await handler(
-      mockReq({
-        method: 'POST',
-        headers: authHeaders(token),
-        body: { module_id: 'sensory', kind: 'thi-nghiem', en: 'Title', vi: 'Mô tả' },
-      }),
+      mockReq({ method: 'POST', headers: authHeaders(token), body: { module_id: 'sensory', en: 'Title', vi: 'Mô tả' } }),
       mockRes(),
     )
-    expect((insert.insert.mock.calls[0][0] as { kind: string }).kind).toBe('thi-nghiem')
-
-    const res = mockRes()
-    await handler(
-      mockReq({
-        method: 'POST',
-        headers: authHeaders(token),
-        body: { module_id: 'sensory', kind: '', en: 'Title', vi: 'Mô tả' },
-      }),
-      res,
-    )
-    expect(res.statusCode).toBe(400)
+    expect((insert.insert.mock.calls[0][0] as { kind: string }).kind).toBe('')
   })
 
   it('creates a draft and returns its id', async () => {
@@ -220,72 +207,6 @@ describe('POST /api/posts', () => {
     const res = mockRes()
     await handler(req, res)
     expect(res.statusCode).toBe(400)
-  })
-})
-
-describe('POST /api/posts — a tag written along with the post', () => {
-  /*
-   * "Bài mới" từng là hai lượt gọi từ trình duyệt: xin id của tag, rồi mới tạo
-   * bài. Hai lượt là hai preflight và hai lần đánh thức function trước khi màn
-   * soạn kịp mở. Nay nhãn đi kèm bài.
-   */
-  it('derives the tag id from the label and writes both', async () => {
-    const tags = queryBuilder({ data: null, error: null })
-    const insert = queryBuilder({ data: { id: 'new-post' }, error: null })
-    fromMock.mockReturnValueOnce(tags).mockReturnValueOnce(insert)
-
-    const res = mockRes()
-    await handler(
-      mockReq({
-        method: 'POST',
-        headers: authHeaders(signToken()),
-        body: { module_id: 'sensory', kindLabel: 'Ghi chép', en: 'Title', vi: '' },
-      }),
-      res,
-    )
-
-    expect(res.statusCode).toBe(201)
-    expect(tags.upsert).toHaveBeenCalledWith(
-      { id: 'ghi-chep', label: 'Ghi chép' },
-      { onConflict: 'id' },
-    )
-    // Bài đeo chính cái id vừa tính ra, không phải nhãn.
-    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({ kind: 'ghi-chep' }))
-  })
-
-  it('still accepts a plain tag id, and then writes no tag', async () => {
-    const insert = queryBuilder({ data: { id: 'new-post' }, error: null })
-    fromMock.mockReturnValue(insert)
-
-    const res = mockRes()
-    await handler(
-      mockReq({
-        method: 'POST',
-        headers: authHeaders(signToken()),
-        body: { module_id: 'sensory', kind: 'essay', en: 'Title', vi: '' },
-      }),
-      res,
-    )
-
-    expect(res.statusCode).toBe(201)
-    expect(insert.insert).toHaveBeenCalledWith(expect.objectContaining({ kind: 'essay' }))
-    expect(fromMock).toHaveBeenCalledTimes(1)
-  })
-
-  it('400s on a label with no letter or number in it', async () => {
-    const res = mockRes()
-    await handler(
-      mockReq({
-        method: 'POST',
-        headers: authHeaders(signToken()),
-        body: { module_id: 'sensory', kindLabel: '!!!', en: 'Title', vi: '' },
-      }),
-      res,
-    )
-
-    expect(res.statusCode).toBe(400)
-    expect(res.body.error).toMatch(/kindLabel/)
-    expect(fromMock).not.toHaveBeenCalled()
   })
 })
 

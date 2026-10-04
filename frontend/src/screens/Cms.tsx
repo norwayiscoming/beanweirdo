@@ -1,55 +1,30 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Breadcrumbs } from '../components/Breadcrumbs'
-import { displayNumber } from '../lib/postText'
-import { onlyLive, orderPosts } from '../lib/postOrder'
-import { bySiteOrder } from '../lib/moduleOrder'
 import { resolveSite, SITE_DEFAULTS, type SiteCopy, type SiteOverrides } from '../content/site'
 import {
-  createModule,
-  deleteModule,
+  listModules,
   listPosts,
-  reorderModules,
-  reorderPosts,
   updateModule,
-  updatePost,
   updateSite,
   uploadImage,
   type Module,
   type PostSummary,
 } from '../admin/lib/apiClient'
-import {
-  transitionStatus,
-  getSite,
-  createTag,
-  renameTag,
-  deleteTag,
-  type Tag,
-} from '../admin/lib/apiClient'
-import {
-  forgetModules,
-  forgetTags,
-  listModulesCached,
-  listTagsCached,
-} from '../admin/lib/lists'
-import { tagColor } from '../lib/notesFilter'
-import { PostsPanel } from '../admin/components/PostsPanel'
-import { AuthorsPanel } from '../admin/components/AuthorsPanel'
+import { getSite } from '../admin/lib/apiClient'
+import { RoutesPanel } from '../admin/components/RoutesPanel'
+import { PagesManager, type SystemPage } from '../admin/components/PagesManager'
 import { ModuleImages } from '../admin/components/ModuleImages'
 import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
 import { coverStyle } from '../lib/imageFocus'
-import { buildTree, depthOf, flattenTree, possibleParents } from '../lib/contentTree'
-import { planModuleMove, type DropWhere } from '../lib/moduleMove'
-import { MODULE_LAYOUTS } from '../content/layouts'
 import { useSlotSwap, type SlotSwap } from '../admin/lib/useSlotSwap'
 import { FeatureCellsEditor } from '../admin/components/FeatureCellsEditor'
-import { patchOverride, QUOTE_CELL, withOverrides, type FeatureOverride } from '../content/notes'
+import type { FeatureOverride } from '../content/notes'
 import { ink, paper, sans, serif } from '../design/tokens'
-import { Button, IconButton } from '../design/Button'
-import { radius, sizes } from '../design/controls'
-import { IconChevron, IconClose, IconDrag, IconPlus, IconTrash, IconUpload } from '../design/icons'
-import { useToast } from '../design/Toaster'
 import { Hover } from '../lib/Hover'
+import { ContentWorkspace } from '../admin/components/ContentWorkspace'
+import { DisplaySettings } from '../admin/components/DisplaySettings'
+import { AuthorsPanel } from '../admin/components/AuthorsPanel'
 import { useNav } from '../lib/nav'
 
 const sectionHead: CSSProperties = {
@@ -114,189 +89,15 @@ const three = 'repeat(3,minmax(0,1fr))'
  */
 const nameRow = 'minmax(0,1fr) 112px 124px 128px'
 const nameRowPlain = 'minmax(0,1fr) 112px'
-/** The parent picker sits alone: a full-width select for one short name reads as a mistake. */
-const parentRow = 'minmax(0,340px)'
 
-/**
- * Một nấc thụt lề trong cây module.
- *
- * 29px là bề ngang tay nắm cộng mũi tên cộng khoảng hở giữa chúng, nên chấm
- * màu của một module con rơi thẳng hàng dưới mũi tên của cha nó.
- */
-const INDENT = 29
 
-/** Vạch chỉ chỗ thẻ sẽ hạ xuống. Nét liền, cùng màu chữ — xem luật hình. */
-const dropBar: CSSProperties = { height: 2, background: ink.base }
-
-/**
- * Chỗ đặt nét dọc của một tầng, tính từ mép trái của tầng ấy.
- *
- * 8px là giữa tay nắm kéo — thứ rộng 16px và đứng đầu mỗi hàng. Nên nét chạy
- * thẳng dưới tay nắm của cha, còn hàng con bắt đầu ở đúng `INDENT`, tức còn
- * 21px trống trước chữ của con: không nét nào cắt qua một cái nút.
- */
-const GUIDE_X = 8
-
-/**
- * What a module row counts.
- *
- * Ghi 02 keeps daily ticks, not posts, so counting posts there would always
- * read zero and mean nothing. Everywhere else the count is posts — and an
- * empty module still appears on the site, so saying otherwise was wrong:
- * group 05 has it that a created public module always shows.
- */
-function countLabel(id: string, live: number): string {
-  if (id === 'ghi02') return 'checkbox hàng ngày'
-  // Counting every post a module ever had said "6 bài" for a module with
-  // nothing on the site at all.
-  return live ? `${live} bài` : 'chưa có bài nào trên trang'
-}
-
-/** The tabs, named once so nothing else can drift from them. */
-export const TABS = [
-  { k: 'posts', t: 'Bài viết' },
+/** The four tabs, named once so the site map and the tab bar cannot drift. */
+const TABS = [
+  { k: 'posts', t: 'Nội dung' },
+  { k: 'pages', t: 'Quản lý trang' },
+  { k: 'display', t: 'Cài đặt hiển thị' },
   { k: 'authors', t: 'Tác giả' },
-  { k: 'config', t: 'Cấu hình' },
 ] as const
-
-/**
- * The boxes inside `Cấu hình`, in the order the grid lays them out.
- *
- * Every `id` here must exist as an anchor in the tab below, and every such
- * anchor must be named here: the grid opens a box by id, so a box renamed on
- * one side and not the other opens onto an empty screen — and nothing about
- * that is a type error or a failing render. `Cms.sections.test.tsx` runs the
- * two lists against each other.
- *
- * `Cấu trúc` and `Chữ trên trang` were two tabs, each one scroll several
- * screenfuls long, and the site owner could not find the field that puts a
- * module inside another module in either of them. One box holds one subject,
- * and the grid is the whole list of subjects on one screen.
- */
-export const CONFIG_BOXES = [
-  { id: 'landing', t: 'Trang chủ', d: 'Nhãn trên cùng, tên lớn hai dòng, hai đoạn dẫn' },
-  { id: 'modules', t: 'Cây module', d: 'Thêm module, đặt nó nằm trong module khác, dàn trang và ảnh' },
-  { id: 'index', t: 'Trang mục lục', d: 'Tiêu đề, hai đoạn dẫn và ba ảnh khay' },
-  { id: 'tag', t: 'Tag', d: 'Danh sách tag, dùng chung cho ghi chép và bài đăng' },
-  { id: 'notes', t: 'Trang Ghi chép', d: 'Tiêu đề, đoạn dẫn, dòng hướng dẫn, câu trích, lời kết' },
-] as const
-
-type ConfigBox = (typeof CONFIG_BOXES)[number]['id']
-
-/**
- * The index names itself, so a test — and a screen reader — can tell an index
- * entry from the breadcrumb of the same name overhead.
- */
-export const GRID_LABEL = 'Mục cấu hình'
-
-/**
- * The left column of `Cấu hình`: every subject, as an index.
- *
- * It was a grid of five cards, and clicking one replaced the grid with that
- * one subject. That made five screens where there is one job — the site
- * owner kept going back to the grid to reach the next field. Now the right
- * column holds all five at once and this column is only the way to jump, so
- * nothing is ever hidden behind a click.
- *
- * `aria-current` rather than `aria-pressed`: these do not toggle anything on,
- * they say which part of one long page you are looking at.
- */
-function BoxIndex({ active, onPick }: { active: ConfigBox | null; onPick: (id: ConfigBox) => void }) {
-  return (
-    <nav
-      aria-label={GRID_LABEL}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        // Dính lại khi cột phải cuộn: chỉ mục mà cuộn mất thì nó không còn là
-        // chỉ mục, chỉ là một cái tiêu đề ở trên cùng.
-        position: 'sticky',
-        top: 16,
-      }}
-    >
-      {CONFIG_BOXES.map((b) => (
-        <button
-          key={b.id}
-          type="button"
-          className="ab-box"
-          aria-current={active === b.id}
-          onClick={() => onPick(b.id)}
-          style={{
-            display: 'block',
-            textAlign: 'left',
-            background: active === b.id ? paper.hover : paper.white,
-            border: `1px solid ${active === b.id ? ink.border : paper.rule}`,
-            borderRadius: radius,
-            padding: '12px 14px 13px',
-            cursor: 'pointer',
-            font: 'inherit',
-            color: 'inherit',
-          }}
-        >
-          <div
-            style={{
-              fontFamily: serif,
-              fontSize: 17,
-              lineHeight: 1.15,
-              letterSpacing: '-.02em',
-              color: ink.base,
-            }}
-          >
-            {b.t}
-          </div>
-          <div
-            style={{
-              fontFamily: sans,
-              fontWeight: 300,
-              fontSize: 11.5,
-              lineHeight: 1.4,
-              color: ink.muted,
-              marginTop: 5,
-            }}
-          >
-            {b.d}
-          </div>
-        </button>
-      ))}
-    </nav>
-  )
-}
-
-/**
- * One subject in the right column.
- *
- * Everything is on screen at once, so the only thing a pick changes is which
- * subject is lit. Dimming the rest is a hint, not a lock — they stay readable
- * and stay editable, because a person who jumped to `Tag` may well fix the
- * line above it without going back to the index first.
- */
-function Section({
-  id,
-  active,
-  children,
-}: {
-  id: ConfigBox
-  active: ConfigBox | null
-  children: ReactNode
-}) {
-  const lit = active === null || active === id
-  return (
-    <section
-      id={id}
-      aria-labelledby={`${id}-head`}
-      style={{
-        // Chừa chỗ cho thanh tab dính phía trên, để phần được cuộn tới không
-        // nằm khuất dưới nó.
-        scrollMarginTop: 72,
-        opacity: lit ? 1 : 0.34,
-        transition: 'opacity .18s ease',
-      }}
-    >
-      {children}
-    </section>
-  )
-}
 
 /** Names where a field turns up on the site — identification, not instruction. */
 function Where({ children }: { children: ReactNode }) {
@@ -362,7 +163,6 @@ function ImageSlot({
 }) {
   const [placing, setPlacing] = useState<string | null>(null)
   const [linking, setLinking] = useState(false)
-  const file = useRef<HTMLInputElement>(null)
   const { marked, handle, ...dragProps } = drag ?? { marked: false, handle: undefined }
   return (
     <div {...dragProps} style={{ outline: marked ? `2px solid ${ink.base}` : undefined, outlineOffset: 4 }}>
@@ -372,9 +172,16 @@ function ImageSlot({
             {...handle}
             title="Kéo sang khung khác để đổi chỗ hai ảnh"
             aria-label={`kéo ${label} sang khung khác`}
-            style={{ lineHeight: 0, color: ink.faint, cursor: 'grab', userSelect: 'none' }}
+            style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 13,
+              lineHeight: 1,
+              color: ink.faint,
+              cursor: 'grab',
+              userSelect: 'none',
+            }}
           >
-            <IconDrag size={15} />
+            ⠿
           </div>
         )}
         <div style={fieldLabel}>{label}</div>
@@ -413,44 +220,85 @@ function ImageSlot({
           <div style={{ fontFamily: sans, fontSize: 11, color: ink.faint }}>chưa có ảnh</div>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 7, flexWrap: 'wrap' }}>
-        {/*
-          A `<label>` wrapping a hidden file input is what this was: it could be
-          clicked but not tabbed to, and it was drawn with a dashed 1px rule
-          that read as a drop zone rather than a control. A real button that
-          forwards the click keeps the keyboard in play.
-        */}
-        <input
-          ref={file}
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) onUpload(f)
-            e.target.value = ''
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7 }}>
+        <Hover
+          as="label"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'block',
+            fontFamily: sans,
+            fontSize: 10,
+            letterSpacing: '.14em',
+            textTransform: 'uppercase',
+            color: ink.soft,
+            border: '1px dashed #DAD7C7',
+            padding: '7px 10px',
+            cursor: 'pointer',
+            textAlign: 'center',
           }}
-          style={{ display: 'none' }}
-        />
-        <Button
-          size="sm"
-          level="secondary"
-          onClick={() => file.current?.click()}
-          icon={<IconUpload size={14} />}
+          hoverStyle={{ borderColor: ink.base, color: ink.base }}
         >
-          {url ? 'Đổi ảnh' : 'Tải ảnh lên'}
-        </Button>
+          {url ? 'đổi ảnh' : 'tải ảnh lên'}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) onUpload(f)
+              e.target.value = ''
+            }}
+            style={{ display: 'none' }}
+          />
+        </Hover>
         {url && (
-          <Button size="sm" onClick={() => setPlacing(url)}>
-            Đặt vào khung
-          </Button>
+          <Hover
+            as="button"
+            onClick={() => setPlacing(url)}
+            style={{
+              fontFamily: sans,
+              fontSize: 10,
+              letterSpacing: '.14em',
+              textTransform: 'uppercase',
+              color: ink.soft,
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              flex: 'none',
+            }}
+            hoverStyle={{ color: ink.base }}
+          >
+            đặt vào khung
+          </Hover>
         )}
-        <Button size="sm" onClick={() => setLinking(!linking)} aria-expanded={linking}>
-          Dán link
-        </Button>
+        <Hover
+          as="button"
+          onClick={() => setLinking(!linking)}
+          style={{
+            fontFamily: sans,
+            fontSize: 10,
+            letterSpacing: '.14em',
+            textTransform: 'uppercase',
+            color: ink.soft,
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            flex: 'none',
+          }}
+          hoverStyle={{ color: ink.base }}
+        >
+          dán link
+        </Hover>
         {url && (
-          <IconButton size="sm" level="danger" label="Bỏ ảnh này" onClick={onClear}>
-            <IconClose size={15} />
-          </IconButton>
+          <Hover
+            onClick={onClear}
+            style={{ fontFamily: sans, fontSize: 11, color: ink.faint, cursor: 'pointer', flex: 'none' }}
+            hoverStyle={{ color: '#C25C7C' }}
+          >
+            ✕
+          </Hover>
         )}
       </div>
 
@@ -497,235 +345,17 @@ function ImageSlot({
 /**
  * Content management — the site's own back office.
  *
- * Three tabs. "Tạo bài đăng" is where everything written is written — posts
- * under modules and Ghi 01 notes alike, one list, because a note is a kind of
- * entry rather than a separate thing to administer.
- * "Sơ đồ trang" is a read-through map of every page in the sidebar, where the
- * three section names are editable in place. "Sửa nội dung" edits the site
- * copy, the three opening plates, and every module: its colours, its layout,
- * its image slots, and its list of posts (drag to reorder, which renumbers
- * them server-side).
+ * Four tabs, one per layer (step 3c): Quản lý bài — every post; Phân loại —
+ * the topic tree, theme tags and dạng bài; Quản lý trang — where posts are
+ * shown: the navigation, pages, their listing rules and their fixed copy;
+ * Cài đặt hiển thị — addresses and the back office's own words.
  *
  * Everything saves on blur — there is no page-level save button (System
  * conventions, rule 08).
  */
-/**
- * Thêm, đổi tên, xoá tag.
- *
- * Cùng một khuôn với tag của Ghi 02, kể cả phần khó nhất của nó: xoá một tag
- * thì phải nói trước những gì đang đeo nó sẽ về đâu. Xoá lặng lẽ là để lại bài
- * trỏ vào một tag không còn tồn tại — nó biến mất khỏi mọi thanh lọc mà vẫn nằm
- * đó, đúng cái lỗi "viết xong rồi không tìm thấy được".
- */
-/**
- * Tag: danh sách bên trái, chi tiết bên phải.
- *
- * Trước đây mỗi tag là một ô nhập nằm thẳng trong danh sách, và **gõ xong rời
- * ô là đổi tên luôn** — không có bước xác nhận nào giữa "tôi bấm nhầm vào đây"
- * và "tag đã đổi tên trên mọi bài đang đeo nó". Nút xoá cũng lặp lại trên từng
- * dòng, nên thứ nguy hiểm nhất lại là thứ nhiều nhất trên màn.
- *
- * Nay danh sách chỉ để đọc và chọn. Đổi tên và xoá nằm ở khung chi tiết, mỗi
- * lần một tag, và đổi tên phải bấm Lưu.
- */
-function TagsPanel() {
-  const [tags, setTags] = useState<Tag[]>([])
-  const [busy, setBusy] = useState<string | null>(null)
-  const [asking, setAsking] = useState<{ id: string; wearing: { posts: string[]; notes: string[] } } | null>(null)
-  const [err, setErr] = useState<string | null>(null)
-  /** Tag đang mở ở khung chi tiết. */
-  const [picked, setPicked] = useState<string | null>(null)
-  /** Ô tạo tag, và ô đổi tên — cả hai chỉ ghi khi bấm nút. */
-  const [fresh, setFresh] = useState('')
-  const [rename, setRename] = useState('')
-
-  const load = () => void listTagsCached().then(setTags)
-  useEffect(load, [])
-
-  const run = async (id: string, fn: () => Promise<unknown>) => {
-    setBusy(id)
-    try {
-      await fn()
-      setErr(null)
-      // Bỏ bản đang giữ trước khi đọc lại, nếu không `load()` trả về đúng cái
-      // danh sách mà lượt ghi vừa rồi đã làm cho cũ.
-      forgetTags()
-      load()
-    } catch (e) {
-      setErr((e as Error).message)
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const open = tags.find((t) => t.id === picked) ?? null
-  const pick = (t: Tag) => {
-    setPicked(t.id)
-    setRename(t.label)
-    setAsking(null)
-  }
-
-  const create = () => {
-    const v = fresh.trim()
-    if (!v) return
-    setFresh('')
-    void run('new', () => createTag(v))
-  }
-
-  const dot = (label: string, size = 9) => (
-    <span
-      style={{ width: size, height: size, borderRadius: 999, background: tagColor(label), flex: 'none' }}
-    />
-  )
-
-  return (
-    <div style={{ marginBottom: 18 }}>
-      {err && <div role="alert" style={{ fontSize: 12, color: '#8E1E42', marginBottom: 10 }}>{err}</div>}
-
-      {/* Tạo tag: một ô và một nút. Gõ không tạo gì cho tới khi bấm. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <input
-          value={fresh}
-          aria-label="tên tag mới"
-          placeholder="tên tag mới"
-          onChange={(e) => setFresh(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') create()
-          }}
-          style={{ ...boxed, maxWidth: 260, padding: '6px 10px', fontSize: 13 }}
-        />
-        <Button size="sm" level="primary" disabled={!fresh.trim() || busy === 'new'} onClick={create} icon={<IconPlus size={14} />}>
-          Tạo tag
-        </Button>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,240px) minmax(0,1fr)', gap: 20, alignItems: 'start' }}>
-        {/* Danh sách — chỉ để đọc và chọn. */}
-        <div style={{ display: 'flex', flexDirection: 'column', border: `1px solid ${paper.rule}` }}>
-          {tags.length === 0 && (
-            <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.faint, padding: '10px 12px' }}>
-              chưa có tag nào
-            </div>
-          )}
-          {tags.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              aria-pressed={picked === t.id}
-              onClick={() => pick(t)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                width: '100%',
-                textAlign: 'left',
-                background: picked === t.id ? paper.white : 'transparent',
-                border: 0,
-                borderLeft: `2px solid ${picked === t.id ? ink.base : 'transparent'}`,
-                padding: '8px 12px',
-                fontFamily: sans,
-                fontSize: 13,
-                color: ink.base,
-                cursor: 'pointer',
-              }}
-            >
-              {dot(t.label)}
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Chi tiết — mỗi lần một tag. */}
-        <div style={{ border: `1px solid ${paper.rule}`, padding: 16, background: paper.white }}>
-          {!open ? (
-            <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.faint }}>
-              Chọn một tag bên trái để sửa tên hoặc xoá.
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                {dot(open.label, 11)}
-                <span style={{ fontFamily: serif, fontSize: 20, lineHeight: 1.1 }}>{open.label}</span>
-              </div>
-
-              <Field label="Tên tag">
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input
-                    value={rename}
-                    aria-label={`tên tag ${open.label}`}
-                    onChange={(e) => setRename(e.target.value)}
-                    style={{ ...boxed, maxWidth: 260, padding: '6px 10px', fontSize: 13 }}
-                  />
-                  <Button
-                    size="sm"
-                    level="primary"
-                    disabled={busy === open.id || !rename.trim() || rename.trim() === open.label}
-                    onClick={() => {
-                      const v = rename.trim()
-                      if (v && v !== open.label) void run(open.id, () => renameTag(open.id, v))
-                    }}
-                  >
-                    Lưu tên
-                  </Button>
-                </div>
-              </Field>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <Button
-                  size="sm"
-                  level="danger"
-                  disabled={busy === open.id}
-                  icon={<IconTrash size={14} />}
-                  onClick={() =>
-                    void run(open.id, async () => {
-                      try {
-                        await deleteTag(open.id)
-                        setPicked(null)
-                      } catch (e) {
-                        // Máy chủ từ chối vì còn thứ đang đeo, và trả về danh sách ấy.
-                        const w = (e as { payload?: { wearing?: { posts: string[]; notes: string[] } } }).payload?.wearing
-                        if (!w) throw e
-                        setAsking({ id: open.id, wearing: w })
-                      }
-                    })
-                  }
-                >
-                  Xoá tag
-                </Button>
-                {asking?.id === open.id && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: ink.mid }}>
-                    {asking.wearing.posts.length + asking.wearing.notes.length} thứ đang đeo — chuyển sang
-                    <select
-                      aria-label="chuyển sang tag"
-                      defaultValue=""
-                      onChange={(e) => {
-                        const to = e.target.value
-                        setAsking(null)
-                        setPicked(null)
-                        void run(open.id, () => deleteTag(open.id, to))
-                      }}
-                      style={{ ...boxed, width: 'auto', padding: '3px 6px', fontSize: 11.5 }}
-                    >
-                      {/* No "leave empty": posts.kind and notes.k are NOT NULL, the server refuses it. */}
-                      <option value="" disabled>—</option>
-                      {tags.filter((o) => o.id !== open.id).map((o) => (
-                        <option key={o.id} value={o.id}>{o.label}</option>
-                      ))}
-                    </select>
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function Cms() {
   const nav = useNav()
-  const toast = useToast()
   // Tab nằm trong địa chỉ, không nằm trong state: ba tab là ba chỗ khác nhau
   // để đứng, nên một đường link tới sơ đồ trang không được mở ra danh sách bài.
   const tab = nav.cmsTab
@@ -733,69 +363,19 @@ export function Cms() {
   const [modules, setModules] = useState<Module[]>([])
   // The site map names what Templates holds, so it has to know.
   const [posts, setPosts] = useState<PostSummary[]>([])
-  const [openModule, setOpenModule] = useState<string | null>(null)
-  /**
-   * Những nhánh đang gấp lại.
-   *
-   * Chỉ sống trong phiên này, không ghi xuống đâu cả: gấp một nhánh là để nhìn
-   * cho đỡ dài lúc đang sắp xếp, không phải một thiết lập của site.
-   */
-  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set())
-  const toggleFold = (id: string) =>
-    setFolded((f) => {
-      const next = new Set(f)
-      if (!next.delete(id)) next.add(id)
-      return next
-    })
-  const [dragModule, setDragModule] = useState<string | null>(null)
-  /**
-   * Chỗ con trỏ đang chỉ tới trong lúc kéo: thẻ nào, và phần nào của thẻ ấy.
-   *
-   * Trước đây chỉ có một id, vì thả chỉ có một nghĩa — chen vào trước thẻ kia.
-   * Cây thì mỗi thẻ có ba vùng thả, nên id thôi không đủ nói người ta đang
-   * định làm gì.
-   */
-  const [dropAt, setDropAt] = useState<{ id: string; where: DropWhere } | null>(null)
-  const [dragEntry, setDragEntry] = useState<string | null>(null)
-  /** Đang hỏi lại trước khi xoá sạch nội dung đã sửa của cả trang. */
-  const [resetting, setResetting] = useState(false)
-  /**
-   * Phần nào của `Cấu hình` đang được chiếu sáng. `null` là chưa chọn gì.
-   *
-   * Nó không còn quyết định phần nào **có mặt** — cả năm phần luôn ở đó, cuộn
-   * tới được. Nên `null` không phải một màn riêng: nó chỉ có nghĩa là chưa ai
-   * bấm vào chỉ mục, và lúc ấy cả năm phần đều rõ như nhau. Làm mờ bốn phần
-   * ngay khi mới mở màn là tự chọn hộ người ta một chỗ để nhìn.
-   *
-   * Không nằm trong địa chỉ, vì nó là chỗ đang nhìn trong một trang, không
-   * phải một trang.
-   */
-  const [box, setBox] = useState<ConfigBox | null>(null)
-
-  /**
-   * Bấm một mục ở chỉ mục: chiếu sáng phần ấy và cuộn tới nó.
-   *
-   * Cuộn nằm trong `requestAnimationFrame` vì `setBox` ở dòng trên làm bốn
-   * phần kia mờ đi, và cuộn trước khi trình duyệt vẽ xong là cuộn theo bố cục
-   * cũ. `block: 'start'` đi cùng `scrollMarginTop` của `Section`.
-   */
-  const pickBox = useCallback((id: ConfigBox) => {
-    setBox(id)
-    requestAnimationFrame(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-  }, [])
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [s, m, p] = await Promise.all([getSite(), listModulesCached(), listPosts('all')])
+      const [s, m, p] = await Promise.all([getSite(), listModules(), listPosts('all')])
       setSite(s)
       setModules(m)
       setPosts(p)
+      setError(null)
     } catch (e) {
-      toast.fromError(e)
+      setError((e as Error).message)
     }
-  }, [toast])
+  }, [])
 
   useEffect(() => {
     void load()
@@ -812,7 +392,7 @@ export function Cms() {
     try {
       setSite(await updateSite(patch))
     } catch (e) {
-      toast.fromError(e)
+      setError((e as Error).message)
     }
   }
 
@@ -892,602 +472,174 @@ export function Cms() {
       await saveSite({ [`plateImg${slot}`]: url } as SiteOverrides)
       return url
     } catch (e) {
-      toast.fromError(e)
+      setError((e as Error).message)
       return null
     }
   }
 
   async function patchModule(id: string, patch: Partial<Module>) {
     setModules((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)))
-    forgetModules()
     try {
       await updateModule(id, patch)
     } catch (e) {
-      toast.fromError(e)
-    }
-  }
-
-  /*
-   * Modules in the order the site reads them.
-   *
-   * This list used to come straight off `sort_order`, while the sidebar and Mục
-   * lục put every journal below every reading module — so `Ghi 01` sat fourth
-   * here and fifth there, and dragging it one place up moved a number nobody
-   * could see. Same class of bug as the post numbering below: a handle that
-   * rearranges a list which is not the list on the page.
-   *
-   * Writing 1..N back over this order also heals the stored numbers: after one
-   * drag no two modules share a number and `bySiteOrder` has nothing to break
-   * a tie on.
-   */
-  const shownModules = useMemo(() => [...modules].sort(bySiteOrder), [modules])
-
-  const ghi01 = modules.find((m) => m.id === 'ghi01')
-  const quoteText =
-    withOverrides([QUOTE_CELL], ghi01?.feature_cells as FeatureOverride[] | null)[0]?.t ?? QUOTE_CELL.t
-
-  /*
-   * Ghi 01 may stand anywhere in the order now (owner, 2026-09-24), but a
-   * journal still does not go *inside* a reading module, nor the other way
-   * round: a journal has a page of its own at its own address, and nothing on
-   * a reading module's page knows how to introduce one as a sub-section.
-   */
-  const NEST_RULE = 'Nhật ký và module đọc không lồng vào nhau được'
-  const kindOf = (id: string) => modules.find((m) => m.id === id)?.kind
-  const nestsAcrossKinds = (src: string, targetId: string, where: DropWhere) =>
-    where === 'inside' && kindOf(src) !== kindOf(targetId)
-
-  /**
-   * Cây module đúng như màn hình bày nó: cha trước con, mỗi hàng mang độ sâu.
-   *
-   * `shownModules` là thứ tự chung của cả bảng; cái cây thì dựng từ `parent_id`.
-   * Một hàng xuất hiện đúng một lần, dưới cha của nó — `buildTree` giữ nguyên
-   * thứ tự đưa vào, nên thứ tự anh em vẫn là thứ tự chủ site kéo ra.
-   */
-  const moduleRows = useMemo(() => {
-    const out: { m: Module; depth: number; kids: boolean }[] = []
-    /*
-     * Gấp một nhánh là giấu cả cụm nằm trong nó, sâu bao nhiêu tầng cũng vậy.
-     * Duyệt cây đã duỗi thẳng thì chỉ cần nhớ một con số: dưới tầng nào thì
-     * mọi hàng đều bị giấu. Gặp một hàng nông hơn hoặc ngang nó là đã ra khỏi
-     * cụm ấy, nên con số hết hiệu lực.
-     */
-    let hideBelow = Number.POSITIVE_INFINITY
-    for (const n of flattenTree(buildTree(shownModules))) {
-      if (n.depth > hideBelow) continue
-      hideBelow = Number.POSITIVE_INFINITY
-      const kids = n.children.length > 0
-      if (kids && folded.has(n.row.id)) hideBelow = n.depth
-      out.push({ m: n.row, depth: n.depth, kids })
-    }
-    return out
-  }, [shownModules, folded])
-
-  /** Số thứ tự đếm lại từ 01 trong mỗi cấp, vì đó là cái người đọc thấy. */
-  const siblingIndex = useMemo(() => {
-    const seen = new Map<string, number>()
-    const out = new Map<string, number>()
-    for (const { m } of moduleRows) {
-      const key = m.parent_id ?? ''
-      const n = (seen.get(key) ?? 0) + 1
-      seen.set(key, n)
-      out.set(m.id, n)
-    }
-    return out
-  }, [moduleRows])
-
-  /**
-   * Thả một thẻ xuống chỗ con trỏ đang chỉ.
-   *
-   * Hai lượt ghi, đúng thứ tự ấy: `parent_id` trước, rồi `sort_order`. Ngược
-   * lại thì `PUT /api/modules` trả về danh sách đọc từ database *trước* khi
-   * cha mới kịp ghi, và màn hình dựng lại cây cũ đè lên cây vừa kéo.
-   */
-  async function dropModule(targetId: string, where: DropWhere) {
-    const src = dragModule
-    setDragModule(null)
-    setDropAt(null)
-    if (!src || src === targetId) return
-    if (nestsAcrossKinds(src, targetId, where)) {
-      toast.info(NEST_RULE)
-      return
-    }
-
-    // `shownModules`, not `modules`: the numbers written here become the site's
-    // order, so they have to be written over the list the owner just dragged.
-    const plan = planModuleMove(shownModules, src, targetId, where)
-    if ('error' in plan) {
-      toast.info('Không đặt được module vào trong chính nó')
-      return
-    }
-
-    // Thả vào trong một nhánh đang gấp thì mở nhánh ấy ra: thả xong mà thẻ
-    // biến mất thì người ta tưởng lệnh hỏng.
-    if (where === 'inside') setFolded((f) => (f.has(targetId) ? new Set([...f].filter((x) => x !== targetId)) : f))
-
-    const before = modules
-    const byId = new Map(modules.map((m) => [m.id, m]))
-    setModules(
-      plan.order.map((id) =>
-        id === src ? { ...byId.get(id)!, parent_id: plan.parentId } : byId.get(id)!,
-      ),
-    )
-    forgetModules()
-    try {
-      if ((byId.get(src)?.parent_id ?? null) !== plan.parentId) {
-        await updateModule(src, { parent_id: plan.parentId })
-      }
-      setModules(await reorderModules(plan.order))
-    } catch (e) {
-      // Ghi hỏng thì trả màn hình về đúng cây cũ, chứ không để nó bày một cây
-      // chỉ có trên trình duyệt này.
-      setModules(before)
-      toast.fromError(e)
-    }
-  }
-
-  /**
-   * Nước đi này có hợp lệ không — hỏi trước khi vẽ dấu hiệu thả.
-   *
-   * Vẽ cái viền "nằm trong" rồi mới từ chối lúc thả là hứa một việc sắp làm
-   * xong. Hỏi cùng một hàm mà lúc thả sẽ hỏi, nên hai câu trả lời không thể
-   * lệch nhau.
-   */
-  const canDropHere = (src: string, targetId: string, where: DropWhere) =>
-    !nestsAcrossKinds(src, targetId, where) &&
-    !('error' in planModuleMove(shownModules, src, targetId, where))
-
-  /**
-   * Con trỏ đang ở phần nào của thẻ: mép trên, mép dưới, hay giữa.
-   *
-   * Một phần tư trên và một phần tư dưới là "đứng cạnh", nửa giữa là "nằm
-   * trong". Chia tư chứ không chia đôi vì thả vào trong là việc mới và là việc
-   * hay làm hơn, nên nó chiếm vùng rộng nhất và dễ trúng nhất.
-   */
-  function whereIn(e: { clientY: number; currentTarget: HTMLElement }): DropWhere {
-    const box = e.currentTarget.getBoundingClientRect()
-    const part = (e.clientY - box.top) / box.height
-    /*
-     * Không đo được thì trả lời `before` — tức đúng cái nút này vẫn làm trước
-     * khi có cây. `inside` đổi cả cha của module lẫn đường dẫn của mọi bài
-     * trong nó, nên nó phải là câu trả lời khi đã **đo được** là con trỏ nằm
-     * giữa thẻ, không bao giờ là câu trả lời mặc định khi phép đo hỏng.
-     */
-    if (!Number.isFinite(part)) return 'before'
-    if (part < 0.25) return 'before'
-    if (part > 0.75) return 'after'
-    return 'inside'
-  }
-
-  /**
-   * A module's posts, in the order the site shows them.
-   *
-   * This used to sort by `sort_order` alone. With every value null — which is
-   * the normal state, since a number there means somebody dragged the post
-   * somewhere — the sort changed nothing and the list stayed in the API's
-   * order, `updated_at`, most recently edited first. So the numbers 01…06 named
-   * an order the site never used, and the drag handle rearranged a list that
-   * did not match the page it was arranging.
-   */
-  const postsOf = (module_id: string) =>
-    orderPosts(posts.filter((p) => p.module_id === module_id))
-
-  /**
-   * The posts a reader can actually see in this module.
-   *
-   * The editor listed every post a module had ever had — drafts, archived,
-   * deleted — and numbered them 01…06 as if that were their running order on
-   * the site. It was not: sensory had one post published and five archived, and
-   * roasting had none at all while the editor said "6 bài". So the numbers named
-   * places no reader would ever count to, and the drag handle rearranged
-   * archived posts in among live ones.
-   */
-  const liveOf = (module_id: string) => onlyLive(postsOf(module_id))
-
-  async function patchPost(id: string, patch: { en?: string; vi?: string; date_label?: string }) {
-    setPosts((ps) => ps.map((p) => (p.id === id ? { ...p, ...patch } : p)))
-    try {
-      const saved = await updatePost(id, patch)
-      // Bài đã đăng: chữ sửa ở đây cũng chỉ vào bản nháp (migration 0028), mà
-      // danh sách này không có nút Đăng — nên phải nói ra chỗ để đăng nó.
-      if ((saved as { has_draft?: boolean }).has_draft) {
-        setPosts((ps) => ps.map((p) => (p.id === id ? { ...p, has_draft: true } : p)))
-        toast.info('Đã lưu nháp — mở bài và bấm "Đăng thay đổi" để lên trang')
-      }
-    } catch (e) {
-      toast.fromError(e)
-    }
-  }
-
-  async function dropEntry(module_id: string, targetId: string) {
-    const src = dragEntry
-    setDragEntry(null)
-    if (!src || src === targetId) return
-    // Only the posts on the page can be arranged, and only they are given a
-    // `sort_order` — the column means "the owner put this here", so writing it
-    // on an archived post would claim a placement nobody made.
-    const order = liveOf(module_id).map((p) => p.id)
-    const i = order.indexOf(src)
-    const j = order.indexOf(targetId)
-    if (i < 0 || j < 0) return
-    order.splice(j, 0, order.splice(i, 1)[0])
-    try {
-      const updated = await reorderPosts(module_id, order)
-      setPosts((ps) => ps.filter((p) => p.module_id !== module_id).concat(updated))
-    } catch (e) {
-      toast.fromError(e)
+      setError((e as Error).message)
     }
   }
 
 
-  async function removeEntry(id: string) {
-    try {
-      await transitionStatus(id, 'delete')
-      setPosts((ps) => ps.filter((p) => p.id !== id))
-    } catch (e) {
-      toast.fromError(e)
-    }
-  }
 
-  const postCount = posts.length
-
-  return (
-    <div style={{ background: paper.cream, color: ink.base, minHeight: '100vh' }}>
-      <div style={{ background: '#DDEBF0', color: '#0E2C38', padding: '44px 56px 30px' }}>
-        <Breadcrumbs style={{ opacity: 0.75 }} />
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            gap: 44,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontFamily: serif,
-                fontWeight: 400,
-                fontSize: 70,
-                lineHeight: 1,
-                letterSpacing: '-.04em',
-                margin: 0,
-              }}
+  /**
+   * The fixed copy of each page the site draws with a screen of its own. It
+   * lives in the page it belongs to, in Quản lý trang (step 3c), rather than
+   * in one long list of every page's words.
+   */
+  const pageCopy: Record<SystemPage, ReactNode> = {
+    landing: <>
+          <div style={sectionHead}>Trang chủ — landing</div>
+          <div style={grid(two)}>
+            <Field label="Nhãn trên cùng">
+              <input
+                {...field('lEyebrow')}
+                style={boxed}
+              />
+            </Field>
+            <Field label="Nhãn xem mục lục">
+              <input {...field('lCta')} style={boxed} />
+            </Field>
+            <Field
+              label={
+                <>
+                  Tên lớn — dòng 1 · chữ <span style={{ color: '#F2A0A5' }}>ӕ</span> phóng to màu hồng
+                </>
+              }
             >
-              Content
-            </h1>
-            <div
-              style={{
-                fontFamily: sans,
-                fontWeight: 300,
-                fontSize: 13.5,
-                lineHeight: 1.5,
-                marginTop: 10,
-                maxWidth: 430,
-                opacity: 0.85,
-              }}
-            >
-              Mọi thứ trong khu quản trị: bài viết, và cấu hình của trang.
-            </div>
+              <input
+                {...field('lTitle1')}
+                style={serifInput}
+              />
+            </Field>
+            <Field label="Tên lớn — dòng 2 (nghiêng, xanh)">
+              <input
+                {...field('lTitle2')}
+                style={serifItalicInput}
+              />
+            </Field>
+            <Field label="Đoạn dẫn — cột 1">
+              <textarea
+                {...field('lIntro1')}
+                rows={4}
+                style={area}
+              />
+            </Field>
+            <Field label="Đoạn dẫn — cột 2">
+              <textarea
+                {...field('lIntro2')}
+                rows={4}
+                style={area}
+              />
+            </Field>
           </div>
-          <div
-            style={{
-              fontFamily: sans,
-              fontSize: 11,
-              letterSpacing: '.14em',
-              textTransform: 'uppercase',
-              opacity: 0.7,
-              paddingBottom: 8,
-            }}
-          >
-            {modules.length} module · {postCount} bài
-          </div>
-        </div>
-
-        {/*
-          Three places to stand, so three real buttons. They were `<div onClick>`,
-          which meant the only way into the other two tabs was the mouse — and
-          `aria-pressed` now says which one you are on rather than leaving it to
-          the fill colour alone.
-        */}
-        <div style={{ display: 'flex', gap: 6, marginTop: 26, flexWrap: 'wrap' }}>
-          {TABS.map((x) => (
-            <button
-              key={x.k}
-              type="button"
-              className="ab-tab"
-              aria-pressed={tab === x.k}
-              onClick={() => nav.goCms(x.k)}
-            >
-              {x.t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {tab === 'posts' && (
-        <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
-          <PostsPanel onChanged={() => void load()} />
-        </div>
-      )}
-
-      {tab === 'authors' && (
-        <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
-          <AuthorsPanel />
-        </div>
-      )}
-
-      {tab === 'config' && (
-        /*
-         * Hai cột: chỉ mục bên trái, toàn bộ nội dung bên phải.
-         *
-         * `align-items: start` là thứ làm cột trái dính được — một `grid` mặc
-         * định kéo mỗi ô cao bằng hàng, và một `position: sticky` bên trong một
-         * ô cao bằng cả nội dung thì không bao giờ có chỗ để dính.
-         */
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(210px, 258px) minmax(0, 1fr)',
-            alignItems: 'start',
-            gap: 34,
-            padding: '34px 56px 130px',
-            maxWidth: 1180,
-          }}
-        >
-          <BoxIndex active={box} onPick={pickBox} />
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 40, minWidth: 0 }}>
 
           {/*
-            Ba ô chữ này từng là tiêu đề của cây sơ đồ, và cây ấy chỉ để đọc.
-            Bỏ cây đi thì ba ô phải có chỗ đứng: chúng vẽ ra nhãn sidebar
-            (`Sidebar.tsx`) và chặng đầu của đường dẫn (`crumbs.ts`), nên
-            chúng là thứ sửa được duy nhất trên cây cũ.
-          */}
-          <Section id="modules" active={box}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 20,
-              borderBottom: `2px solid ${ink.base}`,
-              paddingBottom: 9,
-              marginBottom: 6,
-            }}
-            id="modules-head"
-          >
-            <div
-              style={{
-                fontFamily: sans,
-                fontSize: 10.5,
-                fontWeight: 500,
-                letterSpacing: '.2em',
-                textTransform: 'uppercase',
-                color: ink.muted,
-              }}
-            >
-              Module — kéo để xếp và lồng vào nhau
-            </div>
-            <Button
-              level="primary"
-              icon={<IconPlus size={16} />}
-              onClick={async () => {
-                try {
-                  const m = await createModule()
-                  forgetModules()
-                  setModules((ms) => ms.concat([m]))
-                  setOpenModule(m.id)
-                  toast.ok(`Đã tạo module “${m.title}”`)
-                } catch (e) {
-                  toast.fromError(e)
-                }
-              }}
-            >
-              Module mới
-            </Button>
+            * Trang Ghi chép và trang Lưu trữ.
+            *
+            * Năm dòng của trang Ghi chép từng nằm cứng trong mã, còn hai dòng
+            * của trang Lưu trữ thì có trong dữ liệu nhưng chưa bao giờ có ô để
+            * sửa — khai ra rồi bỏ đó cũng là không sửa được.
+            */}
+          {/*
+            * Tag dùng chung cho cả ghi chép lẫn bài đăng — sửa ở đây, ăn cả hai
+            * chỗ. Trước đây bốn dạng ghi viết cứng trong code, muốn đổi một chữ
+            * là phải sửa code.
+            */}
+        </>,
+    notes: <>
+          <div style={{ ...sectionHead, margin: '34px 0 18px' }}>Trang Ghi chép</div>
+          <div style={grid(two)}>
+            <Field label="Tiêu đề trang">
+              <input {...field('notesTitle')} style={serifInput} />
+            </Field>
+            <Field label="Dòng dưới tiêu đề">
+              <input {...field('notesSubtitle')} style={serifItalicInput} />
+            </Field>
           </div>
-
-          {moduleRows.map(({ m, depth, kids }) => {
-            // Only what a reader sees. Order is a fact about the page, so a
-            // post that is not on the page has no place in this list — the
-            // drafts and the archive are managed on Tạo bài đăng.
-            const entries = liveOf(m.id)
-            const open = openModule === m.id
-            // Which fields this module actually uses — see admin/moduleForm.ts.
-            const shape = formShapeOf(m)
-            // Mỗi tầng thụt vào một nấc bằng đúng bề ngang tay nắm cộng mũi
-            // tên, nên tên module của tầng con rơi thẳng hàng dưới tên cha.
-            const indent = depth * INDENT
-            // Nhánh này đang gấp lại. Hàng không có con thì không gấp được,
-            // nên `folded` có nhớ id của nó cũng không có nghĩa gì.
-            const shut = kids && folded.has(m.id)
-            const over = dropAt?.id === m.id && dragModule !== null && dragModule !== m.id
-            const into = over && dropAt?.where === 'inside'
-            return (
-              <div
-                key={m.id}
-                draggable
-                onDragStart={() => setDragModule(m.id)}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  if (!dragModule) return
-                  const where = whereIn(e)
-                  if (!canDropHere(dragModule, m.id, where)) {
-                    if (dropAt !== null) setDropAt(null)
-                    return
-                  }
-                  if (dropAt?.id !== m.id || dropAt.where !== where) setDropAt({ id: m.id, where })
+          <div style={grid(two, 18)}>
+            <Field label="Đoạn dẫn — góc phải">
+              <textarea {...field('notesIntro')} rows={3} style={{ ...area, fontSize: 14 }} />
+            </Field>
+            <Field label="Dòng hướng dẫn — dưới đoạn dẫn">
+              <textarea {...field('notesHint')} rows={3} style={{ ...area, fontSize: 14 }} />
+            </Field>
+          </div>
+          <div style={grid(two, 18)}>
+            <Field label="Lời kết — cuối trang">
+              <input {...field('notesEnd')} style={serifItalicInput} />
+            </Field>
+            <Field label="Lời kết — dòng phụ">
+              <input {...field('notesEndNote')} style={boxed} />
+            </Field>
+          </div>
+        </>,
+    // The archive's words are fixed in code since the owner retired those fields (2026-09-19).
+    archive: null,
+    index: <>
+          <div style={{ ...sectionHead, margin: '34px 0 18px' }}>Mục lục</div>
+          <div style={grid(two)}>
+            <Field label="Tiêu đề — dòng 1">
+              <input {...field('t1')} style={serifInput} />
+            </Field>
+            <Field label="Tiêu đề — dòng 2 (nghiêng, xanh)">
+              <input
+                {...field('t2')}
+                style={serifItalicInput}
+              />
+            </Field>
+          </div>
+          <div style={grid(two, 18)}>
+            <Field label="Đoạn dẫn — dạng danh sách">
+              <textarea
+                {...field('blurb')}
+                rows={3}
+                style={{ ...area, fontSize: 14 }}
+              />
+            </Field>
+            <Field label="Đoạn dẫn — dạng cột">
+              <textarea
+                {...field('blurbShort')}
+                rows={3}
+                style={{ ...area, fontSize: 14 }}
+              />
+            </Field>
+          </div>
+          <div style={grid(three, 40)}>
+            {([1, 2, 3] as const).map((slot) => (
+              <ImageSlot
+                key={slot}
+                label={`Chú thích ảnh ${slot}`}
+                caption={copy[`plate${slot}` as const]}
+                url={copy[`plateImg${slot}` as const] || null}
+                onCaption={(v) => void saveSite({ [`plate${slot}`]: v } as SiteOverrides)}
+                onUpload={(f) => savePlate(slot, f)}
+                onClear={() => void saveSite({ [`plateImg${slot}`]: '' } as SiteOverrides)}
+                onPlace={(next) => void saveSite({ [`plateImg${slot}`]: next } as SiteOverrides)}
+                ratio={16 / 9}
+                drag={{
+                  ...plateSwap.slotProps(slot),
+                  handle: plateSwap.handleProps(slot),
+                  marked: plateSwap.over === slot,
                 }}
-                onDragLeave={() => {
-                  if (dropAt?.id === m.id) setDropAt(null)
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  void dropModule(m.id, whereIn(e))
-                }}
-                onDragEnd={() => {
-                  setDragModule(null)
-                  setDropAt(null)
-                }}
-                style={{
-                  position: 'relative',
-                  borderBottom: '1px solid #F0EBDB',
-                  padding: '13px 0',
-                  opacity: dragModule === m.id ? 0.45 : 1,
-                }}
-              >
-                {/*
-                  Một nét dọc cho mỗi tầng nằm trên hàng này.
+              />
+            ))}
+          </div>
+        </>,
+  }
 
-                  Cỡ chữ chỉ giảm được tới 17px rồi dừng, nên từ tầng bốn trở
-                  xuống hai tầng liền nhau chỉ còn khác nhau ở lề thụt — liếc
-                  qua không biết hàng nào nằm trong hàng nào. Nét chạy suốt
-                  chiều cao hàng, kể cả phần đệm, nên các hàng kề nhau nối
-                  thành một đường liền và đường ấy tự dứt ở hàng cuối của nhánh.
-                */}
-                {Array.from({ length: depth }, (_, i) => (
-                  <div
-                    key={i}
-                    aria-hidden="true"
-                    style={{
-                      position: 'absolute',
-                      left: i * INDENT + GUIDE_X,
-                      top: 0,
-                      bottom: 0,
-                      width: 1,
-                      background: paper.rule,
-                      pointerEvents: 'none',
-                    }}
-                  />
-                ))}
-                {/*
-                  Ba vùng thả, ba dấu hiệu khác nhau — vì thả sai chỗ trong một
-                  cây không chỉ là đổi thứ tự, nó đổi cả chỗ bài nằm và địa chỉ
-                  của chúng. Vạch ngang thụt vào đúng tầng thẻ sẽ hạ xuống, còn
-                  "nằm trong" viền cả thẻ đích lại vì cái sắp đổi là **thẻ kia**
-                  chứ không phải khe giữa hai thẻ.
-                */}
-                {over && dropAt?.where === 'before' && (
-                  <div style={{ ...dropBar, marginLeft: indent, marginTop: -13, marginBottom: 11 }} />
-                )}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 13,
-                    // Viền của "nằm trong" ăn ra ngoài 8px mỗi bên để chữ
-                    // không dính vào nét, nên lề trái lùi lại đúng chừng ấy và
-                    // hàng không nhích sang khi viền hiện ra.
-                    marginLeft: into ? indent - 8 : indent,
-                    marginTop: into ? -5 : 0,
-                    marginBottom: into ? -5 : 0,
-                    ...(into
-                      ? {
-                          boxShadow: `inset 0 0 0 1px ${ink.base}`,
-                          borderRadius: radius,
-                          padding: '5px 8px',
-                        }
-                      : null),
-                  }}
-                >
-                  <Hover
-                    title="Kéo lên mép thẻ khác để đổi thứ tự, vào giữa thẻ để nằm trong nó"
-                    style={{
-                      fontFamily: sans,
-                      lineHeight: 0,
-                      color: ink.faint,
-                      cursor: 'grab',
-                      flex: 'none',
-                    }}
-                    hoverStyle={{ color: ink.base }}
-                  >
-                    <IconDrag size={16} />
-                  </Hover>
-                  {/*
-                    Mũi tên gấp/mở nhánh — không phải mở biểu mẫu sửa.
-
-                    Chủ site: *"Mũi tên hiện mở biểu mẫu sửa chứ không gấp cây,
-                    nên cây dài thì phải cuộn."* Mũi tên ở đầu một hàng trong
-                    cây là chỗ người ta bấm để gấp nhánh, nên nó nhận nghĩa ấy.
-                    Biểu mẫu sửa không mất đường vào: bấm tên module vẫn mở nó,
-                    và tên là cái bấm rộng hơn nhiều — thêm một nút thứ ba vào
-                    hàng thì mỗi hàng lại dài thêm 41px cho một việc đã có chỗ.
-
-                    Hàng không có con giữ một ô trống đúng bề ngang cái nút, để
-                    chấm màu của các hàng cùng tầng vẫn thẳng một cột.
-                  */}
-                  {kids ? (
-                    <IconButton
-                      size="sm"
-                      label={shut ? `Mở nhánh ${m.title}` : `Gấp nhánh ${m.title}`}
-                      aria-expanded={!shut}
-                      onClick={() => toggleFold(m.id)}
-                    >
-                      <IconChevron size={14} open={!shut} />
-                    </IconButton>
-                  ) : (
-                    <div aria-hidden="true" style={{ width: sizes.sm.height, flex: 'none' }} />
-                  )}
-                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: m.accent, flex: 'none' }} />
-                  <div
-                    style={{ fontFamily: sans, fontSize: 10.5, letterSpacing: '.16em', color: ink.faint, width: 26, flex: 'none' }}
-                  >
-                    {String(siblingIndex.get(m.id) ?? 1).padStart(2, '0')}
-                  </div>
-                  <button
-                    type="button"
-                    className="ab-disclose"
-                    aria-expanded={open}
-                    onClick={() => setOpenModule(open ? null : m.id)}
-                    style={{
-                      fontFamily: serif,
-                      // Mỗi tầng nhỏ đi một nấc, dừng ở 17px: chỉ thụt lề thôi
-                      // thì liếc qua vẫn phải dò xem hàng nào là cha hàng nào.
-                      fontSize: Math.max(24 - depth * 3.5, 17),
-                      lineHeight: 1.1,
-                      letterSpacing: '-.025em',
-                      color: ink.base,
-                      flex: 1,
-                      minWidth: 0,
-                      textAlign: 'left',
-                    }}
-                  >
-                    {m.title}
-                  </button>
-                  <div style={{ fontFamily: sans, fontWeight: 300, fontSize: 12, color: ink.muted, flex: 'none' }}>
-                    {countLabel(m.id, entries.length)}
-                  </div>
-                  <IconButton
-                    size="sm"
-                    level="danger"
-                    label={`Xoá module ${m.title}`}
-                    onClick={async () => {
-                      try {
-                        await deleteModule(m.id)
-                        forgetModules()
-                        setModules((ms) => ms.filter((x) => x.id !== m.id))
-                        setPosts((ps) => ps.filter((p) => p.module_id !== m.id))
-                        setOpenModule(null)
-                        toast.ok(`Đã xoá module “${m.title}”`)
-                      } catch (e) {
-                        toast.fromError(e)
-                      }
-                    }}
-                  >
-                    <IconTrash size={14} />
-                  </IconButton>
-                </div>
-
-                {over && dropAt?.where === 'after' && (
-                  <div style={{ ...dropBar, marginLeft: indent, marginTop: 11, marginBottom: -13 }} />
-                )}
-
-                {open && (
-                  <div style={{ padding: '16px 0 6px', paddingLeft: 39 + indent }}>
+  /** A module's own fields, for a page that still takes its looks from that module. */
+  function moduleFields(m: Module) {
+    // Which fields this module actually uses — see admin/moduleForm.ts.
+    const shape = formShapeOf(m)
+    return (
+      <div>
                     <div style={grid(shape.concept ? nameRow : nameRowPlain)}>
                       <Field label="Tên module">
                         <input
@@ -1524,11 +676,9 @@ export function Cms() {
                             onChange={(e) => void patchModule(m.id, { layout: e.target.value })}
                             style={boxed}
                           >
-                            {MODULE_LAYOUTS.map((l) => (
-                              <option key={l.key} value={l.key}>
-                                {l.label}
-                              </option>
-                            ))}
+                            <option value="band">band</option>
+                            <option value="specimen">specimen</option>
+                            <option value="sequence">sequence</option>
                           </select>
                         </Field>
                       )}
@@ -1541,38 +691,6 @@ export function Cms() {
                           />
                         </Field>
                       )}
-                    </div>
-
-                    {/*
-                      Where this module sits in the tree.
-
-                      Migration 0025 gave `modules` a `parent_id`, and every
-                      surface on the site learned to read it — but nothing in
-                      here could set it, so filing one module inside another
-                      meant calling the API by hand. That is exactly the chore
-                      this whole change set out to remove.
-
-                      The list leaves out the module itself and everything
-                      already inside it: a module cannot be put inside its own
-                      contents. The API refuses the same thing, so this only
-                      keeps the impossible choice off the screen.
-                    */}
-                    <div style={grid(parentRow)}>
-                      <Field label={<>Nằm trong<Where>để trống là ở tầng trên cùng</Where></>}>
-                        <select
-                          value={m.parent_id ?? ''}
-                          onChange={(e) => void patchModule(m.id, { parent_id: e.target.value || null })}
-                          style={boxed}
-                        >
-                          <option value="">— không nằm trong mục nào —</option>
-                          {possibleParents(modules, m.id).map((x) => (
-                            <option key={x.id} value={x.id}>
-                              {'　'.repeat(depthOf(modules, x.id))}
-                              {x.title}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
                     </div>
 
                     {shape.blurb && (
@@ -1637,7 +755,7 @@ export function Cms() {
                             })
                             return url
                           } catch (e) {
-                            toast.fromError(e)
+                            setError((e as Error).message)
                             return null
                           }
                         }}
@@ -1658,7 +776,7 @@ export function Cms() {
                             await patchModule(m.id, { [imageColumn(group, slot)]: url })
                             return url
                           } catch (e) {
-                            toast.fromError(e)
+                            setError((e as Error).message)
                             return null
                           }
                         }}
@@ -1683,361 +801,174 @@ export function Cms() {
                         }
                       />
                     ))}
+      </div>
+    )
+  }
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        gap: 16,
-                        borderTop: '1px solid #E8E2CE',
-                        paddingTop: 14,
-                        marginBottom: 4,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontFamily: sans,
-                          fontSize: 10,
-                          fontWeight: 500,
-                          letterSpacing: '.18em',
-                          textTransform: 'uppercase',
-                          color: ink.muted,
-                        }}
-                      >
-                        Bài trong module
-                      </div>
-                      {/*
-                        Writing a post starts in one place. This list is for
-                        reading the order and changing it, so the button hands
-                        over to the wizard rather than dropping a blank draft
-                        in from the side.
-                      */}
-                      <Button
-                        size="sm"
-                        onClick={() => nav.newPost()}
-                        icon={<IconPlus size={14} />}
-                      >
-                        Bài mới
-                      </Button>
-                    </div>
+  const postCount = posts.length
 
-                    {entries.map((e, i) => (
-                      <div
-                        key={e.id}
-                        draggable
-                        onDragStart={() => setDragEntry(e.id)}
-                        onDragOver={(ev) => ev.preventDefault()}
-                        onDrop={(ev) => {
-                          ev.preventDefault()
-                          void dropEntry(m.id, e.id)
-                        }}
-                        onDragEnd={() => setDragEntry(null)}
-                        style={{
-                          display: 'grid',
-                          // Titles are short names; descriptions are sentences,
-                          // and the ones that got cut off were always these.
-                          gridTemplateColumns: '44px minmax(0,0.72fr) minmax(0,1.6fr) 74px 48px',
-                          gap: 10,
-                          alignItems: 'center',
-                          padding: '6px 0',
-                          borderBottom: '1px solid #EFEADA',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                          <Hover
-                            title="Kéo để đổi thứ tự"
-                            style={{ lineHeight: 0, color: ink.faint, cursor: 'grab' }}
-                            hoverStyle={{ color: ink.base }}
-                          >
-                            <IconDrag size={14} />
-                          </Hover>
-                          <div style={{ fontFamily: sans, fontSize: 10.5, letterSpacing: '.12em', color: ink.faint }}>
-                            {displayNumber(i)}
-                          </div>
-                        </div>
-                        <input
-                          defaultValue={e.en}
-                          onBlur={(ev) => void patchPost(e.id, { en: ev.target.value })}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            background: 'transparent',
-                            border: 0,
-                            color: ink.base,
-                            fontFamily: sans,
-                            fontSize: 13.5,
-                            padding: '4px 2px',
-                            outline: 'none',
-                          }}
-                        />
-                        <input
-                          defaultValue={e.vi}
-                          onBlur={(ev) => void patchPost(e.id, { vi: ev.target.value })}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            background: 'transparent',
-                            border: 0,
-                            color: ink.soft,
-                            fontFamily: sans,
-                            fontWeight: 300,
-                            fontSize: 13,
-                            padding: '4px 2px',
-                            outline: 'none',
-                          }}
-                        />
-                        <input
-                          defaultValue={e.date_label}
-                          onBlur={(ev) => void patchPost(e.id, { date_label: ev.target.value })}
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            background: 'transparent',
-                            border: 0,
-                            color: ink.muted,
-                            fontFamily: sans,
-                            fontSize: 12,
-                            padding: '4px 2px',
-                            outline: 'none',
-                          }}
-                        />
-                        <IconButton
-                          size="sm"
-                          level="danger"
-                          label={`Bỏ “${e.en}” khỏi module`}
-                          onClick={() => void removeEntry(e.id)}
-                        >
-                          <IconClose size={14} />
-                        </IconButton>
-                      </div>
-                    ))}
+  return (
+    <div style={{ background: paper.cream, color: ink.base, minHeight: '100vh' }}>
+      <div style={{ background: '#DDEBF0', color: '#0E2C38', padding: '44px 56px 30px' }}>
+        <Breadcrumbs style={{ opacity: 0.75 }} />
 
-                  </div>
-                )}
-              </div>
-            )
-          })}
-          </Section>
-
-          <Section id="landing" active={box}>
-          <div id="landing-head" style={sectionHead}>Trang chủ — landing</div>
-          <div style={grid(two)}>
-            <Field label="Nhãn trên cùng">
-              <input
-                {...field('lEyebrow')}
-                style={boxed}
-              />
-            </Field>
-            <Field label="Nhãn xem mục lục">
-              <input {...field('lCta')} style={boxed} />
-            </Field>
-            <Field
-              label={
-                <>
-                  Tên lớn — dòng 1 · chữ <span style={{ color: '#F2A0A5' }}>ӕ</span> phóng to màu hồng
-                </>
-              }
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            gap: 44,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <h1
+              style={{
+                fontFamily: serif,
+                fontWeight: 400,
+                fontSize: 70,
+                lineHeight: 1,
+                letterSpacing: '-.04em',
+                margin: 0,
+              }}
             >
-              <input
-                {...field('lTitle1')}
-                style={serifInput}
-              />
-            </Field>
-            <Field label="Tên lớn — dòng 2 (nghiêng, xanh)">
-              <input
-                {...field('lTitle2')}
-                style={serifItalicInput}
-              />
-            </Field>
-            <Field label="Đoạn dẫn — cột 1">
-              <textarea
-                {...field('lIntro1')}
-                rows={4}
-                style={area}
-              />
-            </Field>
-            <Field label="Đoạn dẫn — cột 2">
-              <textarea
-                {...field('lIntro2')}
-                rows={4}
-                style={area}
-              />
-            </Field>
-          </div>
-
-          {/*
-            * Trang Ghi chép và trang Lưu trữ.
-            *
-            * Năm dòng của trang Ghi chép từng nằm cứng trong mã, còn hai dòng
-            * của trang Lưu trữ thì có trong dữ liệu nhưng chưa bao giờ có ô để
-            * sửa — khai ra rồi bỏ đó cũng là không sửa được.
-            */}
-          </Section>
-
-          {/*
-            * Tag dùng chung cho cả ghi chép lẫn bài đăng — sửa ở đây, ăn cả hai
-            * chỗ. Trước đây bốn dạng ghi viết cứng trong code, muốn đổi một chữ
-            * là phải sửa code.
-            */}
-          <Section id="tag" active={box}>
-          <div id="tag-head" style={sectionHead}>Tag</div>
-          <TagsPanel />
-
-          </Section>
-
-          <Section id="notes" active={box}>
-          <div id="notes-head" style={sectionHead}>Trang Ghi chép</div>
-          <div style={grid(two)}>
-            <Field label="Tiêu đề trang">
-              <input {...field('notesTitle')} style={serifInput} />
-            </Field>
-            <Field label="Dòng dưới tiêu đề">
-              <input {...field('notesSubtitle')} style={serifItalicInput} />
-            </Field>
-          </div>
-          <div style={grid(two, 18)}>
-            <Field label="Đoạn dẫn — góc phải">
-              <textarea {...field('notesIntro')} rows={3} style={{ ...area, fontSize: 14 }} />
-            </Field>
-            <Field label="Dòng hướng dẫn — dưới đoạn dẫn">
-              <textarea {...field('notesHint')} rows={3} style={{ ...area, fontSize: 14 }} />
-            </Field>
-          </div>
-          <div style={grid(two, 18)}>
-            <Field label="Lời kết — cuối trang">
-              <input {...field('notesEnd')} style={serifItalicInput} />
-            </Field>
-            <Field label="Lời kết — dòng phụ">
-              <input {...field('notesEndNote')} style={boxed} />
-            </Field>
-          </div>
-          {ghi01 && (
-            /*
-             * The quotation woven between the posts. It is stored with Ghi 01's
-             * feature cells, so the only place to edit it used to be deep in
-             * that module's form under Cây module — and the owner, looking for
-             * it here with the rest of the page's words, concluded it could not
-             * be edited at all.
-             */
-            <div style={grid(one, 18)}>
-              <Field label="Câu trích giữa trang — dòng in nghiêng xen giữa các bài">
-                <input
-                  key={quoteText}
-                  defaultValue={quoteText}
-                  onBlur={(e) => {
-                    if (e.target.value === quoteText) return
-                    void patchModule(ghi01.id, {
-                      feature_cells: patchOverride(ghi01.feature_cells as FeatureOverride[] | null, QUOTE_CELL.n, {
-                        t: e.target.value,
-                      }),
-                    })
-                  }}
-                  style={serifItalicInput}
-                />
-              </Field>
+              Content
+            </h1>
+            <div
+              style={{
+                fontFamily: sans,
+                fontWeight: 300,
+                fontSize: 13.5,
+                lineHeight: 1.5,
+                marginTop: 10,
+                maxWidth: 430,
+                opacity: 0.85,
+              }}
+            >
+              Mọi thứ trong khu quản trị: bài viết, trang và cách site hiển thị.
             </div>
-          )}
-
-          </Section>
-
-          <Section id="index" active={box}>
-          <div id="index-head" style={sectionHead}>Trang mục lục</div>
-          <div style={grid(two)}>
-            <Field label="Tiêu đề — dòng 1">
-              <input {...field('t1')} style={serifInput} />
-            </Field>
-            <Field label="Tiêu đề — dòng 2 (nghiêng, xanh)">
-              <input
-                {...field('t2')}
-                style={serifItalicInput}
-              />
-            </Field>
           </div>
-          <div style={grid(two, 18)}>
-            <Field label="Đoạn dẫn — dạng danh sách">
-              <textarea
-                {...field('blurb')}
-                rows={3}
-                style={{ ...area, fontSize: 14 }}
-              />
-            </Field>
-            <Field label="Đoạn dẫn — dạng cột">
-              <textarea
-                {...field('blurbShort')}
-                rows={3}
-                style={{ ...area, fontSize: 14 }}
-              />
-            </Field>
-          </div>
-          <div style={grid(three, 40)}>
-            {([1, 2, 3] as const).map((slot) => (
-              <ImageSlot
-                key={slot}
-                label={`Chú thích ảnh ${slot}`}
-                caption={copy[`plate${slot}` as const]}
-                url={copy[`plateImg${slot}` as const] || null}
-                onCaption={(v) => void saveSite({ [`plate${slot}`]: v } as SiteOverrides)}
-                onUpload={(f) => savePlate(slot, f)}
-                onClear={() => void saveSite({ [`plateImg${slot}`]: '' } as SiteOverrides)}
-                onPlace={(next) => void saveSite({ [`plateImg${slot}`]: next } as SiteOverrides)}
-                ratio={16 / 9}
-                drag={{
-                  ...plateSwap.slotProps(slot),
-                  handle: plateSwap.handleProps(slot),
-                  marked: plateSwap.over === slot,
-                }}
-              />
-            ))}
-          </div>
-
-          </Section>
-
-          {/*
-            The most destructive control on the screen was the faintest thing
-            on it — 10.5px in `ink.faint`, styled as a footnote, and it wiped
-            every copy field on the site with no way back. It asks first now,
-            and the question is a second press rather than a `confirm()` the
-            browser can suppress.
-
-            Nó nằm ở cuối cột nội dung, ngoài mọi phần: nó xoá chữ của cả năm
-            phần một lúc, nên không thuộc phần nào. Và nó không mờ đi theo phần
-            nào cả — một nút xoá lúc mờ lúc rõ là một nút xoá bấm nhầm.
-          */}
-          <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            {resetting ? (
-              <>
-                <span style={{ fontFamily: sans, fontSize: 12.5, color: ink.danger }}>
-                  Xoá mọi chữ đã sửa trên toàn bộ trang, không hoàn tác được. Chắc chưa?
-                </span>
-                <Button
-                  level="danger"
-                  onClick={async () => {
-                    setResetting(false)
-                    // Every field back to its shipped default: clear the whole blob.
-                    try {
-                      setSite(await updateSite(Object.fromEntries(
-                        Object.keys(SITE_DEFAULTS).map((k) => [k, '']),
-                      ) as SiteOverrides))
-                      await load()
-                      toast.ok('Đã trả toàn bộ nội dung về bản gốc')
-                    } catch (e) {
-                      toast.fromError(e)
-                    }
-                  }}
-                >
-                  Xoá hết, trả về gốc
-                </Button>
-                <Button onClick={() => setResetting(false)}>Thôi</Button>
-              </>
-            ) : (
-              <Button level="danger" onClick={() => setResetting(true)}>
-                Trả về nội dung gốc…
-              </Button>
-            )}
-          </div>
+          <div
+            style={{
+              fontFamily: sans,
+              fontSize: 11,
+              letterSpacing: '.14em',
+              textTransform: 'uppercase',
+              opacity: 0.7,
+              paddingBottom: 8,
+            }}
+          >
+            {modules.length} module · {postCount} bài
           </div>
         </div>
+
+        <div style={{ display: 'flex', gap: 4, marginTop: 26 }}>
+          {TABS.map((x) => (
+            <div
+              key={x.k}
+              onClick={() => nav.goCms(x.k)}
+              style={{
+                fontFamily: sans,
+                fontSize: 11,
+                fontWeight: 500,
+                letterSpacing: '.16em',
+                textTransform: 'uppercase',
+                padding: '10px 18px',
+                cursor: 'pointer',
+                background: tab === x.k ? ink.base : 'transparent',
+                color: tab === x.k ? paper.cream : ink.soft,
+              }}
+            >
+              {x.t}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {error && (
+        <div
+          style={{
+            background: '#FBE7E5',
+            color: '#8E1E42',
+            fontFamily: sans,
+            fontSize: 12.5,
+            padding: '10px 56px',
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {tab === 'posts' && <ContentWorkspace onChanged={() => void load()} />}
+
+      {tab === 'authors' && (
+        <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
+          <AuthorsPanel />
+        </div>
+      )}
+
+      {tab === 'pages' && (
+        <PagesManager
+          renderPractice={() => {
+            const practice = site.practice ?? {}
+            const save = (patch: { title?: string; accent?: string }) => void saveSite({ practice: { ...practice, ...patch } })
+            return (
+              <div style={{ ...grid(two, 20), marginTop: 22 }}>
+                <Field label="Tên trên thanh bên">
+                  <input defaultValue={practice.title ?? ''} key={practice.title ?? ''} placeholder="Ghi 02" onBlur={(e) => e.target.value.trim() !== (practice.title ?? '') && save({ title: e.target.value.trim() || undefined })} style={{ ...serifInput, fontSize: 20 }} />
+                </Field>
+                <Field label="Màu">
+                  <input defaultValue={practice.accent ?? ''} key={practice.accent ?? ''} placeholder="#hex" onBlur={(e) => /^#[0-9a-f]{6}$/i.test(e.target.value.trim()) && save({ accent: e.target.value.trim() })} style={{ ...serifInput, fontSize: 16 }} />
+                </Field>
+              </div>
+            )
+          }}
+          renderCopy={(key) => pageCopy[key]}
+          renderModule={(id) => {
+            const m = modules.find((x) => x.id === id)
+            return m ? moduleFields(m) : null
+          }}
+        />
+      )}
+
+      {tab === 'display' && (
+        <DisplaySettings
+          design={site.design}
+          onSaveDesign={(patch) => saveSite({ design: patch })}
+          routes={<RoutesPanel stored={site.routes} modules={modules} onSave={(routes) => saveSite({ routes } as SiteOverrides)} />}
+          blog={
+            <>
+          <Hover
+            onClick={async () => {
+              // Every field back to its shipped default: clear the whole blob.
+              try {
+                setSite(await updateSite(Object.fromEntries(
+                  Object.keys(SITE_DEFAULTS).map((k) => [k, '']),
+                ) as SiteOverrides))
+                await load()
+              } catch (e) {
+                setError((e as Error).message)
+              }
+            }}
+            style={{
+              display: 'inline-block',
+              marginTop: 30,
+              fontFamily: sans,
+              fontSize: 10.5,
+              letterSpacing: '.16em',
+              textTransform: 'uppercase',
+              color: ink.faint,
+              borderBottom: `1px solid ${paper.rule}`,
+              paddingBottom: 4,
+              cursor: 'pointer',
+            }}
+            hoverStyle={{ color: '#C25C7C', borderColor: '#C25C7C' }}
+          >
+            Trả về nội dung gốc
+          </Hover>
+            </>
+          }
+        />
       )}
     </div>
   )

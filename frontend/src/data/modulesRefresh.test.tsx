@@ -18,6 +18,7 @@ function makeQueryBuilder(result: { data: unknown; error: unknown }) {
   const chain = () => builder
   builder.select = vi.fn(chain)
   builder.order = vi.fn(chain)
+  builder.eq = vi.fn(chain)
   builder.then = (resolve: (v: typeof result) => unknown, reject?: (e: unknown) => unknown) =>
     Promise.resolve(result).then(resolve, reject)
   return builder
@@ -33,23 +34,28 @@ const { modulesChanged } = await import('./modulesChanged')
 
 const rows = (order: string[]) => order.map((id, i) => ({ id, title: id, sort_order: i + 1 }))
 
+// Only `modules` answers; the feature layer's tables are empty, so the site
+// draws from the modules as it did before migration 0028.
+const serve = (order: string[]) =>
+  from.mockImplementation((table: string) => makeQueryBuilder({ data: table === 'modules' ? rows(order) : [], error: null }))
+
 describe('danh sách module tự hỏi lại khi khu quản trị vừa ghi', () => {
   it('hỏi lại và trả về thứ tự mới', async () => {
-    from.mockReturnValue(makeQueryBuilder({ data: rows(['sensory', 'roasting']), error: null }))
+    serve(['sensory', 'roasting'])
 
     const { result } = renderHook(() => useModules())
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.data.map((m) => m.id)).toEqual(['sensory', 'roasting'])
 
     // Chủ site kéo roasting lên trên; máy chủ nay trả về thứ tự đã đổi.
-    from.mockReturnValue(makeQueryBuilder({ data: rows(['roasting', 'sensory']), error: null }))
+    serve(['roasting', 'sensory'])
     act(() => modulesChanged())
 
     await waitFor(() => expect(result.current.data.map((m) => m.id)).toEqual(['roasting', 'sensory']))
   })
 
   it('không xoá trắng danh sách trong lúc hỏi lại', async () => {
-    from.mockReturnValue(makeQueryBuilder({ data: rows(['sensory']), error: null }))
+    serve(['sensory'])
 
     const { result } = renderHook(() => useModules())
     await waitFor(() => expect(result.current.loading).toBe(false))
@@ -62,7 +68,7 @@ describe('danh sách module tự hỏi lại khi khu quản trị vừa ghi', ()
   })
 
   it('hook đã gỡ thì không còn hỏi nữa', async () => {
-    from.mockReturnValue(makeQueryBuilder({ data: rows(['sensory']), error: null }))
+    serve(['sensory'])
 
     const { unmount, result } = renderHook(() => useModules())
     await waitFor(() => expect(result.current.loading).toBe(false))

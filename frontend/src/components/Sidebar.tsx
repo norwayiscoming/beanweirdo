@@ -1,10 +1,9 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { NAV, type Glyph, type NavItem } from '../content/navItems'
 import { SECTION_NAMES, type NavGroup } from '../content/site'
-import { indexModules, useModules, type ModuleRow } from '../data/useModules'
+import { findPage, indexModules, useModules, type ModuleRow } from '../data/useModules'
+import { useSiteCopy } from '../data/useSiteCopy'
 import { buildTree, flattenTree } from '../lib/contentTree'
-import { countUnder } from '../lib/postGroups'
-import { usePublishedPosts, type PostRow } from '../data/usePublishedPosts'
 import { layout, paper, sans, serif } from '../design/tokens'
 import { areaOfGroup, goToArea, visibleGroups } from '../lib/area'
 import { useAuth } from '../lib/auth'
@@ -256,9 +255,9 @@ export function Sidebar() {
   const { on, bind } = useHover()
   const mobile = useIsMobile()
   const [drawer, setDrawer] = useState(false)
-  const { data: allModules } = useModules()
+  const { data: allModules, postsOf } = useModules()
   const modules = indexModules(allModules)
-  const { data: posts } = usePublishedPosts()
+  const { overrides } = useSiteCopy()
   const { authed, signOut } = useAuth()
   const dark = nav.screen === 'notes' || nav.screen === 'hours'
   const t = theme(dark)
@@ -266,13 +265,8 @@ export function Sidebar() {
   // The mobile drawer is always drawn at full width.
   const open = mobile || on
 
-  /*
-   * The count beside a name covers the whole branch, not just what is filed
-   * directly under it. A heading holding two sub-sections of six posts each
-   * reads as empty otherwise — and "chưa có bài" is a different statement from
-   * "everything here is one level down".
-   */
-  const countFor = (m: ModuleRow) => countUnder(posts as PostRow[], modules, m.id)
+  // What the page's rule lists, so the count matches the page it opens.
+  const countFor = (m: ModuleRow) => postsOf(m.id).length
 
   const section = (group: NavGroup) => {
     const items = NAV.filter((n) => n.group === group && !n.hiddenFromSidebar)
@@ -321,7 +315,27 @@ export function Sidebar() {
        * nav entry instead — a hand-copied name and a hand-picked glyph that
        * renaming the module in the CMS left untouched. Ledger D2.
        */
-      const own = item.moduleId ? allModules.find((m) => m.id === item.moduleId) : undefined
+      if (group === 'Practice') {
+        // Practice wears its own name and colour (site settings), drawn as the
+        // square every journal has — the same row the blog page ghi-02 drew,
+        // count included, so moving the definition changed nothing on screen.
+        const practice = overrides.practice ?? {}
+        rows.push(
+          <Row
+            key={item.key}
+            onClick={go(nav, item)}
+            label={practice.title ?? item.label}
+            sub={item.sub}
+            count={0}
+            muted={t.muted}
+            hoverBg={t.hover}
+            glyph={practice.accent ? <ModuleMark m={{ kind: 'special', accent: practice.accent } as ModuleRow} /> : <Mark shape={item.shape} />}
+          />,
+        )
+        continue
+      }
+
+      const own = findPage(allModules, item.moduleId)
       rows.push(
         <Row
           key={item.key}

@@ -23,11 +23,7 @@ import type { Author } from 'api-contract'
 import {
   listAuthors,
   listModules,
-  listTags,
-  listTemplates,
   type Module,
-  type Tag,
-  type TemplateSummary,
 } from './apiClient'
 
 function once<T>(fetch: () => Promise<T>) {
@@ -49,15 +45,11 @@ function once<T>(fetch: () => Promise<T>) {
 }
 
 const modules = once<Module[]>(listModules)
-const tags = once<Tag[]>(listTags)
-const templates = once<TemplateSummary[]>(listTemplates)
 // Looked up on call rather than at import: screens that never show authors
 // should not need `listAuthors` to exist at all.
 const authors = once<Author[]>(() => listAuthors())
 
 export const listModulesCached = (): Promise<Module[]> => modules.get()
-export const listTagsCached = (): Promise<Tag[]> => tags.get()
-export const listTemplatesCached = (): Promise<TemplateSummary[]> => templates.get()
 export const listAuthorsCached = (): Promise<Author[]> => authors.get()
 
 /**
@@ -71,15 +63,11 @@ export const forgetModules = (): void => {
   modules.forget()
   modulesChanged()
 }
-/** Gọi sau khi ghi vào `tags`. */
-export const forgetTags = (): void => tags.forget()
 /** Gọi sau khi ghi vào `authors` hoặc đổi tác giả của một bài (đổi `post_count`). */
 export const forgetAuthors = (): void => authors.forget()
 
 /** Quên sạch — dùng khi đăng xuất, và trong test. */
 export function forgetAllLists(): void {
   modules.forget()
-  tags.forget()
-  templates.forget()
   authors.forget()
 }

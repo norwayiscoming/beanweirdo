@@ -36,6 +36,9 @@ export type Where = {
  * address (`biochemistry`). Only the ones that differ are listed; the rest pass
  * through, which keeps this from becoming a list nobody remembers to update.
  */
+/** Prefix of a tag page's id: `tag-heat` is the page of tag `heat`. */
+export const TAG_PAGE = 'tag-'
+
 export const moduleToUrl = (id: string, w: RouteWords = activeWords()) => w.modules[id] ?? id
 
 function moduleFromUrl(name: string, w: RouteWords = activeWords()): string {
@@ -50,13 +53,18 @@ const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adAuthors}`]: 'cms',
   [`${w.admin}-${w.adSitemap}`]: 'cms',
   [`${w.admin}-${w.adPageContent}`]: 'cms',
+  [`${w.admin}-${w.adTaxonomy}`]: 'cms',
+  [`${w.admin}-${w.adDisplay}`]: 'cms',
   [`${w.admin}-${w.adArchive}`]: 'archive',
-  [`${w.admin}-${w.adPortfolio}`]: 'portfolio',
-  [`${w.admin}-${w.adPortContent}`]: 'portfolio',
-  [`${w.admin}-${w.adPortDesign}`]: 'portfolio',
+  // Portfolio folded into the CMS (port pages in Quản lý trang, its design in
+  // Cài đặt hiển thị); its old addresses still land there.
+  [`${w.admin}-${w.adPortfolio}`]: 'cms',
+  [`${w.admin}-${w.adPortContent}`]: 'cms',
+  [`${w.admin}-${w.adPortDesign}`]: 'cms',
 })
 
-export type CmsTab = 'posts' | 'authors' | 'config'
+/** Nội dung (posts and the vocabularies filing them) · Quản lý trang · Cài đặt hiển thị · Tác giả. */
+export type CmsTab = 'posts' | 'pages' | 'display' | 'authors'
 
 /** Portfolio has two tabs: port pages (create, arrange) and the design system. */
 export type PortTab = 'pages' | 'content' | 'design'
@@ -79,15 +87,24 @@ const portTabs = (w: RouteWords): Record<string, PortTab> => ({
  */
 const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
   [`${w.admin}-${w.adPost}`]: 'posts',
-  [`${w.admin}-${w.adConfig}`]: 'config',
+  // Cấu hình folded into Quản lý trang; its old address still lands there.
+  [`${w.admin}-${w.adConfig}`]: 'pages',
   [`${w.admin}-${w.adAuthors}`]: 'authors',
-  [`${w.admin}-${w.adSitemap}`]: 'config',
-  [`${w.admin}-${w.adPageContent}`]: 'config',
+  // Phân loại folded into Nội dung; its old address still lands there.
+  [`${w.admin}-${w.adTaxonomy}`]: 'posts',
+  [`${w.admin}-${w.adSitemap}`]: 'pages',
+  // Nội dung trang folded into Quản lý trang; its old address still lands there.
+  [`${w.admin}-${w.adPageContent}`]: 'pages',
+  [`${w.admin}-${w.adDisplay}`]: 'display',
+  [`${w.admin}-${w.adPortfolio}`]: 'pages',
+  [`${w.admin}-${w.adPortContent}`]: 'pages',
+  [`${w.admin}-${w.adPortDesign}`]: 'display',
 })
 const pageOfTab = (w: RouteWords): Record<CmsTab, string> => ({
   posts: `${w.admin}-${w.adPost}`,
+  pages: `${w.admin}-${w.adSitemap}`,
+  display: `${w.admin}-${w.adDisplay}`,
   authors: `${w.admin}-${w.adAuthors}`,
-  config: `${w.admin}-${w.adConfig}`,
 })
 
 const screenPage = (w: RouteWords): Partial<Record<Screen, string>> => ({
@@ -165,6 +182,8 @@ function readPath(pathname: string, search: string, w: RouteWords): Where | null
   if (head === w.module && seg[1]) {
     return { area: 'public', screen: 'module', moduleId: moduleFromUrl(seg[1], w) }
   }
+  // A tag's own page (migration 0028): the page id is `tag-<id>`.
+  if (head === w.tag && seg[1]) return { area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${seg[1]}` }
   if (head === w.post && seg[1]) {
     // A reader arriving cold came through neither a module nor the admin list,
     // and `module` is the trail that makes sense to show them.
@@ -204,6 +223,7 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
     case 'portfolioAbout':
       return `/${w.portfolio}/about`
     case 'module':
+      if (where.moduleId?.startsWith(TAG_PAGE)) return `/${w.tag}/${where.moduleId.slice(TAG_PAGE.length)}`
       return where.moduleId ? `/${w.module}/${moduleToUrl(where.moduleId, w)}` : '/'
     case 'article':
       // The door is worth carrying so the trail reads back the way in, but
