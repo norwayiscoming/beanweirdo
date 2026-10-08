@@ -94,6 +94,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
   const method = (init?.method ?? 'GET').toUpperCase()
   const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {}
 
+  // Supabase reads (published posts for the port blocks): an empty table.
+  if (url.includes('/rest/v1/')) return json([])
   if (url.includes('/api/modules') && method === 'PUT') {
     const order = body.order as string[]
     MODULES = order.map((id, i) => ({ ...MODULES.find((m) => m.id === id)!, sort_order: i + 1 }))
@@ -133,8 +135,25 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     TOPICS = [...TOPICS, t]
     return json({ topic: t })
   }
+  if (url.includes('vocab=layout')) {
+    const rule = { id: 'r1', tier: 'topic', nodes: [], exclude: [], kinds: [], templates: [], sort: 'newest', group_by: 'none', limit_n: null, include_children: true, match: 'any', pinned: [], manual_order: [], new_first: true, from_page: true }
+    const page = (id: string, kind: string, title = '', presentation: Record<string, unknown> = {}) => ({ id, kind, title, blocks: ['r1'], presentation, aliases: [], visibility: 'public' })
+    return json({
+      pages: [page('nav', 'nav'), page('ghi', 'curated', 'Ghi', { screen: 'notes' }), page('tpl-subject', 'template_subject'), page('tpl-topic', 'template_topic'), page('tpl-keyword', 'template_keyword')],
+      overrides: [],
+      rules: [rule],
+    })
+  }
   if (url.includes('vocab=topics')) return json({ topics: TOPICS })
   if (url.includes('vocab=keywords')) return json({ keywords: KEYWORDS })
+  if (url.includes('/api/portfolio'))
+    return json({
+      pages: [
+        { id: 'p1', slug: 'business', title: 'business', status: 'published', blocks: [], palette: 'biz', sort_order: 0 },
+        { id: 'p2', slug: 'bean', title: 'bean', status: 'draft', blocks: [], palette: 'baen', sort_order: 1 },
+      ],
+      design: {},
+    })
   if (url.includes('/api/modules')) return json({ modules: MODULES })
   if (url.includes('/api/posts')) return json({ posts: [] })
   if (url.includes('/api/tags')) return json({ tags: [] })
@@ -151,7 +170,7 @@ const nop = () => {}
 const nav = {
   screen: 'cms', area: 'admin', variant: 'a', moduleId: '', postId: null, articleFrom: 'admin',
   // `?tab=authors` mở thẳng tab khác; mặc định là Cấu hình.
-  cmsTab: new URLSearchParams(location.search).get('tab') ?? 'tree',
+  cmsTab: new URLSearchParams(location.search).get('tab') ?? 'pages',
   goLanding: nop, goHome: nop, goArchive: nop, goHours: nop, goNotes: nop, goCms: nop,
   openModule: nop, openArticle: nop, toggleVariant: nop,
   newPost: nop, editPost: nop, previewPost: nop,

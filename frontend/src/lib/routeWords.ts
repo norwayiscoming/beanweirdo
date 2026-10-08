@@ -30,7 +30,7 @@ export type RouteWords = {
   /** Bảy trang con của khu quản trị — phần đứng sau `ad-`. */
   adPost: string
   adConfig: string
-  /** Cấu hình: cây bên trái, chi tiết bên phải — `/ad-cau-hinh`. */
+  /** Cấu hình: mọi trang và cài đặt của site, cây bên trái, chi tiết bên phải — `/ad-cau-hinh`. */
   adTree: string
   adAuthors: string
   /**
@@ -108,7 +108,7 @@ export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'module
   adConfig: 'Cấu hình (địa chỉ cũ)',
   adTree: 'Cấu hình',
   adAuthors: 'Tác giả',
-  adSitemap: 'Quản lý trang',
+  adSitemap: 'Sitemap (địa chỉ cũ)',
   adPageContent: 'Quản lý trang (địa chỉ cũ)',
   adTaxonomy: 'Phân loại',
   adDisplay: 'Cài đặt hiển thị',

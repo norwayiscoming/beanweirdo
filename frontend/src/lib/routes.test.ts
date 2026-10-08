@@ -87,9 +87,9 @@ describe('routes — tên trong địa chỉ', () => {
     expect(parsePath('/ad-taxonomy').tab).toBe('posts')
     expect(parsePath('/ad-display').tab).toBe('display')
     expect(parsePath('/ad-authors').tab).toBe('authors')
-    // Cấu hình is back as its own tab, at its own address.
-    expect(parsePath('/ad-cau-hinh')).toMatchObject({ area: 'admin', screen: 'cms', tab: 'tree' })
-    expect(toPath({ area: 'admin', screen: 'cms', tab: 'tree' })).toBe('/ad-cau-hinh')
+    // Quản lý trang and Cấu hình are one tab, written at /ad-cau-hinh; the old address still reads.
+    expect(parsePath('/ad-cau-hinh')).toMatchObject({ area: 'admin', screen: 'cms', tab: 'pages' })
+    expect(toPath({ area: 'admin', screen: 'cms', tab: 'pages' })).toBe('/ad-cau-hinh')
     expect(toPath({ area: 'public', screen: 'module', moduleId: 'tag-heat' })).toBe('/bean/tag/heat')
     // `/ad` names the screen and not a tab, so it opens on the first one
     // without rewriting itself to another address on arrival.
