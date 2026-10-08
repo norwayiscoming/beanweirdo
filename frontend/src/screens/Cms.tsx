@@ -23,6 +23,7 @@ import type { FeatureOverride } from '../content/notes'
 import { ink, paper, sans, serif } from '../design/tokens'
 import { Hover } from '../lib/Hover'
 import { ContentWorkspace } from '../admin/components/ContentWorkspace'
+import { ConfigTree } from '../admin/components/ConfigTree'
 import { DisplaySettings } from '../admin/components/DisplaySettings'
 import { AuthorsPanel } from '../admin/components/AuthorsPanel'
 import { useNav } from '../lib/nav'
@@ -91,10 +92,11 @@ const nameRow = 'minmax(0,1fr) 112px 124px 128px'
 const nameRowPlain = 'minmax(0,1fr) 112px'
 
 
-/** The four tabs, named once so the site map and the tab bar cannot drift. */
+/** The five tabs, named once so the site map and the tab bar cannot drift. */
 const TABS = [
   { k: 'posts', t: 'Nội dung' },
   { k: 'pages', t: 'Quản lý trang' },
+  { k: 'tree', t: 'Cấu hình' },
   { k: 'display', t: 'Cài đặt hiển thị' },
   { k: 'authors', t: 'Tác giả' },
 ] as const
@@ -862,7 +864,7 @@ export function Cms() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 4, marginTop: 26 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 26 }}>
           {TABS.map((x) => (
             <div
               key={x.k}
@@ -923,6 +925,17 @@ export function Cms() {
               </div>
             )
           }}
+          renderCopy={(key) => pageCopy[key]}
+          renderModule={(id) => {
+            const m = modules.find((x) => x.id === id)
+            return m ? moduleFields(m) : null
+          }}
+        />
+      )}
+
+      {tab === 'tree' && (
+        <ConfigTree
+          modules={modules}
           renderCopy={(key) => pageCopy[key]}
           renderModule={(id) => {
             const m = modules.find((x) => x.id === id)

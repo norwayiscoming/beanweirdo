@@ -37,7 +37,7 @@ const BLOCKS: Block[] = [
   },
   {
     title: 'Trang con của khu quản trị',
-    keys: ['adPost', 'adConfig', 'adAuthors', 'adSitemap', 'adPageContent', 'adTaxonomy', 'adDisplay', 'adArchive', 'adPortfolio', 'adPortContent', 'adPortDesign'],
+    keys: ['adPost', 'adConfig', 'adTree', 'adAuthors', 'adSitemap', 'adPageContent', 'adTaxonomy', 'adDisplay', 'adArchive', 'adPortfolio', 'adPortContent', 'adPortDesign'],
     sample: (w) => toPath({ area: 'admin', screen: 'archive' }, w),
   },
   {

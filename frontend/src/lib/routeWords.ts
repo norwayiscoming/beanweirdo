@@ -30,6 +30,8 @@ export type RouteWords = {
   /** Bảy trang con của khu quản trị — phần đứng sau `ad-`. */
   adPost: string
   adConfig: string
+  /** Cấu hình: cây bên trái, chi tiết bên phải — `/ad-cau-hinh`. */
+  adTree: string
   adAuthors: string
   /**
    * Hai trang con đã gộp lại thành `adConfig`. Chúng không còn được sinh ra,
@@ -70,6 +72,7 @@ export const DEFAULT_WORDS: RouteWords = {
   details: 'details',
   adPost: 'post',
   adConfig: 'config',
+  adTree: 'cau-hinh',
   adAuthors: 'authors',
   adSitemap: 'sitemap',
   adPageContent: 'page-content',
@@ -103,6 +106,7 @@ export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'module
   details: 'Trang chủ blog',
   adPost: 'Nội dung',
   adConfig: 'Cấu hình (địa chỉ cũ)',
+  adTree: 'Cấu hình',
   adAuthors: 'Tác giả',
   adSitemap: 'Quản lý trang',
   adPageContent: 'Quản lý trang (địa chỉ cũ)',
@@ -143,7 +147,7 @@ const MUST_DIFFER: (keyof RouteWords)[][] = [
   // Các trang của blog đứng cùng một chỗ, ngay sau `/bean/`.
   ['post', 'module', 'tag', 'index', 'notes', 'details'],
   // Bảy trang con đứng cùng một chỗ, ngay sau `ad-`.
-  ['adPost', 'adConfig', 'adAuthors', 'adSitemap', 'adPageContent', 'adTaxonomy', 'adDisplay', 'adArchive', 'adPortfolio', 'adPortContent', 'adPortDesign'],
+  ['adPost', 'adConfig', 'adTree', 'adAuthors', 'adSitemap', 'adPageContent', 'adTaxonomy', 'adDisplay', 'adArchive', 'adPortfolio', 'adPortContent', 'adPortDesign'],
   // Ba động từ đứng cùng một chỗ, ngay sau `/ad-post/`.
   ['create', 'edit', 'view'],
 ]

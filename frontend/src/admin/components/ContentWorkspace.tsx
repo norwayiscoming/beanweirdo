@@ -908,7 +908,7 @@ function NameInput({ value, onSave, big }: { value: string; onSave: (v: string) 
   )
 }
 
-function TopicSettings({
+export function TopicSettings({
   topic,
   parent,
   kids,
@@ -929,7 +929,8 @@ function TopicSettings({
   count: number
   used: string[]
   save: (patch: Parameters<typeof updateTopic>[1]) => void
-  onRetire: (to: string | null) => void
+  /** Absent where the screen shows no posts to move (Cấu hình): retiring lives in Nội dung. */
+  onRetire?: (to: string | null) => void
   onClose: () => void
 }) {
   const targets = tree.filter((t) => t.id !== topic.id && t.parent_id !== topic.id)
@@ -1008,7 +1009,7 @@ function TopicSettings({
           </select>
         </Field>
       )}
-      <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
+      {onRetire && <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
         {kids.length > 0 ? (
           <span style={{ fontFamily: sans, fontSize: 12, color: ink.muted }}>còn {kids.length} topic</span>
         ) : count > 0 ? (
@@ -1027,12 +1028,12 @@ function TopicSettings({
         ) : (
           <Confirm text={`Xoá ${topic.title}`} onGo={() => onRetire(null)} />
         )}
-      </div>
+      </div>}
     </>
   )
 }
 
-function FlatSettings({
+export function FlatSettings({
   kind,
   entry,
   count,
@@ -1054,7 +1055,8 @@ function FlatSettings({
   required?: boolean
   address?: string
   onRename: (label: string) => void
-  onRetire: (to: string | null) => void
+  /** Absent where the screen shows no posts to move (Cấu hình): retiring lives in Nội dung. */
+  onRetire?: (to: string | null) => void
   onClose: () => void
 }) {
   const [to, setTo] = useState(required ? (others.find((o) => o.id === 'note') ?? others[0])?.id ?? '' : '')
@@ -1075,7 +1077,7 @@ function FlatSettings({
           </a>
         </Field>
       )}
-      <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
+      {onRetire && <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
         {count > 0 ? (
           <>
             <Field name={`Chuyển ${count} bài sang`}>
@@ -1093,7 +1095,7 @@ function FlatSettings({
         ) : (
           <Confirm text={`Xoá ${entry.label}`} onGo={() => onRetire(required ? to : null)} disabled={required && !to} />
         )}
-      </div>
+      </div>}
     </>
   )
 }
