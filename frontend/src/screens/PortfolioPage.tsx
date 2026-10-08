@@ -1,11 +1,11 @@
 import { useNav } from '../lib/nav'
 import { PortAbout, PortHome, PortfolioView } from '../portfolio/PortfolioView'
-import { buildChrome, homeCards, usePortChrome, usePostHref, usePortSources, usePublicPort } from '../portfolio/data'
-import { activeWords } from '../lib/routeWords'
+import { buildChrome, homeCards, onwardOf, usePortChrome, usePostHref, usePortSources, usePublicPort } from '../portfolio/data'
+import { toPath } from '../lib/routes'
 
 /**
- * The public portfolio: /portfolio (main page), /portfolio/about and
- * /portfolio/<slug>. Full width, without the site's left rail — every page
+ * The public portfolio, which owns the root: / (main page), /about and
+ * /<slug>. Full width, without the site's left rail — every page
  * wears the portfolio's own header and footer (06.1, 06.17).
  */
 function NotFound() {
@@ -31,6 +31,7 @@ export function PortfolioPage() {
       posts={src.posts}
       moduleTitles={src.moduleTitles}
       postHref={postHref}
+      onward={onwardOf(page.slug)}
       chrome={buildChrome(chrome.content, chrome.pages, `page:${page.id}`)}
     />
   )
@@ -53,12 +54,11 @@ export function PortfolioAbout() {
   const { design, loading } = usePublicPort(null)
   const chrome = usePortChrome()
   if (loading || chrome.loading) return null
-  const word = activeWords().portfolio
   return (
     <PortAbout
       design={design}
       chrome={buildChrome(chrome.content, chrome.pages, 'about')}
-      posts={chrome.pages.filter((p) => p.status === 'published').map((p) => ({ label: p.title, url: `/${word}/${p.slug}` }))}
+      posts={chrome.pages.filter((p) => p.status === 'published').map((p) => ({ label: p.title, url: toPath({ area: 'public', screen: 'portfolioPage', slug: p.slug }) }))}
     />
   )
 }

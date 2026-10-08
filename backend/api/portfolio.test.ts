@@ -159,4 +159,12 @@ describe('pageColumns', () => {
     expect(pageColumns({ status: 'deleted' })).toBeTypeOf('string')
     expect(pageColumns({ blocks: {} })).toBeTypeOf('string')
   })
+
+  it('refuses slugs the root already answers to, but leaves bean free', () => {
+    // Port pages live at /<slug>; these addresses belong to other pages.
+    for (const slug of ['about', 'portfolio', 'post', 'muc-luc', 'practice', 'ad-post']) {
+      expect(pageColumns({ slug }), slug).toBeTypeOf('string')
+    }
+    expect(pageColumns({ slug: 'bean' })).toEqual({ slug: 'bean' })
+  })
 })

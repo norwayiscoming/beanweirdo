@@ -27,7 +27,7 @@ type Block = {
 const BLOCKS: Block[] = [
   {
     title: 'Trang công khai',
-    keys: ['index', 'notes', 'module', 'tag', 'post', 'practice', 'portfolio'],
+    keys: ['bean', 'details', 'index', 'notes', 'module', 'tag', 'post', 'practice'],
     sample: (w) => toPath({ area: 'public', screen: 'module', moduleId: 'biochem' }, w),
   },
   {
@@ -48,7 +48,7 @@ const BLOCKS: Block[] = [
   {
     title: 'Địa chỉ của một bài',
     keys: ['postMark', 'draftMark'],
-    sample: (w) => `/${w.post}/${buildSlug({ moduleId: 'ghi01', createdAt: '2026-08-24T09:00:00Z', status: 'draft' }, w)}`,
+    sample: (w) => toPath({ area: 'public', screen: 'article', slug: buildSlug({ moduleId: 'ghi01', createdAt: '2026-08-24T09:00:00Z', status: 'draft' }, w) }, w),
   },
 ]
 
@@ -167,7 +167,7 @@ export function RoutesPanel({
           Đường dẫn
           {!open && (
             <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: ink.muted }}>
-              {toPath({ area: 'admin', screen: 'cms' }, live)} · {`/${live.post}/…`}
+              {toPath({ area: 'admin', screen: 'cms' }, live)} · {`/${live.bean}/${live.post}/…`}
             </code>
           )}
         </h2>

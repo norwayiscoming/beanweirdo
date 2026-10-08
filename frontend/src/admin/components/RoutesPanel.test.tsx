@@ -84,7 +84,7 @@ describe('RoutesPanel — co lại', () => {
     render(<RoutesPanel stored={undefined} modules={modules} onSave={vi.fn()} />)
 
     expect(screen.queryByLabelText('Tên khu')).toBeNull()
-    expect(screen.getByText('/ad · /post/…')).toBeTruthy()
+    expect(screen.getByText('/ad · /bean/post/…')).toBeTruthy()
 
     fireEvent.click(screen.getByText('Đường dẫn'))
     expect(screen.getByLabelText('Tên khu')).toBeTruthy()

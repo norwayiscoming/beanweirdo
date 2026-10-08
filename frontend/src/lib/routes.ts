@@ -122,23 +122,42 @@ const actionOfScreen = (w: RouteWords): Partial<Record<Screen, string>> => ({
 })
 
 /**
+ * The port's about page, `/about`. A fixed word rather than one of the owner's:
+ * the API refuses it as a port page slug, so the two can never collide.
+ */
+const ABOUT = 'about'
+
+/**
+ * Where the portfolio lived before it became the root (`/portfolio/<slug>`).
+ * Only read, never written: links to it are already out there.
+ */
+const OLD_PORTFOLIO = 'portfolio'
+
+/**
  * Where an address points.
  *
- * Anything unrecognised lands on the public front page rather than an error:
- * a mistyped address is a reader who took a wrong turn, not a fault to report.
+ * The site is a tree: the portfolio at `/`, its pages at `/<slug>`, and the
+ * bean blog one level under its own port page, at `/bean/…`. Anything that is
+ * not an address of the blog, the journal or the back office is therefore a
+ * port page's slug — and one that does not exist says so, rather than quietly
+ * opening something else.
  */
 export function parsePath(pathname: string, search = '', w: RouteWords = activeWords()): Where {
-  const hit = readPath(pathname, search, w)
-  if (hit) return hit
-
   // Địa chỉ viết bằng một bộ từ cũ vẫn phải mở ra đúng chỗ — đổi tên một trang
   // không được làm chết những link đã phát ra. Đọc được rồi thì `useRoute` viết
   // lại nó bằng bộ từ đang dùng.
-  for (const old of [DEFAULT_WORDS, ...pastWords()]) {
-    const back = readPath(pathname, search, old)
-    if (back) return back
+  for (const words of [w, DEFAULT_WORDS, ...pastWords()]) {
+    const hit = readPath(pathname, search, words)
+    if (hit) return hit
   }
-  return { area: 'public', screen: 'landing' }
+  return readPort(pathname.split('/').filter(Boolean))
+}
+
+/** `/`, `/about` and `/<slug>`: the portfolio, which owns the root. */
+function readPort(seg: string[]): Where {
+  if (!seg[0]) return { area: 'public', screen: 'portfolioHome' }
+  if (seg[0] === ABOUT) return { area: 'public', screen: 'portfolioAbout' }
+  return { area: 'public', screen: 'portfolioPage', slug: seg[0] }
 }
 
 /** Một lượt đọc bằng đúng một bộ từ. `null` nghĩa là bộ từ này không nhận ra. */
@@ -172,25 +191,30 @@ function readPath(pathname: string, search: string, w: RouteWords): Where | null
   }
 
   // ── public ───────────────────────────────────────────────────────────────
+  if (head === w.bean && seg[1]) return readBlog(seg.slice(1), search, w, true)
+  // The blog used to sit at the root (`/post/<slug>`, `/muc-luc`…) and the
+  // portfolio under `/portfolio`. Both moved; their old addresses still read,
+  // and `useRoute` rewrites them to where they live now.
+  if (head === OLD_PORTFOLIO) return readPort(seg.slice(1))
+  return readBlog(seg, search, w, false)
+}
+
+/** The blog's pages, read from what follows `/bean/`. */
+function readBlog(seg: string[], search: string, w: RouteWords, nested: boolean): Where | null {
+  const [head, arg] = seg
+  // Only under `/bean/`: at the root `details` was never an address.
+  if (nested && head === w.details && !arg) return { area: 'public', screen: 'landing' }
   if (head === w.index) return { area: 'public', screen: 'home' }
   if (head === w.notes) return { area: 'public', screen: 'notes' }
-  // `/portfolio` is the main page and `/portfolio/about` the about page; every
-  // other second segment is a port page's slug (the API refuses the slug 'about').
-  if (head === w.portfolio && !seg[1]) return { area: 'public', screen: 'portfolioHome' }
-  if (head === w.portfolio && seg[1] === 'about') return { area: 'public', screen: 'portfolioAbout' }
-  if (head === w.portfolio && seg[1]) return { area: 'public', screen: 'portfolioPage', slug: seg[1] }
-  if (head === w.module && seg[1]) {
-    return { area: 'public', screen: 'module', moduleId: moduleFromUrl(seg[1], w) }
-  }
+  if (head === w.module && arg) return { area: 'public', screen: 'module', moduleId: moduleFromUrl(arg, w) }
   // A tag's own page (migration 0028): the page id is `tag-<id>`.
-  if (head === w.tag && seg[1]) return { area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${seg[1]}` }
-  if (head === w.post && seg[1]) {
+  if (head === w.tag && arg) return { area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${arg}` }
+  if (head === w.post && arg) {
     // A reader arriving cold came through neither a module nor the admin list,
     // and `module` is the trail that makes sense to show them.
     const from = (new URLSearchParams(search).get('from') as Origin | null) ?? 'module'
-    return { area: 'public', screen: 'article', slug: seg[1], from }
+    return { area: 'public', screen: 'article', slug: arg, from }
   }
-
   return null
 }
 
@@ -199,11 +223,12 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
   if (where.area === 'practice') return `/${w.practice}`
   const adHome = `/${w.admin}`
   const adPost = `/${w.admin}-${w.adPost}`
+  const blog = `/${w.bean}`
 
   if (where.area === 'admin') {
     const action = actionOfScreen(w)[where.screen]
     if (action) return where.slug ? `${adPost}/${action}=${where.slug}` : `${adPost}/${action}`
-    if (where.screen === 'article') return where.slug ? `/${w.post}/${where.slug}?from=admin` : adHome
+    if (where.screen === 'article') return where.slug ? `${blog}/${w.post}/${where.slug}?from=admin` : adHome
     if (where.screen === 'cms') return where.tab ? `/${pageOfTab(w)[where.tab]}` : adHome
     if (where.screen === 'portfolio')
       return `/${w.admin}-${where.portTab === 'design' ? w.adPortDesign : where.portTab === 'content' ? w.adPortContent : w.adPortfolio}`
@@ -212,25 +237,25 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
   }
 
   switch (where.screen) {
+    case 'landing':
+      return `${blog}/${w.details}`
     case 'home':
-      return `/${w.index}`
+      return `${blog}/${w.index}`
     case 'notes':
-      return `/${w.notes}`
+      return `${blog}/${w.notes}`
     case 'portfolioPage':
-      return where.slug ? `/${w.portfolio}/${where.slug}` : '/'
-    case 'portfolioHome':
-      return `/${w.portfolio}`
+      return where.slug ? `/${where.slug}` : '/'
     case 'portfolioAbout':
-      return `/${w.portfolio}/about`
+      return `/${ABOUT}`
     case 'module':
-      if (where.moduleId?.startsWith(TAG_PAGE)) return `/${w.tag}/${where.moduleId.slice(TAG_PAGE.length)}`
-      return where.moduleId ? `/${w.module}/${moduleToUrl(where.moduleId, w)}` : '/'
+      if (where.moduleId?.startsWith(TAG_PAGE)) return `${blog}/${w.tag}/${where.moduleId.slice(TAG_PAGE.length)}`
+      return where.moduleId ? `${blog}/${w.module}/${moduleToUrl(where.moduleId, w)}` : `${blog}/${w.details}`
     case 'article':
       // The door is worth carrying so the trail reads back the way in, but
       // `module` is the default and does not need saying.
       return where.slug
-        ? `/${w.post}/${where.slug}${where.from && where.from !== 'module' ? `?from=${where.from}` : ''}`
-        : '/'
+        ? `${blog}/${w.post}/${where.slug}${where.from && where.from !== 'module' ? `?from=${where.from}` : ''}`
+        : `${blog}/${w.details}`
     default:
       return '/'
   }

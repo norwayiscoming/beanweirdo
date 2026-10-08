@@ -26,6 +26,7 @@ import {
 import { useRowDrag } from '../lib/useRowDrag'
 import { findPage, useModules, type PageRow } from '../../data/useModules'
 import { treeOrder, type ListingRule, type RuleGroup, type RuleSort, type RuleTier } from '../../lib/listingRule'
+import { activeWords } from '../../lib/routeWords'
 import { toPath } from '../../lib/routes'
 import { Builder, ContentTab, createFromPreset, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { usePortSources } from '../../portfolio/data'
@@ -60,7 +61,7 @@ type Selected =
 type BlogSelected = Extract<Selected, { kind: 'system' | 'curated' | 'template' | 'override' }>
 
 const SYSTEM: { key: SystemPage; title: string; path: string }[] = [
-  { key: 'landing', title: 'Trang chủ', path: '/' },
+  { key: 'landing', title: 'Trang chủ', path: toPath({ area: 'public', screen: 'landing' }) },
   { key: 'index', title: 'Mục lục', path: toPath({ area: 'public', screen: 'home' }) },
   { key: 'archive', title: 'Lưu trữ', path: '' },
 ]
@@ -460,7 +461,7 @@ export function PagesManager({
 
   const tree = () => (
     <nav aria-label="Cây trang" style={{ background: paper.white, paddingBottom: 24, ...(stacked ? {} : { height: 'calc(100vh - 220px)', overflowY: 'auto', position: 'sticky', top: 0 }) }}>
-      <SectionHead id="pages.port" title="Port" big meta="/portfolio">
+      <SectionHead id="pages.port" title="Port" big meta={toPath({ area: 'public', screen: 'portfolioHome' })}>
         {item({ kind: 'port-part', part: 'home' }, 'Trang chủ', 24)}
         <SectionHead
           id="pages.port.pages"
@@ -479,7 +480,7 @@ export function PagesManager({
       </SectionHead>
 
       <div style={{ borderTop: `1px solid ${paper.rule}`, marginTop: 10 }} />
-      <SectionHead id="pages.blog" title="Personal Blog" big meta="/">
+      <SectionHead id="pages.blog" title="Personal Blog" big meta={`/${activeWords().bean}/…`}>
         {SYSTEM.map((s) => item({ kind: 'system', key: s.key }, s.title, 24))}
         {item({ kind: 'nav' }, 'Điều hướng', 24, navItems.length)}
         <SectionHead id="pages.blog.curated" title="Trang chọn tay" indent={24} add={{ label: 'trang (địa chỉ)', onAdd: (v) => addPage(v.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')) }}>
@@ -512,7 +513,7 @@ export function PagesManager({
 
   let body: ReactNode
   if (open.kind === 'port-part') {
-    const path = `/portfolio${open.part === 'about' || open.part === 'sign' ? '/about' : ''}`
+    const path = toPath({ area: 'public', screen: open.part === 'about' || open.part === 'sign' ? 'portfolioAbout' : 'portfolioHome' })
     body = port.loaded ? (
       <>
         <ContentTab key={open.part} only={open.part} content={port.content} setStored={port.setContentStored} pages={port.pages} />
@@ -556,7 +557,7 @@ export function PagesManager({
     body = (
       <div>
         {errorLine}
-        {frame('/', 'trang chủ')}
+        {frame(toPath({ area: 'public', screen: 'landing' }), 'trang chủ')}
         {navItems.map((it, i) => {
           const p = navPage(it.ref)
           return (

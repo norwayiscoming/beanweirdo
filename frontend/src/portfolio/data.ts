@@ -4,11 +4,11 @@ import { usePublishedPosts, type PostRow } from '../data/usePublishedPosts'
 import { useModules } from '../data/useModules'
 import { usePostAddresses } from '../data/usePostAddresses'
 import { toPath } from '../lib/routes'
+import { activeWords } from '../lib/routeWords'
 import { parseBlocks, type Block, type PortPost } from './blocks'
 import { resolveDesign, type Design } from './tokens'
 import { navLinks, resolveContent, type NavPage, type PortContent } from './content'
 import type { Chrome, HomeCard } from './PortfolioView'
-import { activeWords } from '../lib/routeWords'
 
 type PortPage = {
   id: string
@@ -152,9 +152,21 @@ const toPortPage = (row: Record<string, unknown>): PortPage => ({
   sortOrder: Number(row.sort_order ?? 0),
 })
 
+/**
+ * The way down from a port page into the blog it heads.
+ *
+ * The bean blog lives under the port page whose slug is the blog's own word
+ * (`/bean` → `/bean/details`), so that page — and only that one — leads there.
+ */
+export function onwardOf(slug: string): { href: string; label: string } | undefined {
+  const w = activeWords()
+  if (slug !== w.bean) return undefined
+  return { href: toPath({ area: 'public', screen: 'landing' }), label: w.details }
+}
+
 /** Header links and footer for a page; `current` marks the link of the page being shown. */
 export function buildChrome(content: PortContent, pages: NavPage[], current?: string): Chrome {
-  return { content, links: navLinks(content, pages, activeWords().portfolio), current }
+  return { content, links: navLinks(content, pages), current }
 }
 
 /**
@@ -167,12 +179,11 @@ export function homeCards(content: PortContent, pages: PortPage[], design: Desig
   const features = content.home.features.length
     ? content.home.features
     : live.map((p) => ({ pageId: p.id, label: '', intro: '', image: '' }))
-  const word = activeWords().portfolio
   return features.flatMap((f) => {
     const page = live.find((p) => p.id === f.pageId)
     if (!page) return []
     return [{
-      href: `/${word}/${page.slug}`,
+      href: toPath({ area: 'public', screen: 'portfolioPage', slug: page.slug }),
       title: page.title,
       label: f.label || design.palettes[page.palette]?.name || '',
       intro: f.intro || page.intro,

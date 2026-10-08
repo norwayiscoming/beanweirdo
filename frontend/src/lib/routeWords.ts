@@ -20,8 +20,13 @@ export type RouteWords = {
   index: string
   notes: string
   practice: string
-  /** Public port page: `/portfolio/<slug>`. */
-  portfolio: string
+  /**
+   * The bean blog's prefix: every blog page lives under `/bean/…`, and the
+   * blog's own front page is `/bean/details`. `/bean` alone is the port page
+   * with that slug — the blog is reached from it, one level down.
+   */
+  bean: string
+  details: string
   /** Bảy trang con của khu quản trị — phần đứng sau `ad-`. */
   adPost: string
   adConfig: string
@@ -61,7 +66,8 @@ export const DEFAULT_WORDS: RouteWords = {
   index: 'muc-luc',
   notes: 'ghi',
   practice: 'practice',
-  portfolio: 'portfolio',
+  bean: 'bean',
+  details: 'details',
   adPost: 'post',
   adConfig: 'config',
   adAuthors: 'authors',
@@ -93,7 +99,8 @@ export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'module
   index: 'Mục lục',
   notes: 'Ghi 01',
   practice: 'Nhật ký',
-  portfolio: 'Portfolio',
+  bean: 'Khu bean',
+  details: 'Trang chủ blog',
   adPost: 'Nội dung',
   adConfig: 'Cấu hình (địa chỉ cũ)',
   adAuthors: 'Tác giả',
@@ -131,8 +138,10 @@ const SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
  * chúng trong địa chỉ quyết định, không phải do sở thích.
  */
 const MUST_DIFFER: (keyof RouteWords)[][] = [
-  // Đoạn đầu địa chỉ: mọi trang công khai và khu quản trị nằm cùng một chỗ.
-  ['admin', 'post', 'module', 'tag', 'index', 'notes', 'practice', 'portfolio'],
+  // Đoạn đầu địa chỉ: khu bean, nhật ký và khu quản trị nằm cùng một chỗ.
+  ['admin', 'practice', 'bean'],
+  // Các trang của blog đứng cùng một chỗ, ngay sau `/bean/`.
+  ['post', 'module', 'tag', 'index', 'notes', 'details'],
   // Bảy trang con đứng cùng một chỗ, ngay sau `ad-`.
   ['adPost', 'adConfig', 'adAuthors', 'adSitemap', 'adPageContent', 'adTaxonomy', 'adDisplay', 'adArchive', 'adPortfolio', 'adPortContent', 'adPortDesign'],
   // Ba động từ đứng cùng một chỗ, ngay sau `/ad-post/`.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { resolvePosts, type Block, type PortPost } from './blocks'
 import { gridArea, imageOf, seriesLayout, storyLayout, type Placed } from './layout'
@@ -25,6 +25,11 @@ type PortfolioViewProps = {
   postHref: (p: PortPost) => string
   /** Header and footer content (Portfolio › Nội dung trang). Without it the page shows a bare default. */
   chrome?: Chrome
+  /**
+   * A way one level down the site tree, drawn right under the page's hero.
+   * The bean port page carries one into the blog, which lives under it.
+   */
+  onward?: { href: string; label: string }
   /** The block selected in the page arranger — lightly outlined so it is easy to spot. */
   activeId?: string | null
   onPick?: (id: string) => void
@@ -111,7 +116,7 @@ function PortFrame({ design, palette, chrome, children }: { design: Design; pale
 }
 
 export function PortfolioView(props: PortfolioViewProps) {
-  const { design, palette, blocks, posts, moduleTitles, postHref, activeId, onPick } = props
+  const { design, palette, blocks, posts, moduleTitles, postHref, onward, activeId, onPick } = props
   const [open, setOpen] = useState<PortPost | null>(null)
   const vars = cssVars(design, palette) as CSSProperties
 
@@ -331,15 +336,19 @@ export function PortfolioView(props: PortfolioViewProps) {
 
   return (
     <PortFrame design={design} palette={palette} chrome={props.chrome ?? FALLBACK_CHROME(props.title)}>
-      {blocks.map((b) => (
-        <div
-          key={b.id}
-          data-block={b.id}
-          onClickCapture={onPick ? () => onPick(b.id) : undefined}
-          style={activeId === b.id ? { outline: `1px dashed ${design.colors.ink3}`, outlineOffset: -1 } : undefined}
-        >
-          {render(b)}
-        </div>
+      {/* Under the hero when the page opens with one, so it is seen before any scrolling. */}
+      {onward && blocks[0]?.type !== 'head' && <Onward {...onward} />}
+      {blocks.map((b, i) => (
+        <Fragment key={b.id}>
+          <div
+            data-block={b.id}
+            onClickCapture={onPick ? () => onPick(b.id) : undefined}
+            style={activeId === b.id ? { outline: `1px dashed ${design.colors.ink3}`, outlineOffset: -1 } : undefined}
+          >
+            {render(b)}
+          </div>
+          {onward && i === 0 && b.type === 'head' && <Onward {...onward} />}
+        </Fragment>
       ))}
       {open &&
         createPortal(
@@ -350,10 +359,23 @@ export function PortfolioView(props: PortfolioViewProps) {
   )
 }
 
+function Onward({ href, label }: { href: string; label: string }) {
+  return (
+    <section className="rg sec">
+      <div className="rail" />
+      <div className="main">
+        <a className="onward" href={href}>
+          <span className="mk">{label}</span> →
+        </a>
+      </div>
+    </section>
+  )
+}
+
 /** A port page as the main page lists it. */
 export type HomeCard = { href: string; title: string; label: string; intro: string; image: string; palette: string }
 
-/** /portfolio — 06.2 Hero, then each featured port page as a two-column Card grid (06.4). */
+/** / — 06.2 Hero, then each featured port page as a two-column Card grid (06.4). */
 export function PortHome({ design, chrome, cards }: { design: Design; chrome: Chrome; cards: HomeCard[] }) {
   const { home } = chrome.content
   const first = Object.keys(design.palettes)[0] ?? 'biz'
@@ -388,7 +410,7 @@ export function PortHome({ design, chrome, cards }: { design: Design; chrome: Ch
   )
 }
 
-/** /portfolio/about — 06.12 About hero and 06.11 Link list. */
+/** /about — 06.12 About hero and 06.11 Link list. */
 export function PortAbout({ design, chrome, posts }: { design: Design; chrome: Chrome; posts: LinkItemOut[] }) {
   const { about } = chrome.content
   const first = Object.keys(design.palettes)[0] ?? 'biz'

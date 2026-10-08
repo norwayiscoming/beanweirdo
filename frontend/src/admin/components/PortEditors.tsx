@@ -17,7 +17,8 @@ import {
 } from '../lib/apiClient'
 import { PortfolioView } from '../../portfolio/PortfolioView'
 import docHtml from '../../portfolio/design-doc.html?raw'
-import { buildChrome, usePortSources, usePostHref } from '../../portfolio/data'
+import { buildChrome, onwardOf, usePortSources, usePostHref } from '../../portfolio/data'
+import { toPath } from '../../lib/routes'
 import { navLinks, resolveContent, type Feature, type LinkItem, type NavOverride, type PortContent } from '../../portfolio/content'
 import {
   BLOCK_NAMES,
@@ -340,7 +341,7 @@ export function Builder({
         <Field label="Tiêu đề">
           <input style={{ ...boxed, fontFamily: serif, fontSize: 22 }} value={draft.title} onChange={(e) => set({ title: e.target.value })} />
         </Field>
-        <Field label="Đường dẫn · /portfolio/">
+        <Field label="Đường dẫn · /">
           <input
             style={boxed}
             value={draft.slug}
@@ -364,7 +365,7 @@ export function Builder({
         </div>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', fontFamily: sans, fontSize: 12 }}>
           {draft.status === 'published' && (
-            <a href={`/portfolio/${draft.slug}`} target="_blank" rel="noopener noreferrer" style={{ color: ink.green }}>
+            <a href={toPath({ area: 'public', screen: 'portfolioPage', slug: draft.slug })} target="_blank" rel="noopener noreferrer" style={{ color: ink.green }}>
               mở trang ↗
             </a>
           )}
@@ -452,6 +453,7 @@ export function Builder({
           posts={src.posts}
           moduleTitles={src.moduleTitles}
           postHref={postHref}
+          onward={onwardOf(draft.slug)}
           activeId={active}
           onPick={setActive}
           chrome={buildChrome(content, pages.map((p) => (p.id === draft.id ? { ...p, title: draft.title, slug: draft.slug, status: draft.status } : p)), `page:${draft.id}`)}
@@ -786,11 +788,10 @@ export function ContentTab({
     push({ [group]: value })
   }
   const { header, footer, home, about } = content
-  const word = 'portfolio'
   const published = pages.filter((p) => p.status === 'published')
 
   // Header links: the automatic list with the owner's overrides applied.
-  const links = navLinks(content, pages, word)
+  const links = navLinks(content, pages)
   const saveLinks = (list: typeof links) =>
     setGroup('header', { ...header, links: list.map((l): NavOverride => ({ key: l.key, label: l.label, hidden: l.hidden })) })
   const linkDrag = useRowDrag((from, to) => {
@@ -889,7 +890,7 @@ export function ContentTab({
 
       {show('home') && (
         <>
-      {head('Trang tổng', `/${word}`)}
+      {head('Trang tổng', toPath({ area: 'public', screen: 'portfolioHome' }))}
       <div style={two}>
         {text('Tiêu đề', home.title, (v) => setGroup('home', { ...home, title: v }))}
         {text('Giới thiệu', home.intro, (v) => setGroup('home', { ...home, intro: v }), true)}
@@ -933,7 +934,7 @@ export function ContentTab({
 
       {show('about') && (
         <>
-      {head('About', `/${word}/about`)}
+      {head('About', toPath({ area: 'public', screen: 'portfolioAbout' }))}
       {text('Đoạn chữ phủ ảnh', about.text, (v) => setGroup('about', { ...about, text: v }), true)}
       <div style={fieldLabel}>Nhãn trên ảnh</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8, marginBottom: 12 }}>
@@ -954,7 +955,7 @@ export function ContentTab({
 
       {show('sign') && (
         <>
-      {only ? head('Ký tên', `/${word}/about`) : <div style={fieldLabel}>Ký tên</div>}
+      {only ? head('Ký tên', toPath({ area: 'public', screen: 'portfolioAbout' })) : <div style={fieldLabel}>Ký tên</div>}
       {about.signs.map((sg, i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px minmax(0,1fr) 24px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
           <label style={{ fontFamily: sans, fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
