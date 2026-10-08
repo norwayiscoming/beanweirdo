@@ -9,6 +9,7 @@
  * it is used. Pure: the caller hands in posts already readable by the viewer
  * (published, visible), and the topic tree.
  */
+import { ancestorsOf, buildTree, descendantIds, flattenTree } from './contentTree'
 
 export type RuleTier = 'topic' | 'keyword' | 'kind' | 'template' | 'pick' | 'all'
 export type RuleSort = 'newest' | 'oldest' | 'manual' | 'tree'
@@ -90,19 +91,14 @@ type RuleContext = {
 
 export type PostGroup<P> = { key: string; label: string; posts: P[] }
 
-/** Subjects in order, each followed by its topics: the tree read top to bottom. */
+/** Every node in order, each followed by everything under it: the tree read top to bottom, at any depth. */
 export function treeOrder(topics: readonly RuleTopic[]): string[] {
-  const sorted = [...topics].sort((a, b) => a.sort_order - b.sort_order)
-  return sorted
-    .filter((t) => t.parent_id === null)
-    .flatMap((s) => [s.id, ...sorted.filter((t) => t.parent_id === s.id).map((t) => t.id)])
+  return flattenTree(buildTree([...topics].sort((a, b) => a.sort_order - b.sort_order))).map((n) => n.row.id)
 }
 
-/** A node and, when asked, every topic under it. */
+/** A node and, when asked, every topic anywhere under it. */
 function withChildren(ids: readonly string[], topics: readonly RuleTopic[], children: boolean): Set<string> {
-  const out = new Set(ids)
-  if (children) for (const t of topics) if (t.parent_id && out.has(t.parent_id)) out.add(t.id)
-  return out
+  return new Set(children ? ids.flatMap((id) => descendantIds(topics, id)) : ids)
 }
 
 function matches<P extends RulePost>(tier: RuleTier, ids: readonly string[], rule: ListingRule, ctx: RuleContext) {
@@ -187,10 +183,8 @@ export function groupPosts<P extends RulePost>(rule: ListingRule, posts: readonl
   if (rule.group_by === 'none') return [{ key: '', label: '', posts: [...posts] }]
   const groups = new Map<string, P[]>()
   const put = (key: string, p: P) => groups.set(key, [...(groups.get(key) ?? []), p])
-  const subjectOf = (id: string | null) => {
-    const t = id ? ctx.topics.find((x) => x.id === id) : undefined
-    return t ? t.parent_id ?? t.id : ''
-  }
+  // The subject is the top of the branch, however deep the topic sits.
+  const subjectOf = (id: string | null) => (id && ctx.topics.some((x) => x.id === id) ? (ancestorsOf(ctx.topics, id)[0]?.id ?? id) : '')
   for (const p of posts) {
     if (rule.group_by === 'topic') put(p.topic_id ?? '', p)
     else if (rule.group_by === 'subject') put(subjectOf(p.topic_id), p)

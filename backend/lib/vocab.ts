@@ -48,7 +48,7 @@ async function countBy(supabase: Db, table: 'posts' | 'post_keywords', column: s
 }
 
 function fail(res: VercelResponse, error: { code?: string; message: string }): void {
-  // P0001 is the two-level trigger; 23503 a parent that does not exist.
+  // P0001 is the no-cycle trigger (0031); 23503 a parent that does not exist.
   const client = error.code === 'P0001' || error.code === '23503' || error.code === '23514'
   res.status(error.code === '23505' ? 409 : client ? 400 : 500).json({ error: error.message })
 }

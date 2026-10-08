@@ -78,6 +78,7 @@ let TOPICS: Row[] = [
   topic('bean', 'bean weirdo', 3, null, '#6FA8C0', 9),
   topic('roasting', 'roasting 101', 4, 'bean', '#C0705A', 5),
   topic('sensory', 'sensory', 5, 'bean', null, 3),
+  topic('maillard', 'phản ứng Maillard', 6, 'roasting', null, 2),
   topic('ghi', 'ghi', 6, null, '#F0B45C', 12),
 ]
 const KEYWORDS: Row[] = [
@@ -120,6 +121,17 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     const id = decodeURIComponent(url.split('id=')[1])
     TOPICS = TOPICS.map((t) => (t.id === id ? { ...t, ...body } : t))
     return json({ topic: TOPICS.find((t) => t.id === id) })
+  }
+  if (url.includes('vocab=topics') && method === 'PUT') {
+    const order = body.order as string[]
+    TOPICS = TOPICS.map((t) => ({ ...t, sort_order: order.indexOf(t.id as string) + 1 }))
+    console.log('PUT topics', order.join(' → '))
+    return json({ order })
+  }
+  if (url.includes('vocab=topics') && method === 'POST') {
+    const t = topic(String(body.title), String(body.title), TOPICS.length + 1, (body.parent_id as string | null) ?? null, null, 0)
+    TOPICS = [...TOPICS, t]
+    return json({ topic: t })
   }
   if (url.includes('vocab=topics')) return json({ topics: TOPICS })
   if (url.includes('vocab=keywords')) return json({ keywords: KEYWORDS })
