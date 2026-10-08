@@ -37,7 +37,7 @@ vi.mock('../../data/useModules', () => ({
 vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], moduleTitles: {}, moduleIds: [], loading: false }) }))
 vi.mock('./PortEditors', () => ({
   usePortAdmin: () => ({ pages: [], content: {}, setContentStored: () => {}, setPages: () => {}, loaded: true, design: {} }),
-  useSplit: () => ({ columns: '520px 7px minmax(0,1fr)', handle: null, dragging: false }),
+  useSplit: () => ({ size: 520, columns: '520px 7px minmax(0,1fr)', handle: null, dragging: false }),
   ContentTab: ({ only }: { only: string }) => <div>port:{only}</div>,
   Builder: () => null,
   createFromPreset: vi.fn(),
@@ -164,6 +164,17 @@ describe('Cấu hình', () => {
     expect(screen.getAllByRole('button', { name: 'Mẫu trang topic' }).filter((b) => !tree().contains(b))).toHaveLength(1)
     await userEvent.click(screen.getByRole('button', { name: '+ cài đặt riêng' }))
     await waitFor(() => expect(api.saveOverride).toHaveBeenCalledWith({ node_type: 'topic', node_id: 'sensory', rule_id: 'r2' }))
+  })
+
+  it('sets each site apart under its own heading, which folds', async () => {
+    await renderScreen()
+    const port = screen.getByRole('region', { name: 'Port' })
+    // Mục lục is the blog's: it sits under Bean blog, never under Port.
+    expect(within(port).queryByRole('button', { name: /^Mục lục/ })).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Bean blog' })).getByRole('button', { name: /^Mục lục/ })).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gập Bean blog' }))
+    expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
   })
 
   it('walks the tree with the arrow keys and folds with ← →', async () => {

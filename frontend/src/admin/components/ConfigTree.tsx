@@ -295,12 +295,33 @@ function AddField({ label, placeholder, onAdd }: { label: string; placeholder: s
 const sectionHead = { fontFamily: sans, fontSize: 10.5, fontWeight: 500, letterSpacing: '.2em', textTransform: 'uppercase', color: ink.muted, borderBottom: `2px solid ${ink.base}`, paddingBottom: 9, margin: '30px 0 12px' } as const
 const hint = { fontFamily: sans, fontSize: 13, lineHeight: 1.55, color: ink.muted, margin: '6px 0 14px', maxWidth: 520 } as const
 
-function SiteLabel({ name, path }: { name: string; path: string }) {
+/**
+ * One of the three sites (Port, Bean blog, Practice) and everything under it.
+ * The owner read the tree as one list and asked why the port had a Mục lục:
+ * a faint label was not enough of a boundary, so each site is a heading that
+ * folds, with its items set in under it.
+ */
+function Site({ name, path, fold, children }: { name: string; path: string; fold: { open: boolean; toggle: () => void }; children: ReactNode }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontFamily: sans, fontSize: 10, letterSpacing: '.18em', textTransform: 'uppercase', color: ink.faint, margin: '14px 2px 2px' }}>
-      {name}
-      <span style={{ letterSpacing: 0, textTransform: 'none', fontFamily: 'ui-monospace, Menlo, monospace' }}>{path}</span>
-    </div>
+    <section aria-label={name} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+      <button
+        type="button"
+        {...{ [ROW]: '' }}
+        data-fold={fold.open ? 'open' : 'closed'}
+        aria-expanded={fold.open}
+        aria-label={`${fold.open ? 'Gập' : 'Mở'} ${name}`}
+        onClick={fold.toggle}
+        onKeyDown={(e) => foldKey(e, fold)}
+        style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 8, padding: '6px 2px', borderBottom: `2px solid ${ink.base}` }}
+      >
+        <span aria-hidden style={{ width: 12, fontSize: 11, color: ink.muted }}>
+          {fold.open ? '▾' : '▸'}
+        </span>
+        <span style={{ fontFamily: serif, fontSize: 21, letterSpacing: '-.02em', color: ink.base, flex: 1 }}>{name}</span>
+        <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.muted }}>{path}</span>
+      </button>
+      {fold.open && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 10, borderLeft: `2px solid ${paper.rule}` }}>{children}</div>}
+    </section>
   )
 }
 
@@ -337,6 +358,8 @@ export function ConfigTree({
     })
   const fold = (id: string) => ({ open: !folded.has(id), toggle: () => toggle(id) })
 
+  // Both dividers drag, and each width is remembered: the tree for long names, the fields for long forms.
+  const treeSplit = useSplit('cfg-tree', 264, 'left', 200, 520)
   const split = useSplit('cfg-v1', 520, 'left', 360, 900)
   const [root, width] = useWidth<HTMLDivElement>()
   // Wide: tree, fields, preview side by side. Narrower: the preview goes under the fields. Phone: one column.
@@ -502,7 +525,7 @@ export function ConfigTree({
       onKeyDown={walk}
       style={{ display: 'flex', flexDirection: 'column', gap: 8, ...(columns === 1 ? {} : { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto' }), padding: '0 4px 24px 0' }}
     >
-      <SiteLabel name="Port" path="/" />
+      <Site name="Port" path="/" fold={fold('site:port')}>
       <Card title="Trang chủ port" note="Lời chào và các khối của trang /" on={on({ kind: 'port-part', part: 'home' })} onClick={pick({ kind: 'port-part', part: 'home' })} />
       {groupCard('port-pages', 'Các trang port', `${livePort.length} trang · thêm từ mẫu bibi, bibe hay trang trống`)}
       {openGroup('port-pages') && (
@@ -518,8 +541,9 @@ export function ConfigTree({
       {groupCard('port-parts', 'Phần chung của port', 'About, Signature, thanh trên, chân trang')}
       {openGroup('port-parts') &&
         PORT_PARTS.map((x) => <Leaf key={x.part} name={x.title} depth={0} on={on({ kind: 'port-part', part: x.part })} onClick={pick({ kind: 'port-part', part: x.part })} />)}
+      </Site>
 
-      <SiteLabel name="Bean blog" path={`${blog}/…`} />
+      <Site name="Bean blog" path={`${blog}/…`} fold={fold('site:blog')}>
       <Card title="Trang chủ blog" note={`${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`} on={on({ kind: 'system', key: 'landing' })} onClick={pick({ kind: 'system', key: 'landing' })} />
       <Card title="Mục lục" note={`${toPath({ area: 'public', screen: 'home' })} · tiêu đề, đoạn dẫn, ảnh khay`} on={on({ kind: 'system', key: 'index' })} onClick={pick({ kind: 'system', key: 'index' })} />
       <Card title="Lưu trữ" note="Chữ cố định của trang lưu trữ" on={on({ kind: 'system', key: 'archive' })} onClick={pick({ kind: 'system', key: 'archive' })} />
@@ -553,9 +577,11 @@ export function ConfigTree({
               onClick={pick({ kind: 'module', id: row.id })}
             />
           ))}
+      </Site>
 
-      <SiteLabel name="Practice" path={toPath({ area: 'practice', screen: 'hours' })} />
-      <Card title="Ghi 02" note="Nhật ký giờ luyện, sau đăng nhập" on={on({ kind: 'practice' })} onClick={pick({ kind: 'practice' })} />
+      <Site name="Practice" path={toPath({ area: 'practice', screen: 'hours' })} fold={fold('site:practice')}>
+        <Card title="Ghi 02" note="Nhật ký giờ luyện, sau đăng nhập" on={on({ kind: 'practice' })} onClick={pick({ kind: 'practice' })} />
+      </Site>
 
       {undo && (
         <div role="status" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', background: paper.cream, border: `1px solid ${ink.border}`, borderRadius: radius, padding: '8px 10px', fontFamily: sans, fontSize: 12, color: ink.base }}>
@@ -863,23 +889,24 @@ export function ConfigTree({
         )
       : null
 
-  const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging ? 'none' : undefined } as const
+  const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging || treeSplit.dragging ? 'none' : undefined } as const
 
   return (
     <div
       ref={root}
       style={{
         display: 'grid',
-        gridTemplateColumns: columns === 3 ? `minmax(220px, 264px) ${split.columns}` : columns === 2 ? 'minmax(220px, 264px) minmax(0, 1fr)' : 'minmax(0, 1fr)',
+        gridTemplateColumns: columns === 3 ? `${treeSplit.size}px 7px ${split.columns}` : columns === 2 ? treeSplit.columns : 'minmax(0, 1fr)',
         // Each cell keeps its own height, which is what lets the tree and the preview stick.
         alignItems: 'start',
-        columnGap: columns === 3 ? 12 : 28,
+        columnGap: 12,
         rowGap: 20,
         padding: columns === 1 ? '24px 16px 90px' : '28px 32px 120px',
       }}
     >
       <style>{'.cfg-leaf .cfg-grip{opacity:0}.cfg-leaf:hover .cfg-grip,.cfg-leaf:focus-within .cfg-grip{opacity:1}'}</style>
       <div style={columns === 2 ? { gridRow: '1 / span 2' } : undefined}>{tree}</div>
+      {columns > 1 && <div style={{ alignSelf: 'stretch', ...(columns === 2 ? { gridRow: '1 / span 2' } : {}) }}>{treeSplit.handle}</div>}
       <div ref={editor} style={{ minWidth: 0, scrollMarginTop: 16, ...(columns === 3 ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
         {header}
         {body}
@@ -891,7 +918,7 @@ export function ConfigTree({
         style={{
           ...previewStyle,
           ...(columns === 3 ? { position: 'sticky', top: 0, height: 'calc(100vh - 40px)' } : { height: '70vh' }),
-          ...(columns === 2 ? { gridColumn: 2 } : {}),
+          ...(columns === 2 ? { gridColumn: 3 } : {}),
         }}
       />
       {previewPane}
