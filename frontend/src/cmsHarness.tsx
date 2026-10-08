@@ -2,7 +2,7 @@
  * Trang thử cho màn `Cấu hình` — dựng `Cms` thật với một máy chủ giả.
  *
  * Khu quản trị nằm sau cổng đăng nhập và chỉ chủ site có mật khẩu, nên không
- * phiên nào mở được `/ad-config` để nhìn. Mà cây module là chỗ kéo thả: nó phụ
+ * phiên nào mở được `/ad-cau-hinh` để nhìn. Mà cây module là chỗ kéo thả: nó phụ
  * thuộc vào **chiều cao thật của một thẻ** — `whereIn` trong `Cms.tsx` chia
  * thẻ làm bốn phần để biết con trỏ đang định đặt thẻ cạnh hay vào trong. jsdom
  * trả về chiều cao 0 cho mọi thứ, nên đúng cái quan trọng nhất ở đây là cái nó
@@ -69,6 +69,22 @@ let AUTHORS: Row[] = [
   { id: 'a3', name: 'Khách mời cũ', slug: 'khach-moi', avatar_url: null, bio: 'Viết hai bài về sensory năm ngoái.', active: false, created_at: '', post_count: 2 },
 ]
 
+const topic = (id: string, title: string, sort_order: number, parent_id: string | null, accent: string | null, posts: number): Row => ({
+  id, parent_id, title, intro: '', accent, on_color: null, tint: null, tint2: null, image_url: null, sort_order, visibility: 'public', posts,
+})
+let TOPICS: Row[] = [
+  topic('tu-duy', 'tư duy', 1, null, '#F2A0A5', 4),
+  topic('doc-sach', 'đọc sách', 2, 'tu-duy', null, 2),
+  topic('bean', 'bean weirdo', 3, null, '#6FA8C0', 9),
+  topic('roasting', 'roasting 101', 4, 'bean', '#C0705A', 5),
+  topic('sensory', 'sensory', 5, 'bean', null, 3),
+  topic('ghi', 'ghi', 6, null, '#F0B45C', 12),
+]
+const KEYWORDS: Row[] = [
+  { id: 'heat', label: 'heat', posts: 4 },
+  { id: 'acid', label: 'acid', posts: 2 },
+]
+
 const json = (body: unknown) =>
   new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
 
@@ -100,6 +116,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     return json({ author: AUTHORS.find((a) => a.id === id) })
   }
   if (url.includes('vocab=authors')) return json({ authors: AUTHORS })
+  if (url.includes('vocab=topics') && method === 'PATCH') {
+    const id = decodeURIComponent(url.split('id=')[1])
+    TOPICS = TOPICS.map((t) => (t.id === id ? { ...t, ...body } : t))
+    return json({ topic: TOPICS.find((t) => t.id === id) })
+  }
+  if (url.includes('vocab=topics')) return json({ topics: TOPICS })
+  if (url.includes('vocab=keywords')) return json({ keywords: KEYWORDS })
   if (url.includes('/api/modules')) return json({ modules: MODULES })
   if (url.includes('/api/posts')) return json({ posts: [] })
   if (url.includes('/api/tags')) return json({ tags: [] })
@@ -115,8 +138,8 @@ const { ToastProvider } = await import('./design/Toaster')
 const nop = () => {}
 const nav = {
   screen: 'cms', area: 'admin', variant: 'a', moduleId: '', postId: null, articleFrom: 'admin',
-  // `?tab=authors` mở thẳng tab khác; mặc định vẫn là Cấu hình.
-  cmsTab: new URLSearchParams(location.search).get('tab') ?? 'config',
+  // `?tab=authors` mở thẳng tab khác; mặc định là Cấu hình.
+  cmsTab: new URLSearchParams(location.search).get('tab') ?? 'tree',
   goLanding: nop, goHome: nop, goArchive: nop, goHours: nop, goNotes: nop, goCms: nop,
   openModule: nop, openArticle: nop, toggleVariant: nop,
   newPost: nop, editPost: nop, previewPost: nop,

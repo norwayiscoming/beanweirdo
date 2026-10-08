@@ -50,6 +50,7 @@ function moduleFromUrl(name: string, w: RouteWords = activeWords()): string {
 const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adPost}`]: 'cms',
   [`${w.admin}-${w.adConfig}`]: 'cms',
+  [`${w.admin}-${w.adTree}`]: 'cms',
   [`${w.admin}-${w.adAuthors}`]: 'cms',
   [`${w.admin}-${w.adSitemap}`]: 'cms',
   [`${w.admin}-${w.adPageContent}`]: 'cms',
@@ -63,8 +64,8 @@ const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adPortDesign}`]: 'cms',
 })
 
-/** Nội dung (posts and the vocabularies filing them) · Quản lý trang · Cài đặt hiển thị · Tác giả. */
-export type CmsTab = 'posts' | 'pages' | 'display' | 'authors'
+/** Nội dung (posts and the vocabularies filing them) · Quản lý trang · Cấu hình · Cài đặt hiển thị · Tác giả. */
+export type CmsTab = 'posts' | 'pages' | 'tree' | 'display' | 'authors'
 
 /** Portfolio has two tabs: port pages (create, arrange) and the design system. */
 export type PortTab = 'pages' | 'content' | 'design'
@@ -89,6 +90,7 @@ const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
   [`${w.admin}-${w.adPost}`]: 'posts',
   // Cấu hình folded into Quản lý trang; its old address still lands there.
   [`${w.admin}-${w.adConfig}`]: 'pages',
+  [`${w.admin}-${w.adTree}`]: 'tree',
   [`${w.admin}-${w.adAuthors}`]: 'authors',
   // Phân loại folded into Nội dung; its old address still lands there.
   [`${w.admin}-${w.adTaxonomy}`]: 'posts',
@@ -103,6 +105,7 @@ const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
 const pageOfTab = (w: RouteWords): Record<CmsTab, string> => ({
   posts: `${w.admin}-${w.adPost}`,
   pages: `${w.admin}-${w.adSitemap}`,
+  tree: `${w.admin}-${w.adTree}`,
   display: `${w.admin}-${w.adDisplay}`,
   authors: `${w.admin}-${w.adAuthors}`,
 })
