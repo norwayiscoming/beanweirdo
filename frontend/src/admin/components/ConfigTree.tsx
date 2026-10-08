@@ -712,7 +712,7 @@ export function ConfigTree({
               used={[...new Set(vocab.topics.map((x) => x.accent).filter((c): c is string => !!c))]}
               save={(patch) => run(() => updateTopic(t.id, patch))}
             />
-            <NavFlags layout={layout} navRef={`topic:${t.id}`} listed={t.parent_id === null} run={run} />
+            <NavFlags layout={layout} navRef={`topic:${t.id}`} defaults={{ sidebar: true, home: t.parent_id === null }} run={run} />
           </div>
           <div style={sectionHead}>Mục con</div>
           <AddField
@@ -747,7 +747,7 @@ export function ConfigTree({
           {errorLine}
           <div style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
             <FlatSettings key={k.id} kind="Tag" entry={k} count={k.posts} onRename={(label) => run(() => renameKeyword(k.id, label))} />
-            <NavFlags layout={layout} navRef={`tag:${k.id}`} listed={false} run={run} />
+            <NavFlags layout={layout} navRef={`tag:${k.id}`} defaults={{ sidebar: false, home: false }} run={run} />
           </div>
           <div style={sectionHead}>Trang</div>
           {nodePage('keyword', k.id)}

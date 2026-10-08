@@ -107,6 +107,8 @@ describe('pages from the feature layer', () => {
     // The stored list puts biochemistry first; the tree's order still wins for subjects.
     expect(indexModules(pages).map((p) => p.id)).toEqual(['bean', 'biochemistry', 'ghi'])
     expect(landingModules(pages).map((p) => p.id)).toEqual(['bean', 'biochemistry'])
+    // Nested where the topic tree nests it, so the sidebar draws it under its subject.
+    expect(findPage(pages, 'biochemistry')!.parent_id).toBe('bean')
   })
 
   it('falls back to the modules exactly while no page is set up', () => {
