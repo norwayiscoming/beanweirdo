@@ -904,7 +904,6 @@ export function FlatSettings({ kind, entry, count, onRename }: { kind: string; e
     <>
       <Head kind={kind} count={count} />
       <NameInput value={entry.label} onSave={onRename} />
-      <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.faint }}>{entry.id}</span>
     </>
   )
 }

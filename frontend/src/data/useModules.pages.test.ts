@@ -103,9 +103,10 @@ describe('pages from the feature layer', () => {
     expect(findPage(pages, 'ghi02')?.screen).toBeUndefined()
   })
 
-  it('lists the owner order first, then every subject not placed, honouring the flags', () => {
-    expect(indexModules(pages).map((p) => p.id)).toEqual(['biochemistry', 'ghi', 'bean'])
-    expect(landingModules(pages).map((p) => p.id)).toEqual(['biochemistry', 'bean'])
+  it('lists the subjects in tree order, then what else the owner listed, honouring the flags', () => {
+    // The stored list puts biochemistry first; the tree's order still wins for subjects.
+    expect(indexModules(pages).map((p) => p.id)).toEqual(['bean', 'biochemistry', 'ghi'])
+    expect(landingModules(pages).map((p) => p.id)).toEqual(['bean', 'biochemistry'])
   })
 
   it('falls back to the modules exactly while no page is set up', () => {

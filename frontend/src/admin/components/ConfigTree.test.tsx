@@ -109,7 +109,7 @@ describe('Cấu hình', () => {
   it('a click on the left only picks; nothing on the left can be typed into', async () => {
     await renderScreen()
     await userEvent.click(rowButton('sensory'))
-    expect(screen.getByLabelText('Đang sửa').textContent).toBe('Bean blog › Cây chủ đề › coffee')
+    expect(screen.getByLabelText('Đang sửa').textContent).toBe('Bean blog › Mục lục › coffee')
     expect(screen.getByLabelText('Tên')).toHaveProperty('value', 'sensory')
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/module/sensory')
     expect(within(tree()).queryByRole('textbox')).toBeNull()
@@ -117,17 +117,17 @@ describe('Cấu hình', () => {
 
   it('a click on a group card opens it on the right, and only its arrow folds it', async () => {
     await renderScreen()
-    await userEvent.click(rowButton('Cây chủ đề'))
-    expect(heading()).toBe('Cây chủ đề')
+    await userEvent.click(rowButton('Mục lục'))
+    expect(heading()).toBe('Mục lục')
     expect(rowButton('sensory')).toBeTruthy()
 
-    await userEvent.click(within(tree()).getByRole('button', { name: 'Gập Cây chủ đề' }))
+    await userEvent.click(within(tree()).getByRole('button', { name: 'Gập Mục lục' }))
     expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
   })
 
   it('adds a subject from the tree card, and an entry inside the topic being edited', async () => {
     await renderScreen()
-    await userEvent.click(rowButton('Cây chủ đề'))
+    await userEvent.click(rowButton('Mục lục'))
     await userEvent.type(screen.getByLabelText('Thêm subject'), 'cacao')
     await userEvent.click(screen.getByRole('button', { name: 'Thêm subject' }))
     expect(api.createTopic).toHaveBeenCalledWith('cacao', null)
@@ -160,8 +160,8 @@ describe('Cấu hình', () => {
   it('shows a topic’s page beside its fields, and gives it settings of its own', async () => {
     await renderScreen()
     await userEvent.click(rowButton('sensory'))
-    // It follows the topic template — a link to it on the right, beside the template's own row in the tree.
-    expect(screen.getAllByRole('button', { name: 'Mẫu trang topic' }).filter((b) => !tree().contains(b))).toHaveLength(1)
+    // It follows the topic template, which is named but has no row of its own any more.
+    expect(screen.getByText(/quy chế chung của trang topic/)).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: '+ cài đặt riêng' }))
     await waitFor(() => expect(api.saveOverride).toHaveBeenCalledWith({ node_type: 'topic', node_id: 'sensory', rule_id: 'r2' }))
   })
@@ -175,6 +175,25 @@ describe('Cấu hình', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Gập Bean blog' }))
     expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
+  })
+
+  it('keeps one card per thing: Mục lục is the topic tree, and nothing without a page is left', async () => {
+    await renderScreen()
+    await userEvent.click(rowButton('Mục lục'))
+    expect(screen.getByText('copy:index')).toBeTruthy()
+    expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/muc-luc')
+    for (const gone of ['Điều hướng', 'Mẫu', 'Lưu trữ', 'Cây chủ đề']) expect(within(tree()).queryByRole('button', { name: new RegExp(`^${gone}`) })).toBeNull()
+  })
+
+  it('puts the sidebar and blog-home switches on the subject itself', async () => {
+    api.updatePage.mockResolvedValue(undefined)
+    await renderScreen()
+    await userEvent.click(rowButton('tea'))
+    const sidebar = screen.getByRole('checkbox', { name: 'hiện ở thanh bên' })
+    // A subject not yet in the stored list is shown.
+    expect(sidebar).toHaveProperty('checked', true)
+    await userEvent.click(sidebar)
+    expect(api.updatePage).toHaveBeenCalledWith('nav', { presentation: { items: [{ ref: 'topic:tea', sidebar: false, home: true }] } })
   })
 
   it('walks the tree with the arrow keys and folds with ← →', async () => {
