@@ -350,7 +350,7 @@ export function ConfigTree({
   const [err, setErr] = useState<string | null>(null)
   const [round, setRound] = useState(0)
   const [portRound, setPortRound] = useState(0)
-  const [undo, setUndo] = useState<{ msg: string; revert: () => Promise<unknown> } | null>(null)
+  const [undo, setUndo] = useState<{ msg: string; saving: boolean; revert: () => Promise<unknown> } | null>(null)
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const toggle = (id: string) =>
     setFolded((f) => {
@@ -419,25 +419,44 @@ export function ConfigTree({
     if ('error' in p) return setErr(p.error)
     const from = vocab.topics.find((t) => t.id === id)?.parent_id ?? null
     const oldOrder = shown.map((t) => t.id)
+    // The tree moves the moment the row is dropped. Saving takes two calls
+    // across the ocean (Vercel in the US, the database in Tokyo) and then a
+    // reload; waiting for all that before redrawing made the owner think the
+    // drop had failed.
+    placeLocally(id, p.parentId, p.order)
+    // A drop inside a folded node opens it, so the row does not vanish.
+    if (p.parentId)
+      setFolded((f) => {
+        const next = new Set(f)
+        next.delete(`t:${p.parentId}`)
+        return next
+      })
+    setUndo({
+      msg: `Đã chuyển ${titleOf(id)} ${WHERE_WORDS[where]} ${titleOf(target)}`,
+      saving: true,
+      revert: async () => {
+        placeLocally(id, from, oldOrder)
+        if (from !== p.parentId) await updateTopic(id, { parent_id: from })
+        await reorderTopics(oldOrder)
+      },
+    })
     run(async () => {
       // Parent first: the order only means anything once the node sits where it is going.
       if (from !== p.parentId) await updateTopic(id, { parent_id: p.parentId })
       await reorderTopics(p.order)
-      // A drop inside a folded node opens it, so the row does not vanish.
-      if (p.parentId)
-        setFolded((f) => {
-          const next = new Set(f)
-          next.delete(`t:${p.parentId}`)
-          return next
-        })
-      setUndo({
-        msg: `Đã chuyển ${titleOf(id)} ${WHERE_WORDS[where]} ${titleOf(target)}`,
-        revert: async () => {
-          if (from !== p.parentId) await updateTopic(id, { parent_id: from })
-          await reorderTopics(oldOrder)
-        },
-      })
+      setUndo((u) => u && { ...u, saving: false })
     })
+  }
+
+  /** Draws a move before the server has it; the reload after the save replaces this with what was stored. */
+  function placeLocally(id: string, parentId: string | null, order: string[]) {
+    setVocab((v) => ({
+      ...v,
+      topics: v.topics.map((t) => {
+        const at = order.indexOf(t.id)
+        return { ...t, ...(at >= 0 ? { sort_order: at + 1 } : {}), ...(t.id === id ? { parent_id: parentId } : {}) }
+      }),
+    }))
   }
 
   const dragOf = (id: string): DragProps => ({
@@ -582,15 +601,19 @@ export function ConfigTree({
 
       {undo && (
         <div role="status" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', background: paper.cream, border: `1px solid ${ink.border}`, borderRadius: radius, padding: '8px 10px', fontFamily: sans, fontSize: 12, color: ink.base }}>
-          <span style={{ flex: 1 }}>{undo.msg}</span>
+          <span style={{ flex: 1 }}>
+            <span>{undo.msg}</span>
+            {undo.saving && <span style={{ color: ink.muted }}> · đang lưu…</span>}
+          </span>
           <button
             type="button"
+            disabled={undo.saving}
             onClick={() => {
               const u = undo
               setUndo(null)
               run(u.revert)
             }}
-            style={{ all: 'unset', cursor: 'pointer', color: ink.green, fontWeight: 500 }}
+            style={{ all: 'unset', cursor: undo.saving ? 'default' : 'pointer', color: undo.saving ? ink.faint : ink.green, fontWeight: 500 }}
           >
             Hoàn tác
           </button>
