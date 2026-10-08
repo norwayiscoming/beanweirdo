@@ -166,6 +166,17 @@ describe('Cấu hình', () => {
     await waitFor(() => expect(api.saveOverride).toHaveBeenCalledWith({ node_type: 'topic', node_id: 'sensory', rule_id: 'r2' }))
   })
 
+  it('sets each site apart under its own heading, which folds', async () => {
+    await renderScreen()
+    const port = screen.getByRole('region', { name: 'Port' })
+    // Mục lục is the blog's: it sits under Bean blog, never under Port.
+    expect(within(port).queryByRole('button', { name: /^Mục lục/ })).toBeNull()
+    expect(within(screen.getByRole('region', { name: 'Bean blog' })).getByRole('button', { name: /^Mục lục/ })).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gập Bean blog' }))
+    expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
+  })
+
   it('walks the tree with the arrow keys and folds with ← →', async () => {
     await renderScreen()
     rowButton('coffee').focus()
