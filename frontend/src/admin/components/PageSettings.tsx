@@ -297,13 +297,23 @@ type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
  * useModules), so all that is left of the navigation is these two switches,
  * shown on the page they are about.
  */
-export function NavFlags({ layout, navRef, listed, run }: { layout: Layout; navRef: string; listed: boolean; run: (fn: () => Promise<unknown>) => void }) {
+export function NavFlags({
+  layout,
+  navRef,
+  defaults,
+  run,
+}: {
+  layout: Layout
+  navRef: string
+  /** What an entry not yet in the list shows as — the same defaults `arrange` applies. */
+  defaults: { sidebar: boolean; home: boolean }
+  run: (fn: () => Promise<unknown>) => void
+}) {
   const nav = layout.pages.find((p) => p.kind === 'nav')
   if (!nav) return null
   const items = (nav.presentation.items ?? []) as NavItem[]
   const own = items.find((i) => i.ref === navRef)
-  // An entry not in the list: a subject is shown by default, anything else is not.
-  const shown = (flag: 'sidebar' | 'home') => (own ? own[flag] !== false : listed)
+  const shown = (flag: 'sidebar' | 'home') => (own ? own[flag] !== false : defaults[flag])
   const set = (flag: 'sidebar' | 'home', value: boolean) => {
     const entry = { ref: navRef, sidebar: shown('sidebar'), home: shown('home'), [flag]: value }
     const next = own ? items.map((i) => (i.ref === navRef ? entry : i)) : [...items, entry]
@@ -481,7 +491,7 @@ export function PageEditor({
           </select>
         </div>
       )}
-      {record && selected.kind === 'curated' && <NavFlags layout={layout} navRef={`page:${record.id}`} listed={false} run={run} />}
+      {record && selected.kind === 'curated' && <NavFlags layout={layout} navRef={`page:${record.id}`} defaults={{ sidebar: false, home: false }} run={run} />}
 
       {rule && (
         <>

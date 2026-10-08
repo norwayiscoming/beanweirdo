@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { watchModules } from './modulesChanged'
 import { bySiteOrder } from '../lib/moduleOrder'
-import { ancestorsOf, rootsOf } from '../lib/contentTree'
+import { ancestorsOf, buildTree, flattenTree, rootsOf } from '../lib/contentTree'
 import { supabase } from '../lib/supabaseClient'
 import { groupPosts, resolveRule, toRule, type ListingRule, type PostGroup, type RuleTopic } from '../lib/listingRule'
 import type { PostRow } from './usePublishedPosts'
@@ -235,6 +235,9 @@ export function buildPages(store: Store): PageRow[] {
     out.push({
       ...look,
       id: t.id,
+      // The topic tree is where the owner nests the blog; a borrowed module's
+      // old parent must not file the page somewhere else in the sidebar.
+      parent_id: t.parent_id,
       visibility: t.visibility === 'private' ? 'private' : 'public',
       aliases: own?.aliases ?? [],
       source: 'topic',
@@ -294,8 +297,8 @@ function withScreen(p: PageRow): PageRow {
 }
 
 /**
- * The navigation as a rule: every subject in tree order, unless the owner hid
- * it, then whatever else the owner listed. With no navigation
+ * The navigation as a rule: the topic tree in its order, minus what the owner
+ * hid, then whatever else the owner listed. With no navigation
  * stored yet, the modules' own order and flags stand in for it.
  */
 function arrange(pages: PageRow[], nav: PageRecord | undefined, topics: TopicRecord[], modules: ModuleRow[]): PageRow[] {
@@ -319,17 +322,25 @@ function arrange(pages: PageRow[], nav: PageRecord | undefined, topics: TopicRec
     return pages
   }
 
-  // Subjects come in the topic tree's order, whatever order the list stored
-  // them in: the tree is where the owner arranges the blog, and a second order
-  // here meant a drag in the tree did not move the sidebar. The list still
-  // says, per entry, whether it is shown; anything else it names (a topic
-  // further down, a curated page, a tag) follows the subjects in its order.
+  // The whole topic tree comes in its own order, whatever order the list
+  // stored: the tree is where the owner arranges and nests the blog, and a
+  // second order here meant a drag in the tree did not move the sidebar. The
+  // list still says, per entry, whether it is shown — every topic is in the
+  // sidebar unless hidden (a hidden branch hides what is under it), only
+  // subjects are on the blog home unless asked. Whatever else it names (a
+  // curated page, a tag) follows the tree, in its stored order.
   const items = ((nav.presentation.items ?? []) as NavItem[]).filter((i) => byRef(i.ref))
   const own = new Map(items.map((i) => [i.ref, i]))
-  const subjects = [...topics].filter((t) => t.parent_id === null).sort((a, b) => a.sort_order - b.sort_order)
-  const subjectRefs = new Set(subjects.map((s) => `topic:${s.id}`))
-  const inTree = subjects.map((s) => own.get(`topic:${s.id}`) ?? { ref: `topic:${s.id}`, sidebar: true, home: true })
-  ;[...inTree, ...items.filter((i) => !subjectRefs.has(i.ref))].forEach((item, i) => {
+  const tree = flattenTree(buildTree([...topics].sort((a, b) => a.sort_order - b.sort_order))).map((n) => n.row)
+  const topicRefs = new Set(tree.map((t) => `topic:${t.id}`))
+  const hidden = new Set<string>()
+  const inTree = tree.map((t) => {
+    const o = own.get(`topic:${t.id}`)
+    const sidebar = (o ? o.sidebar !== false : true) && !(t.parent_id && hidden.has(t.parent_id))
+    if (!sidebar) hidden.add(t.id)
+    return { ref: `topic:${t.id}`, sidebar, home: o ? o.home !== false : t.parent_id === null }
+  })
+  ;[...inTree, ...items.filter((i) => !topicRefs.has(i.ref))].forEach((item, i) => {
     const page = byRef(item.ref)!
     page.sort_order = i + 1
     page.inSidebar = item.sidebar !== false && page.visibility !== 'private'
