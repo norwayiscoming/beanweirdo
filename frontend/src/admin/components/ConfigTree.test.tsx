@@ -152,9 +152,20 @@ describe('Cấu hình', () => {
     expect(api.updateTopic).toHaveBeenCalledWith('tea', { parent_id: 'coffee' })
     expect(await screen.findByText('Đã chuyển tea vào trong coffee')).toBeTruthy()
 
+    // Undo waits for the save, so it cannot race the move it undoes.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Hoàn tác' })).toHaveProperty('disabled', false))
     await userEvent.click(screen.getByRole('button', { name: 'Hoàn tác' }))
     await waitFor(() => expect(api.updateTopic).toHaveBeenCalledWith('tea', { parent_id: null }))
     expect(api.reorderTopics).toHaveBeenLastCalledWith(['coffee', 'sensory', 'tea'])
+  })
+
+  it('moves the row the moment it is dropped, before the server answers', async () => {
+    await renderScreen()
+    api.updateTopic.mockReturnValue(new Promise(() => {}))
+    fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo tea' }))
+    dropOn(rowButton('coffee').parentElement as HTMLElement, 20)
+    await waitFor(() => expect((rowButton('tea').parentElement as HTMLElement).style.marginLeft).toBe('16px'))
+    expect(screen.getByText(/đang lưu/)).toBeTruthy()
   })
 
   it('shows a topic’s page beside its fields, and gives it settings of its own', async () => {
