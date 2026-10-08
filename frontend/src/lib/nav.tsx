@@ -13,9 +13,9 @@ export type Screen =
   | 'cms'
   /** Admin › Portfolio — port pages and the design system. */
   | 'portfolio'
-  /** Public port page, /portfolio/<slug>. */
+  /** Public port page, /<slug>. */
   | 'portfolioPage'
-  /** /portfolio — the main page, and /portfolio/about. */
+  /** / — the main page, and /about. */
   | 'portfolioHome'
   | 'portfolioAbout'
   | 'cards'

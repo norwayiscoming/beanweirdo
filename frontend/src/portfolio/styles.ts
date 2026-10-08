@@ -31,6 +31,8 @@ export const PF_CSS = `
 .pf .rg>.rail{grid-column:1}.pf .rg>.main{grid-column:2}
 .pf .rail .lbl{color:var(--acc-700)}
 .pf .sec{padding-bottom:var(--s-6)}
+.pf .onward{display:inline-block;font:var(--t-label);letter-spacing:var(--tr-label);border:1px solid var(--ink);border-radius:var(--r-1);padding:10px 18px 11px}
+.pf .onward:hover{background:var(--mark)}
 
 .pf .topbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:var(--s-4);padding:var(--s-3) var(--gut);font:var(--t-label)}
 .pf .topbar .nav{display:flex;gap:var(--s-4);flex-wrap:wrap;justify-content:center}

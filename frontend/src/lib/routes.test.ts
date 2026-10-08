@@ -47,15 +47,15 @@ describe('routes — đi một vòng rồi về đúng chỗ cũ', () => {
 describe('routes — tên trong địa chỉ', () => {
   it('spells out the module ids that are abbreviated in the database', () => {
     // `biochem` là tên cột, `biochemistry` là tên người đọc thấy.
-    expect(toPath({ area: 'public', screen: 'module', moduleId: 'biochem' })).toBe('/module/biochemistry')
-    expect(toPath({ area: 'public', screen: 'module', moduleId: 'ghi01' })).toBe('/module/ghi')
+    expect(toPath({ area: 'public', screen: 'module', moduleId: 'biochem' })).toBe('/bean/module/biochemistry')
+    expect(toPath({ area: 'public', screen: 'module', moduleId: 'ghi01' })).toBe('/bean/module/ghi')
     expect(moduleToUrl('sensory')).toBe('sensory')
   })
 
   it('reads an abbreviated name back to its database id', () => {
-    expect(parsePath('/module/biochemistry').moduleId).toBe('biochem')
-    expect(parsePath('/module/ghi').moduleId).toBe('ghi01')
-    expect(parsePath('/module/roasting').moduleId).toBe('roasting')
+    expect(parsePath('/bean/module/biochemistry').moduleId).toBe('biochem')
+    expect(parsePath('/bean/module/ghi').moduleId).toBe('ghi01')
+    expect(parsePath('/bean/module/roasting').moduleId).toBe('roasting')
   })
 
   it('puts the verb and its object in one step', () => {
@@ -87,7 +87,7 @@ describe('routes — tên trong địa chỉ', () => {
     expect(parsePath('/ad-taxonomy').tab).toBe('posts')
     expect(parsePath('/ad-display').tab).toBe('display')
     expect(parsePath('/ad-authors').tab).toBe('authors')
-    expect(toPath({ area: 'public', screen: 'module', moduleId: 'tag-heat' })).toBe('/tag/heat')
+    expect(toPath({ area: 'public', screen: 'module', moduleId: 'tag-heat' })).toBe('/bean/tag/heat')
     // `/ad` names the screen and not a tab, so it opens on the first one
     // without rewriting itself to another address on arrival.
     expect(parsePath('/ad').tab).toBeUndefined()
@@ -95,11 +95,12 @@ describe('routes — tên trong địa chỉ', () => {
 })
 
 describe('routes — địa chỉ lạ', () => {
-  it('lands a wrong turn on the front page rather than an error', () => {
-    // Gõ sai địa chỉ là người đọc rẽ nhầm, không phải sự cố để báo.
-    expect(parsePath('/khong-co-trang-nay')).toMatchObject({ area: 'public', screen: 'landing' })
-    expect(parsePath('/module')).toMatchObject({ screen: 'landing' })
-    expect(parsePath('/post')).toMatchObject({ screen: 'landing' })
+  it('reads a one-word address as a port page, which says so when it does not exist', () => {
+    // Trang port nằm ngay ở gốc, nên một chữ lạ là slug của một trang port —
+    // không có trang ấy thì màn port nói "không có trang này".
+    expect(parsePath('/khong-co-trang-nay')).toMatchObject({ area: 'public', screen: 'portfolioPage', slug: 'khong-co-trang-nay' })
+    expect(parsePath('/module')).toMatchObject({ screen: 'portfolioPage' })
+    expect(parsePath('/bean/khong-co')).toMatchObject({ screen: 'portfolioPage', slug: 'bean' })
   })
 
   it('keeps an unknown admin address inside admin', () => {
@@ -110,11 +111,11 @@ describe('routes — địa chỉ lạ', () => {
   })
 
   it('carries the door only when it is not the usual one', () => {
-    expect(toPath({ area: 'public', screen: 'article', slug: 's-p260817', from: 'module' })).toBe('/post/s-p260817')
+    expect(toPath({ area: 'public', screen: 'article', slug: 's-p260817', from: 'module' })).toBe('/bean/post/s-p260817')
     expect(toPath({ area: 'public', screen: 'article', slug: 's-p260817', from: 'archive' }))
-      .toBe('/post/s-p260817?from=archive')
+      .toBe('/bean/post/s-p260817?from=archive')
     // Không nói gì thì mặc định là cửa module.
-    expect(parsePath('/post/s-p260817').from).toBe('module')
+    expect(parsePath('/bean/post/s-p260817').from).toBe('module')
   })
 })
 
@@ -128,5 +129,45 @@ describe('routes — địa chỉ cũ', () => {
 
   it('still opens a post from the editor\u2019s old preview link', () => {
     expect(parsePath('/admin', '?preview=abc')).toMatchObject({ screen: 'postPreview', slug: 'abc' })
+  })
+})
+
+describe('routes — cây site: portfolio ở gốc, blog dưới /bean', () => {
+  it('đặt từng trang vào chỗ mới của nó', () => {
+    expect(toPath({ area: 'public', screen: 'portfolioHome' })).toBe('/')
+    expect(toPath({ area: 'public', screen: 'portfolioAbout' })).toBe('/about')
+    expect(toPath({ area: 'public', screen: 'portfolioPage', slug: 'business' })).toBe('/business')
+    expect(toPath({ area: 'public', screen: 'portfolioPage', slug: 'bean' })).toBe('/bean')
+    expect(toPath({ area: 'public', screen: 'landing' })).toBe('/bean/details')
+    expect(toPath({ area: 'public', screen: 'home' })).toBe('/bean/muc-luc')
+    expect(toPath({ area: 'public', screen: 'notes' })).toBe('/bean/ghi')
+  })
+
+  it('đọc lại đúng các địa chỉ mới', () => {
+    expect(parsePath('/')).toMatchObject({ area: 'public', screen: 'portfolioHome' })
+    expect(parsePath('/about')).toMatchObject({ screen: 'portfolioAbout' })
+    expect(parsePath('/business')).toMatchObject({ screen: 'portfolioPage', slug: 'business' })
+    expect(parsePath('/bean')).toMatchObject({ screen: 'portfolioPage', slug: 'bean' })
+    expect(parsePath('/bean/details')).toMatchObject({ screen: 'landing' })
+  })
+
+  it('link cũ vẫn mở ra đúng trang, rồi được viết lại bằng địa chỉ mới', () => {
+    // Bài đã chia sẻ, bookmark cũ: đổi chỗ không được làm chết link nào.
+    const old: [string, string][] = [
+      ['/portfolio', '/'],
+      ['/portfolio/about', '/about'],
+      ['/portfolio/business', '/business'],
+      ['/muc-luc', '/bean/muc-luc'],
+      ['/ghi', '/bean/ghi'],
+      ['/module/biochemistry', '/bean/module/biochemistry'],
+      ['/tag/heat', '/bean/tag/heat'],
+      ['/post/sensory-p260817', '/bean/post/sensory-p260817'],
+    ]
+    for (const [from, to] of old) expect(toPath(parsePath(from)), from).toBe(to)
+  })
+
+  it('details chỉ có nghĩa dưới /bean', () => {
+    // Ở gốc nó chưa từng là một địa chỉ, nên nó là slug như mọi chữ khác.
+    expect(parsePath('/details')).toMatchObject({ screen: 'portfolioPage', slug: 'details' })
   })
 })

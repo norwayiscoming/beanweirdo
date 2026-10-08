@@ -65,12 +65,20 @@ function toPage(row: PortfolioPageRow) {
  * type. Only fields that are present get checked, so a PATCH carrying a single
  * field is still valid.
  */
+/**
+ * Root addresses a port page may not take. `bean` is not here on purpose: the
+ * port page at /bean is the one the blog hangs under.
+ */
+const RESERVED_SLUGS = ['about', 'portfolio', 'practice', 'ad', 'admin', 'post', 'module', 'tag', 'muc-luc', 'ghi']
+
 export function pageColumns(body: PageInput): Record<string, unknown> | string {
   const out: Record<string, unknown> = {}
   if ('slug' in body) {
     if (typeof body.slug !== 'string' || !SLUG.test(body.slug)) return 'slug chỉ gồm chữ thường, số và gạch nối'
-    // /portfolio/about is the about page, so no port page may take that address.
-    if (body.slug === 'about') return 'slug about đã dành cho trang About'
+    // Port pages sit at the root (/<slug>), next to the about page, the journal,
+    // the back office and the blog's old addresses, which still forward.
+    if (RESERVED_SLUGS.includes(body.slug) || body.slug.startsWith('ad-'))
+      return `slug ${body.slug} đã dành cho một trang khác của site`
     out.slug = body.slug
   }
   if ('title' in body) {

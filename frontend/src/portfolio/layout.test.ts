@@ -51,8 +51,8 @@ describe('06.7 khối kể chuyện — khung 8 × 13, trục giữa hàng 8 và
 describe('địa chỉ Portfolio', () => {
   it('trang công khai đọc và viết khớp nhau', () => {
     const w = { area: 'public', screen: 'portfolioPage', slug: 'bibi' } as const
-    expect(toPath(w, DEFAULT_WORDS)).toBe('/portfolio/bibi')
-    expect(parsePath('/portfolio/bibi', '', DEFAULT_WORDS)).toEqual(w)
+    expect(toPath(w, DEFAULT_WORDS)).toBe('/bibi')
+    expect(parsePath('/bibi', '', DEFAULT_WORDS)).toEqual(w)
   })
 
   it('địa chỉ admin cũ của Portfolio rơi vào CMS', () => {
