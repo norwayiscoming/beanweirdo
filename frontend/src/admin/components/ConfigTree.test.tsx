@@ -37,7 +37,7 @@ vi.mock('../../data/useModules', () => ({
 vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], moduleTitles: {}, moduleIds: [], loading: false }) }))
 vi.mock('./PortEditors', () => ({
   usePortAdmin: () => ({ pages: [], content: {}, setContentStored: () => {}, setPages: () => {}, loaded: true, design: {} }),
-  useSplit: () => ({ columns: '520px 7px minmax(0,1fr)', handle: null, dragging: false }),
+  useSplit: () => ({ size: 520, columns: '520px 7px minmax(0,1fr)', handle: null, dragging: false }),
   ContentTab: ({ only }: { only: string }) => <div>port:{only}</div>,
   Builder: () => null,
   createFromPreset: vi.fn(),

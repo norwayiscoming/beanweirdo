@@ -337,6 +337,8 @@ export function ConfigTree({
     })
   const fold = (id: string) => ({ open: !folded.has(id), toggle: () => toggle(id) })
 
+  // Both dividers drag, and each width is remembered: the tree for long names, the fields for long forms.
+  const treeSplit = useSplit('cfg-tree', 264, 'left', 200, 520)
   const split = useSplit('cfg-v1', 520, 'left', 360, 900)
   const [root, width] = useWidth<HTMLDivElement>()
   // Wide: tree, fields, preview side by side. Narrower: the preview goes under the fields. Phone: one column.
@@ -863,23 +865,24 @@ export function ConfigTree({
         )
       : null
 
-  const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging ? 'none' : undefined } as const
+  const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging || treeSplit.dragging ? 'none' : undefined } as const
 
   return (
     <div
       ref={root}
       style={{
         display: 'grid',
-        gridTemplateColumns: columns === 3 ? `minmax(220px, 264px) ${split.columns}` : columns === 2 ? 'minmax(220px, 264px) minmax(0, 1fr)' : 'minmax(0, 1fr)',
+        gridTemplateColumns: columns === 3 ? `${treeSplit.size}px 7px ${split.columns}` : columns === 2 ? treeSplit.columns : 'minmax(0, 1fr)',
         // Each cell keeps its own height, which is what lets the tree and the preview stick.
         alignItems: 'start',
-        columnGap: columns === 3 ? 12 : 28,
+        columnGap: 12,
         rowGap: 20,
         padding: columns === 1 ? '24px 16px 90px' : '28px 32px 120px',
       }}
     >
       <style>{'.cfg-leaf .cfg-grip{opacity:0}.cfg-leaf:hover .cfg-grip,.cfg-leaf:focus-within .cfg-grip{opacity:1}'}</style>
       <div style={columns === 2 ? { gridRow: '1 / span 2' } : undefined}>{tree}</div>
+      {columns > 1 && <div style={{ alignSelf: 'stretch', ...(columns === 2 ? { gridRow: '1 / span 2' } : {}) }}>{treeSplit.handle}</div>}
       <div ref={editor} style={{ minWidth: 0, scrollMarginTop: 16, ...(columns === 3 ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
         {header}
         {body}
@@ -891,7 +894,7 @@ export function ConfigTree({
         style={{
           ...previewStyle,
           ...(columns === 3 ? { position: 'sticky', top: 0, height: 'calc(100vh - 40px)' } : { height: '70vh' }),
-          ...(columns === 2 ? { gridColumn: 2 } : {}),
+          ...(columns === 2 ? { gridColumn: 3 } : {}),
         }}
       />
       {previewPane}

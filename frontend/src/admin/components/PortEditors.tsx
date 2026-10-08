@@ -189,7 +189,7 @@ export function useSplit(key: string, initial: number, side: 'left' | 'right', m
       }}
     />
   )
-  return { columns, handle, dragging }
+  return { size, columns, handle, dragging }
 }
 
 // ── screen ──────────────────────────────────────────────────────────────────
