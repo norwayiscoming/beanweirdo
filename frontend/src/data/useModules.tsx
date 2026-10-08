@@ -294,8 +294,8 @@ function withScreen(p: PageRow): PageRow {
 }
 
 /**
- * The navigation as a rule: every subject in tree order is listed unless the
- * owner placed or hid it, and the owner's list comes first. With no navigation
+ * The navigation as a rule: every subject in tree order, unless the owner hid
+ * it, then whatever else the owner listed. With no navigation
  * stored yet, the modules' own order and flags stand in for it.
  */
 function arrange(pages: PageRow[], nav: PageRecord | undefined, topics: TopicRecord[], modules: ModuleRow[]): PageRow[] {
@@ -319,11 +319,17 @@ function arrange(pages: PageRow[], nav: PageRecord | undefined, topics: TopicRec
     return pages
   }
 
+  // Subjects come in the topic tree's order, whatever order the list stored
+  // them in: the tree is where the owner arranges the blog, and a second order
+  // here meant a drag in the tree did not move the sidebar. The list still
+  // says, per entry, whether it is shown; anything else it names (a topic
+  // further down, a curated page, a tag) follows the subjects in its order.
   const items = ((nav.presentation.items ?? []) as NavItem[]).filter((i) => byRef(i.ref))
-  const listed = new Set(items.map((i) => i.ref))
+  const own = new Map(items.map((i) => [i.ref, i]))
   const subjects = [...topics].filter((t) => t.parent_id === null).sort((a, b) => a.sort_order - b.sort_order)
-  const auto = subjects.filter((s) => !listed.has(`topic:${s.id}`)).map((s) => ({ ref: `topic:${s.id}`, sidebar: true, home: true }))
-  ;[...items, ...auto].forEach((item, i) => {
+  const subjectRefs = new Set(subjects.map((s) => `topic:${s.id}`))
+  const inTree = subjects.map((s) => own.get(`topic:${s.id}`) ?? { ref: `topic:${s.id}`, sidebar: true, home: true })
+  ;[...inTree, ...items.filter((i) => !subjectRefs.has(i.ref))].forEach((item, i) => {
     const page = byRef(item.ref)!
     page.sort_order = i + 1
     page.inSidebar = item.sidebar !== false && page.visibility !== 'private'

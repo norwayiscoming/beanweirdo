@@ -30,13 +30,12 @@ import { ink, paper, sans, serif } from '../../design/tokens'
  */
 
 /** Pages the site draws with screens of their own, whose copy lives in site settings. */
-export type SystemPage = 'landing' | 'index' | 'notes' | 'archive'
+export type SystemPage = 'landing' | 'index' | 'notes'
 
 /** What PageEditor opens: the blog's own pages. */
 export type BlogSelected =
   | { kind: 'system'; key: SystemPage }
   | { kind: 'curated'; id: string }
-  | { kind: 'template'; id: string }
   | { kind: 'override'; type: 'topic' | 'keyword'; node: string }
 
 export type Layout = { pages: LayoutPage[]; overrides: LayoutOverride[]; rules: StoredRule[] }
@@ -44,13 +43,17 @@ export type Layout = { pages: LayoutPage[]; overrides: LayoutOverride[]; rules: 
 const SYSTEM: { key: SystemPage; title: string; path: string }[] = [
   { key: 'landing', title: 'Trang chủ', path: toPath({ area: 'public', screen: 'landing' }) },
   { key: 'index', title: 'Mục lục', path: toPath({ area: 'public', screen: 'home' }) },
-  { key: 'archive', title: 'Lưu trữ', path: '' },
 ]
 
-export const TEMPLATE_TITLES: Record<string, string> = {
-  template_subject: 'Mẫu trang subject',
-  template_topic: 'Mẫu trang topic',
-  template_keyword: 'Mẫu trang tag',
+/**
+ * The template a node's page follows when it has no settings of its own.
+ * Templates are no longer opened in Cấu hình (the owner found nothing to see
+ * on them), so this is only named, never linked.
+ */
+const TEMPLATE_WORDS: Record<string, string> = {
+  template_subject: 'quy chế chung của trang subject',
+  template_topic: 'quy chế chung của trang topic',
+  template_keyword: 'quy chế chung của trang tag',
 }
 
 const TIER_NAMES: Record<RuleTier, string> = {
@@ -149,25 +152,23 @@ function nodeOptions(tier: RuleTier, v: Vocab): { id: string; label: string }[] 
   return []
 }
 
-/** The rule's own fields. A template's rule always takes its node from the page. */
-function RuleEditor({ rule, vocab, template, onChange }: { rule: StoredRule; vocab: Vocab; template: boolean; onChange: (patch: Partial<ListingRule>) => void }) {
+/** The rule's own fields. */
+function RuleEditor({ rule, vocab, onChange }: { rule: StoredRule; vocab: Vocab; onChange: (patch: Partial<ListingRule>) => void }) {
   const opts = nodeOptions(rule.tier, vocab)
   return (
     <div style={{ display: 'grid', gap: 14 }}>
-      {!template && (
-        <div>
-          <div style={label}>Kéo từ</div>
-          <select aria-label="Kéo từ" value={rule.tier} onChange={(e) => onChange({ tier: e.target.value as RuleTier, nodes: [], exclude: [] })} style={box}>
-            {/* No dạng bài: it is retired, the template tier says the same. */}
-            {(Object.keys(TIER_NAMES) as RuleTier[]).filter((t) => t !== 'pick' && t !== 'kind').map((t) => (
-              <option key={t} value={t}>
-                {TIER_NAMES[t]}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-      {!template && opts.length > 0 && (
+      <div>
+        <div style={label}>Kéo từ</div>
+        <select aria-label="Kéo từ" value={rule.tier} onChange={(e) => onChange({ tier: e.target.value as RuleTier, nodes: [], exclude: [] })} style={box}>
+          {/* No dạng bài: it is retired, the template tier says the same. */}
+          {(Object.keys(TIER_NAMES) as RuleTier[]).filter((t) => t !== 'pick' && t !== 'kind').map((t) => (
+            <option key={t} value={t}>
+              {TIER_NAMES[t]}
+            </option>
+          ))}
+        </select>
+      </div>
+      {opts.length > 0 && (
         <div>
           <div style={label}>Nút</div>
           <Chips options={opts} value={rule.nodes} onChange={(nodes) => onChange({ nodes })} />
@@ -179,7 +180,7 @@ function RuleEditor({ rule, vocab, template, onChange }: { rule: StoredRule; voc
           gồm topic con
         </label>
       )}
-      {rule.tier === 'keyword' && !template && (
+      {rule.tier === 'keyword' && (
         <div>
           <div style={label}>Khớp</div>
           <select aria-label="Khớp" value={rule.match} onChange={(e) => onChange({ match: e.target.value as 'any' | 'all' })} style={box}>
@@ -188,7 +189,7 @@ function RuleEditor({ rule, vocab, template, onChange }: { rule: StoredRule; voc
           </select>
         </div>
       )}
-      {!template && opts.length > 0 && (
+      {opts.length > 0 && (
         <div>
           <div style={label}>Loại trừ</div>
           <Chips options={opts} value={rule.exclude} onChange={(exclude) => onChange({ exclude })} />
@@ -276,8 +277,6 @@ function HandOrder({ rule, posts, onChange }: { rule: StoredRule; posts: { id: s
   )
 }
 
-type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
-
 export const PORT_PARTS: { part: PortPart; title: string }[] = [
   { part: 'about', title: 'About' },
   { part: 'sign', title: 'Signature' },
@@ -287,62 +286,37 @@ export const PORT_PARTS: { part: PortPart; title: string }[] = [
 
 const ruleIn = (layout: Layout) => (id: string | null | undefined) => layout.rules.find((r) => r.id === id)
 
-/** The navigation as the site draws it: the owner's list, then subjects not yet placed. */
-export function navItemsOf(nav: LayoutPage | undefined, topics: Topic[]): NavItem[] {
-  const items = ((nav?.presentation.items ?? []) as NavItem[]).slice()
-  const listed = new Set(items.map((i) => i.ref))
-  const subjects = topics.filter((t) => t.parent_id === null).sort((a, b) => a.sort_order - b.sort_order)
-  for (const s of subjects) if (!listed.has(`topic:${s.id}`)) items.push({ ref: `topic:${s.id}`, sidebar: true, home: true })
-  return items
-}
+type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
 
-/** Điều hướng: the subjects and pages the sidebar and the blog home list, in order. */
-export function NavEditor({
-  layout,
-  topics,
-  pages,
-  postsOf,
-  run,
-}: {
-  layout: Layout
-  topics: Topic[]
-  pages: PageRow[]
-  postsOf: (id: string) => { id: string; en: string }[]
-  run: (fn: () => Promise<unknown>) => void
-}) {
+/**
+ * Whether one page is listed in the blog's sidebar and on the blog home.
+ *
+ * There used to be a whole Điều hướng screen that also ordered that list, and
+ * its order fought the topic tree's: drag a subject in the tree and the
+ * sidebar did not follow. The tree is the one order now (`arrange` in
+ * useModules), so all that is left of the navigation is these two switches,
+ * shown on the page they are about.
+ */
+export function NavFlags({ layout, navRef, listed, run }: { layout: Layout; navRef: string; listed: boolean; run: (fn: () => Promise<unknown>) => void }) {
   const nav = layout.pages.find((p) => p.kind === 'nav')
-  const items = navItemsOf(nav, topics)
-  const save = (next: NavItem[]) => nav && run(() => updatePage(nav.id, { presentation: { ...nav.presentation, items: next } }))
-  const drag = useRowDrag((from, to) => save(moved(items, from, to)))
-  const pageOf = (ref: string): PageRow | undefined => {
-    const [type, id] = ref.split(':')
-    return findPage(pages, type === 'tag' ? `tag-${id}` : id)
+  if (!nav) return null
+  const items = (nav.presentation.items ?? []) as NavItem[]
+  const own = items.find((i) => i.ref === navRef)
+  // An entry not in the list: a subject is shown by default, anything else is not.
+  const shown = (flag: 'sidebar' | 'home') => (own ? own[flag] !== false : listed)
+  const set = (flag: 'sidebar' | 'home', value: boolean) => {
+    const entry = { ref: navRef, sidebar: shown('sidebar'), home: shown('home'), [flag]: value }
+    const next = own ? items.map((i) => (i.ref === navRef ? entry : i)) : [...items, entry]
+    run(() => updatePage(nav.id, { presentation: { ...nav.presentation, items: next } }))
   }
   return (
-    <div>
-      {items.map((it, i) => {
-        const p = pageOf(it.ref)
-        return (
-          <div key={it.ref} {...dragRow(drag, i)}>
-            <span style={{ cursor: 'grab', color: ink.faint }} aria-hidden>
-              ⋮⋮
-            </span>
-            <span style={{ flex: 1 }}>{p?.title ?? it.ref}</span>
-            <span style={{ color: ink.faint, fontSize: 11 }}>{p ? postsOf(p.id).length : 0} bài</span>
-            {(['sidebar', 'home'] as const).map((flag) => (
-              <label key={flag} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: ink.muted }}>
-                <input
-                  type="checkbox"
-                  aria-label={`${flag === 'sidebar' ? 'thanh bên' : 'trang chủ'} ${p?.title ?? it.ref}`}
-                  checked={it[flag] !== false}
-                  onChange={(e) => save(items.map((x, j) => (j === i ? { ...x, [flag]: e.target.checked } : x)))}
-                />
-                {flag === 'sidebar' ? 'thanh bên' : 'trang chủ'}
-              </label>
-            ))}
-          </div>
-        )
-      })}
+    <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+      {(['sidebar', 'home'] as const).map((flag) => (
+        <label key={flag} style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: sans, fontSize: 12.5, color: ink.base }}>
+          <input type="checkbox" checked={shown(flag)} onChange={(e) => set(flag, e.target.checked)} />
+          {flag === 'sidebar' ? 'hiện ở thanh bên' : 'hiện ở trang chủ blog'}
+        </label>
+      ))}
     </div>
   )
 }
@@ -360,7 +334,6 @@ export function NodePage({
   vocab,
   error,
   run,
-  onOpenTemplate,
   renderCopy,
   renderModule,
 }: {
@@ -372,7 +345,6 @@ export function NodePage({
   vocab: Vocab
   error: ReactNode
   run: (fn: () => Promise<unknown>) => void
-  onOpenTemplate: (id: string) => void
   renderCopy: (key: SystemPage) => ReactNode
   renderModule: (moduleId: string) => ReactNode
 }) {
@@ -395,20 +367,21 @@ export function NodePage({
   const tplKind = type === 'keyword' ? 'template_keyword' : topic?.parent_id ? 'template_topic' : 'template_subject'
   const tpl = layout.pages.find((p) => p.kind === tplKind)
   const page = findPage(pages, type === 'keyword' ? `tag-${node}` : node)
+  const listed = page ? postsOf(page.id) : []
   return (
     <div>
       {error}
-      <div style={{ fontFamily: sans, fontSize: 13, color: ink.muted, margin: '8px 0 14px' }}>
-        theo{' '}
-        {tpl ? (
-          <button type="button" onClick={() => onOpenTemplate(tpl.id)} style={{ ...link, fontSize: 13 }}>
-            {TEMPLATE_TITLES[tplKind]}
-          </button>
-        ) : (
-          TEMPLATE_TITLES[tplKind]
-        )}{' '}
-        · {page ? postsOf(page.id).length : 0} bài
+      <div style={{ fontFamily: sans, fontSize: 13, color: ink.muted, margin: '8px 0 10px' }}>
+        Theo {TEMPLATE_WORDS[tplKind]}: {listed.length ? `trang đang liệt kê ${listed.length} bài` : 'trang chưa có bài nào'}.
       </div>
+      {listed.length > 0 && (
+        <ol style={{ margin: '0 0 14px', paddingLeft: 20, fontFamily: serif, fontSize: 14, lineHeight: 1.6, color: ink.base }}>
+          {listed.slice(0, 8).map((p) => (
+            <li key={p.id}>{p.en}</li>
+          ))}
+          {listed.length > 8 && <li style={{ listStyle: 'none', fontFamily: sans, fontSize: 12, color: ink.muted }}>… và {listed.length - 8} bài nữa</li>}
+        </ol>
+      )}
       <button
         type="button"
         style={{ ...link, fontSize: 12.5 }}
@@ -443,11 +416,11 @@ export function describePage(selected: BlogSelected, layout: Layout, pages: Page
     title = s.title
     preview = s.path
     copyKey = s.key
-  } else if (selected.kind === 'curated' || selected.kind === 'template') {
+  } else if (selected.kind === 'curated') {
     record = layout.pages.find((p) => p.id === selected.id)
     rule = ruleOf(record?.blocks[0])
-    page = selected.kind === 'curated' ? findPage(pages, selected.id) : undefined
-    title = selected.kind === 'template' ? TEMPLATE_TITLES[record?.kind ?? ''] ?? '' : record?.title || selected.id
+    page = findPage(pages, selected.id)
+    title = record?.title || selected.id
     if (page) preview = page.screen === 'notes' ? toPath({ area: 'public', screen: 'notes' }) : toPath({ area: 'public', screen: 'module', moduleId: page.id })
     if (page?.screen === 'notes') copyKey = 'notes'
   } else {
@@ -508,11 +481,12 @@ export function PageEditor({
           </select>
         </div>
       )}
+      {record && selected.kind === 'curated' && <NavFlags layout={layout} navRef={`page:${record.id}`} listed={false} run={run} />}
 
       {rule && (
         <>
           <div style={head}>Quy chế</div>
-          <RuleEditor rule={rule} vocab={vocab} template={selected.kind === 'template'} onChange={saveRule} />
+          <RuleEditor rule={rule} vocab={vocab} onChange={saveRule} />
         </>
       )}
 

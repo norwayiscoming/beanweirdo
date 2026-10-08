@@ -29,12 +29,10 @@ import { Builder, ContentTab, createFromPreset, usePortAdmin, useSplit, type Por
 import { ScaledPreview, useWidth } from './ScaledPreview'
 import {
   describePage,
-  NavEditor,
-  navItemsOf,
+  NavFlags,
   NodePage,
   PageEditor,
   PORT_PARTS,
-  TEMPLATE_TITLES,
   type BlogSelected,
   type Layout,
   type SystemPage,
@@ -56,16 +54,20 @@ import {
  * - everything about one thing sits together on the right — a topic's name,
  *   colour and place in the tree beside the page it gets;
  * - the public page is always previewed beside the fields.
+ *
+ * Later the same day the owner asked for one order and nothing without a
+ * page: Mục lục and the topic tree are one card (Mục lục draws the tree), the
+ * Điều hướng screen went (the sidebar follows the tree; its two switches sit
+ * on each page), and so did Mẫu and Lưu trữ, which had nothing to see.
  */
 
-type Group = 'port-pages' | 'port-parts' | 'topics' | 'tags' | 'curated' | 'templates' | 'modules'
+type Group = 'port-pages' | 'port-parts' | 'topics' | 'tags' | 'curated' | 'modules'
 
 type Picked =
   | BlogSelected
   | { kind: 'group'; id: Group }
   | { kind: 'port-part'; part: PortPart }
   | { kind: 'port-page'; id: string }
-  | { kind: 'nav' }
   | { kind: 'topic'; id: string }
   | { kind: 'tag'; id: string }
   | { kind: 'module'; id: string }
@@ -482,15 +484,15 @@ export function ConfigTree({
 
   // A page drawn by the practice journal's screen is Practice's, not the blog's.
   const curated = layout.pages.filter((p) => p.kind === 'curated' && p.presentation.screen !== 'hours')
-  const templates = layout.pages.filter((p) => p.kind.startsWith('template_'))
   const livePort = port.pages.filter((p) => p.status !== 'archived')
   const archivedPort = port.pages.filter((p) => p.status === 'archived')
   const overrideOf = (type: 'topic' | 'keyword', id: string) => layout.overrides.find((o) => o.node_type === type && o.node_id === id)
-  const nodeCount = (type: 'topic' | 'keyword', id: string) => {
-    const page = findPage(pages, type === 'keyword' ? `${TAG_PAGE}${id}` : id)
-    return page ? postsOf(page.id).length : 0
-  }
-  const leafMeta = (type: 'topic' | 'keyword', id: string) => `${overrideOf(type, id) ? 'riêng · ' : ''}${posts(nodeCount(type, id))}`
+  // One count per node, the one its settings show too: the posts filed under it.
+  const leafMeta = (type: 'topic' | 'keyword', id: string, n: number) => `${overrideOf(type, id) ? 'riêng · ' : ''}${posts(n)}`
+  // Tags have no order of their own; by name, so a long list can be scanned.
+  const tags = [...vocab.keywords].sort((a, b) => a.label.localeCompare(b.label, 'vi'))
+  // The page that wears a module's looks, if any: the one to preview it on.
+  const wearer = (id: string) => findPage(pages, id)
   const pick = (p: Picked) => () => setPicked(p)
   const on = (p: Picked) => same(picked, p)
   const blog = `/${activeWords().bean}`
@@ -501,7 +503,7 @@ export function ConfigTree({
         name={t.title}
         depth={depth}
         dot={t.accent ?? ancestorsOf(sorted, t.id).reverse().find((a) => a.accent)?.accent ?? null}
-        meta={leafMeta('topic', t.id)}
+        meta={leafMeta('topic', t.id, t.posts)}
         on={on({ kind: 'topic', id: t.id })}
         fold={children.length ? fold(`t:${t.id}`) : undefined}
         drag={dragOf(t.id)}
@@ -545,24 +547,18 @@ export function ConfigTree({
 
       <Site name="Bean blog" path={`${blog}/…`} fold={fold('site:blog')}>
       <Card title="Trang chủ blog" note={`${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`} on={on({ kind: 'system', key: 'landing' })} onClick={pick({ kind: 'system', key: 'landing' })} />
-      <Card title="Mục lục" note={`${toPath({ area: 'public', screen: 'home' })} · tiêu đề, đoạn dẫn, ảnh khay`} on={on({ kind: 'system', key: 'index' })} onClick={pick({ kind: 'system', key: 'index' })} />
-      <Card title="Lưu trữ" note="Chữ cố định của trang lưu trữ" on={on({ kind: 'system', key: 'archive' })} onClick={pick({ kind: 'system', key: 'archive' })} />
-      <Card title="Điều hướng" note={`${navItemsOf(layout.pages.find((p) => p.kind === 'nav'), vocab.topics).length} mục ở thanh bên và trang chủ blog`} on={on({ kind: 'nav' })} onClick={pick({ kind: 'nav' })} />
-      {groupCard('topics', 'Cây chủ đề', 'Mỗi mục là một trang. Thêm mục ở bên phải; kéo ⋮⋮ để đổi chỗ')}
+      {groupCard('topics', 'Mục lục', 'Cây chủ đề: thứ tự ở đây là thứ tự của thanh bên và trang Mục lục. Kéo ⋮⋮ để đổi chỗ')}
       {openGroup('topics') && topicTree.map(topicNode)}
-      {groupCard('tags', 'Tag', `${vocab.keywords.length} tag · mỗi tag là một trang`)}
+      {groupCard('tags', 'Tag', `${vocab.keywords.length} tag, xếp theo tên · mỗi tag là một trang`)}
       {openGroup('tags') &&
-        vocab.keywords.map((k) => <Leaf key={k.id} name={k.label} depth={0} meta={leafMeta('keyword', k.id)} on={on({ kind: 'tag', id: k.id })} onClick={pick({ kind: 'tag', id: k.id })} />)}
+        tags.map((k) => <Leaf key={k.id} name={k.label} depth={0} meta={leafMeta('keyword', k.id, k.posts)} on={on({ kind: 'tag', id: k.id })} onClick={pick({ kind: 'tag', id: k.id })} />)}
       {groupCard('curated', 'Trang chọn tay', 'Trang có quy chế riêng, như Ghi')}
       {openGroup('curated') &&
         curated.map((p) => {
           const page = findPage(pages, p.id)
           return <Leaf key={p.id} name={p.title || p.id} depth={0} meta={posts(page ? postsOf(page.id).length : 0)} on={on({ kind: 'curated', id: p.id })} onClick={pick({ kind: 'curated', id: p.id })} />
         })}
-      {groupCard('templates', 'Mẫu', 'Quy chế chung của trang subject, topic và tag')}
-      {openGroup('templates') &&
-        templates.map((p) => <Leaf key={p.id} name={TEMPLATE_TITLES[p.kind] ?? p.kind} depth={0} on={on({ kind: 'template', id: p.id })} onClick={pick({ kind: 'template', id: p.id })} />)}
-      {groupCard('modules', 'Hình trang', 'Module mà một trang mượn dàn trang, ảnh và chữ')}
+      {groupCard('modules', 'Hình trang', 'Dàn trang, ảnh và chữ mà một trang mượn; xem trước trên trang đang mượn')}
       {openGroup('modules') &&
         moduleRows
           .filter(({ row }) => !hidden(row.id))
@@ -572,6 +568,7 @@ export function ConfigTree({
               name={row.title}
               depth={depth}
               dot={row.accent}
+              meta={wearer(row.id) ? undefined : 'chưa dùng'}
               on={on({ kind: 'module', id: row.id })}
               fold={children.length ? fold(`m:${row.id}`) : undefined}
               onClick={pick({ kind: 'module', id: row.id })}
@@ -639,7 +636,6 @@ export function ConfigTree({
       vocab={vocab}
       error={errorLine}
       run={run}
-      onOpenTemplate={(id) => setPicked({ kind: 'template', id })}
       renderCopy={renderCopy}
       renderModule={renderModule}
     />
@@ -683,10 +679,9 @@ export function ConfigTree({
       break
     }
     case 'system':
-    case 'curated':
-    case 'template': {
+    case 'curated': {
       const d = describePage(picked, layout, pages)
-      const where = picked.kind === 'curated' ? 'Trang chọn tay' : picked.kind === 'template' ? 'Mẫu' : null
+      const where = picked.kind === 'curated' ? 'Trang chọn tay' : null
       crumbs = ['Bean blog', ...(where ? [where] : []), picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ blog' : d.title]
       preview = d.preview
       address = d.preview
@@ -696,22 +691,11 @@ export function ConfigTree({
     case 'override':
       // Not opened from the tree: a node's own settings show inside its topic or tag.
       break
-    case 'nav':
-      crumbs = ['Bean blog', 'Điều hướng']
-      preview = toPath({ area: 'public', screen: 'landing' })
-      body = (
-        <>
-          {errorLine}
-          <p style={hint}>Kéo ⋮⋮ để đổi thứ tự. Bỏ chọn để giấu một mục khỏi thanh bên hay khỏi trang chủ blog.</p>
-          <NavEditor layout={layout} topics={vocab.topics} pages={pages} postsOf={postsOf} run={run} />
-        </>
-      )
-      break
     case 'topic': {
       const t = vocab.topics.find((x) => x.id === picked.id)
       if (!t) break
       const path = [...ancestorsOf(sorted, t.id), t].map((x) => x.title)
-      crumbs = ['Bean blog', 'Cây chủ đề', ...path]
+      crumbs = ['Bean blog', 'Mục lục', ...path]
       named = true
       address = toPath({ area: 'public', screen: 'module', moduleId: t.id })
       preview = address
@@ -728,6 +712,7 @@ export function ConfigTree({
               used={[...new Set(vocab.topics.map((x) => x.accent).filter((c): c is string => !!c))]}
               save={(patch) => run(() => updateTopic(t.id, patch))}
             />
+            <NavFlags layout={layout} navRef={`topic:${t.id}`} listed={t.parent_id === null} run={run} />
           </div>
           <div style={sectionHead}>Mục con</div>
           <AddField
@@ -762,6 +747,7 @@ export function ConfigTree({
           {errorLine}
           <div style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
             <FlatSettings key={k.id} kind="Tag" entry={k} count={k.posts} onRename={(label) => run(() => renameKeyword(k.id, label))} />
+            <NavFlags layout={layout} navRef={`tag:${k.id}`} listed={false} run={run} />
           </div>
           <div style={sectionHead}>Trang</div>
           {nodePage('keyword', k.id)}
@@ -769,10 +755,21 @@ export function ConfigTree({
       )
       break
     }
-    case 'module':
+    case 'module': {
       crumbs = ['Bean blog', 'Hình trang', modules.find((m) => m.id === picked.id)?.title ?? picked.id]
-      body = renderModule(picked.id)
+      // A module is not a page of its own since the pages moved onto the topic
+      // tree; it is previewed on the page that wears it.
+      const w = wearer(picked.id)
+      if (w) preview = w.screen === 'notes' ? toPath({ area: 'public', screen: 'notes' }) : toPath({ area: 'public', screen: 'module', moduleId: w.id })
+      address = preview
+      body = (
+        <>
+          <p style={hint}>{!w ? 'Chưa trang nào mượn hình này, nên không có gì để xem trước.' : w.source === 'module' ? 'Chưa trang nào mượn hình này; nó vẫn là một trang của riêng nó, xem ở khung bên cạnh.' : `Trang ${w.title} đang mượn hình này; khung bên cạnh là trang ấy.`}</p>
+          {renderModule(picked.id)}
+        </>
+      )
       break
+    }
     case 'practice':
       crumbs = ['Practice', 'Ghi 02']
       preview = toPath({ area: 'practice', screen: 'hours' })
@@ -810,16 +807,18 @@ export function ConfigTree({
           </>
         )
       } else if (g === 'topics') {
-        crumbs = ['Bean blog', 'Cây chủ đề']
+        crumbs = ['Bean blog', 'Mục lục']
         preview = toPath({ area: 'public', screen: 'home' })
+        address = preview
         body = (
           <>
             {errorLine}
             <p style={hint}>
-              Mỗi mục trong cây là một trang của blog. Chọn một mục ở bên trái để sửa tên, màu, lời dẫn và trang của nó. Muốn đổi chỗ thì nắm ⋮⋮ ở cuối dòng và kéo: thả vào giữa một dòng là cho vào trong mục đó, thả vào mép trên hay mép dưới là đặt trước hay sau.
+              Trang Mục lục và thanh bên vẽ đúng cây này, theo đúng thứ tự này. Chọn một mục ở bên trái để sửa tên, màu, lời dẫn và trang của nó. Muốn đổi chỗ thì nắm ⋮⋮ ở cuối dòng và kéo: thả vào giữa một dòng là cho vào trong mục đó, thả vào mép trên hay mép dưới là đặt trước hay sau.
             </p>
             <div style={sectionHead}>Subject mới</div>
             <AddField label="Thêm subject" placeholder="tên subject" onAdd={(title) => run(() => createTopic(title, null))} />
+            {renderCopy('index')}
           </>
         )
       } else if (g === 'tags') {
@@ -853,7 +852,7 @@ export function ConfigTree({
           </>
         )
       } else {
-        crumbs = g === 'port-parts' ? ['Port', 'Phần chung'] : ['Bean blog', g === 'templates' ? 'Mẫu' : 'Hình trang']
+        crumbs = g === 'port-parts' ? ['Port', 'Phần chung'] : ['Bean blog', 'Hình trang']
         body = <p style={hint}>Chọn một mục ở cây bên trái để sửa.</p>
       }
       break

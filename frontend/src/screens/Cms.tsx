@@ -581,8 +581,6 @@ export function Cms() {
             </Field>
           </div>
         </>,
-    // The archive's words are fixed in code since the owner retired those fields (2026-09-19).
-    archive: null,
     index: <>
           <div style={{ ...sectionHead, margin: '34px 0 18px' }}>Mục lục</div>
           <div style={grid(two)}>
