@@ -25,6 +25,7 @@ import {
 } from '../lib/apiClient'
 import { useRowDrag } from '../lib/useRowDrag'
 import { findPage, useModules, type PageRow } from '../../data/useModules'
+import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { treeOrder, type ListingRule, type RuleGroup, type RuleSort, type RuleTier } from '../../lib/listingRule'
 import { activeWords } from '../../lib/routeWords'
 import { toPath } from '../../lib/routes'
@@ -160,11 +161,7 @@ function Chips({ options, value, onChange }: { options: { id: string; label: str
 function nodeOptions(tier: RuleTier, v: Vocab): { id: string; label: string }[] {
   if (tier === 'topic') {
     const byId = new Map(v.topics.map((t) => [t.id, t]))
-    return treeOrder(v.topics).map((id) => {
-      const t = byId.get(id)!
-      const parent = t.parent_id ? byId.get(t.parent_id) : undefined
-      return { id, label: parent ? `${parent.title} › ${t.title}` : t.title }
-    })
+    return treeOrder(v.topics).map((id) => ({ id, label: [...ancestorsOf(v.topics, id), byId.get(id)!].map((t) => t.title).join(' › ') }))
   }
   if (tier === 'keyword') return v.keywords.map((k) => ({ id: k.id, label: k.label }))
   if (tier === 'kind') return v.kinds.map((k) => ({ id: k.id, label: k.label }))
@@ -417,7 +414,6 @@ export function PagesManager({
   const templates = layout.pages.filter((p) => p.kind.startsWith('template_'))
   const overrideOf = (type: 'topic' | 'keyword', id: string) => layout.overrides.find((o) => o.node_type === type && o.node_id === id)
   const sortedTopics = [...vocab.topics].sort((a, b) => a.sort_order - b.sort_order)
-  const subjects = sortedTopics.filter((t) => t.parent_id === null)
   const livePort = port.pages.filter((p) => p.status !== 'archived')
   const archivedPort = port.pages.filter((p) => p.status === 'archived')
 
@@ -487,12 +483,7 @@ export function PagesManager({
           {curated.map((p) => item({ kind: 'curated', id: p.id }, p.title || p.id, 40, postsOf(p.id).length))}
         </SectionHead>
         <SectionHead id="pages.blog.topics" title="Chủ đề" indent={24}>
-          {subjects.map((s) => (
-            <div key={s.id}>
-              {nodeItem('topic', s.id, s.title, 40, true)}
-              {sortedTopics.filter((t) => t.parent_id === s.id).map((t) => nodeItem('topic', t.id, t.title, 54))}
-            </div>
-          ))}
+          {flattenTree(buildTree(sortedTopics)).map(({ row: t, depth }) => nodeItem('topic', t.id, t.title, 40 + depth * 14, depth === 0))}
         </SectionHead>
         {vocab.keywords.length > 0 && (
           <SectionHead id="pages.blog.tags" title="Tag" indent={24}>

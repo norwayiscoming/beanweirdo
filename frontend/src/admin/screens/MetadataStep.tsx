@@ -121,9 +121,9 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
         {topicOptions(topics).map(({ subject, children }) => (
           <optgroup key={subject.id} label={subject.title}>
             <option value={subject.id}>{subject.title}</option>
-            {children.map((t) => (
+            {children.map(({ topic: t, path }) => (
               <option key={t.id} value={t.id}>
-                {subject.title} › {t.title}
+                {path}
               </option>
             ))}
           </optgroup>

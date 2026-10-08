@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { listKeywords, listTopics, renameKeyword, updateTopic, type Keyword, type Module, type Topic } from '../lib/apiClient'
-import { buildTree, flattenTree } from '../../lib/contentTree'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { createTopic, listKeywords, listTopics, renameKeyword, reorderTopics, updateTopic, type Keyword, type Module, type Topic } from '../lib/apiClient'
+import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
+import { planMove, type DropWhere } from '../../lib/treeMove'
 import { bySiteOrder } from '../../lib/moduleOrder'
 import { TAG_PAGE, toPath } from '../../lib/routes'
 import { ink, paper, sans, serif } from '../../design/tokens'
@@ -17,9 +18,11 @@ import type { SystemPage } from './PagesManager'
  * fields on the right. The owner asked for it back because a tree you click
  * into is faster to work through than Quản lý trang's per-page editor plus a
  * live preview. The subjects are the same five, read from today's data: the
- * module tree became the topic tree (subject › topic), tags are the keyword
- * vocabulary, and modules survive only as the looks a page can borrow — so
- * they are listed under Hình trang and edited, never created or nested, here.
+ * module tree became the topic tree (subject › topic) — the site's real page
+ * tree, so it is where adding and dragging into and out of a branch lives —
+ * tags are the keyword vocabulary, and modules survive only as the looks a
+ * page can borrow, so they are listed under Hình trang and edited, never
+ * created or nested, here.
  */
 
 type CopyKey = Extract<SystemPage, 'landing' | 'index' | 'notes'>
@@ -40,7 +43,7 @@ const COPY: { key: CopyKey; t: string; d: string }[] = [
 ]
 
 const BRANCHES: { id: Branch; t: string; d: string }[] = [
-  { id: 'topics', t: 'Cây chủ đề', d: 'Subject và topic: tên, màu, lời dẫn, quyền xem' },
+  { id: 'topics', t: 'Cây chủ đề', d: 'Thêm, kéo vào trong hay ra ngoài; tên, màu, lời dẫn' },
   { id: 'tags', t: 'Tag', d: 'Đổi tên tag; gộp và xoá ở tab Nội dung' },
   { id: 'modules', t: 'Hình trang', d: 'Module mà một trang mượn dàn trang, ảnh và chữ' },
 ]
@@ -80,6 +83,64 @@ function Card({ title, note, on, open, onClick }: { title: string; note: string;
   )
 }
 
+type TopicNode = ReturnType<typeof buildTree<Topic>>[number]
+
+type DragProps = {
+  onDragStart: () => void
+  onDragOver: (e: DragEvent<HTMLElement>) => void
+  onDragLeave: () => void
+  onDrop: (e: DragEvent<HTMLElement>) => void
+  onDragEnd: () => void
+  dragging: boolean
+  mark: DropWhere | null
+}
+
+/**
+ * Which part of the row the pointer is on: the top quarter and the bottom
+ * quarter mean "beside", the middle half means "inside" — the wider target,
+ * because filing something inside is the move this tree exists for. A broken
+ * measurement answers "before", never "inside", since inside changes the
+ * node's parent and with it every post address under it.
+ */
+function whereIn(e: { clientY: number; currentTarget: HTMLElement }): DropWhere {
+  const box = e.currentTarget.getBoundingClientRect()
+  const part = (e.clientY - box.top) / box.height
+  if (!Number.isFinite(part) || part < 0.25) return 'before'
+  if (part > 0.75) return 'after'
+  return 'inside'
+}
+
+/** A "+" line that turns into a name field; Enter adds, Esc or leaving cancels. */
+function AddRow({ label, depth, onAdd }: { label: string; depth: number; onAdd: (title: string) => void }) {
+  const [typing, setTyping] = useState(false)
+  if (!typing)
+    return (
+      <button
+        type="button"
+        onClick={() => setTyping(true)}
+        style={{ all: 'unset', cursor: 'pointer', marginLeft: depth * INDENT + 22, padding: '4px 8px', fontFamily: sans, fontSize: 12, color: ink.green }}
+      >
+        + {label}
+      </button>
+    )
+  return (
+    <input
+      autoFocus
+      aria-label={label}
+      placeholder={label}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') setTyping(false)
+        if (e.key !== 'Enter') return
+        const v = e.currentTarget.value.trim()
+        setTyping(false)
+        if (v) onAdd(v)
+      }}
+      onBlur={() => setTyping(false)}
+      style={{ marginLeft: depth * INDENT + 22, boxSizing: 'border-box', width: `calc(100% - ${depth * INDENT + 22}px)`, border: `1px solid ${ink.green}`, background: paper.white, fontFamily: sans, fontSize: 13, padding: '4px 8px', outline: 'none' }}
+    />
+  )
+}
+
 function Leaf({
   name,
   depth,
@@ -87,6 +148,7 @@ function Leaf({
   dot,
   meta,
   fold,
+  drag,
   onClick,
 }: {
   name: string
@@ -96,10 +158,33 @@ function Leaf({
   meta?: string
   /** Present on a node that has children: whether they are shown, and the toggle. */
   fold?: { open: boolean; toggle: () => void }
+  /** Present on a node that can be dragged and dropped on. */
+  drag?: DragProps
   onClick: () => void
 }) {
+  const mark = drag?.mark
   return (
-    <div style={{ display: 'flex', alignItems: 'center', marginLeft: depth * INDENT, borderLeft: `1px solid ${paper.rule}` }}>
+    <div
+      draggable={!!drag}
+      onDragStart={drag?.onDragStart}
+      onDragOver={drag?.onDragOver}
+      onDragLeave={drag?.onDragLeave}
+      onDrop={drag?.onDrop}
+      onDragEnd={drag?.onDragEnd}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        marginLeft: depth * INDENT,
+        borderLeft: `1px solid ${paper.rule}`,
+        // Where the drop will land: a line above or below, or the whole row lit for "inside".
+        boxShadow: mark === 'before' ? `inset 0 2px 0 ${ink.green}` : mark === 'after' ? `inset 0 -2px 0 ${ink.green}` : 'none',
+        outline: mark === 'inside' ? `2px solid ${ink.green}` : 'none',
+        outlineOffset: -2,
+        borderRadius: mark === 'inside' ? radius : 0,
+        opacity: drag?.dragging ? 0.45 : 1,
+        cursor: drag ? 'grab' : undefined,
+      }}
+    >
       <button
         type="button"
         aria-label={fold ? `${fold.open ? 'Gập' : 'Mở'} ${name}` : undefined}
@@ -169,6 +254,73 @@ export function ConfigTree({
       return next
     })
 
+  // ── topic tree: add, and drag into, out of and between branches ─────────
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [dropAt, setDropAt] = useState<{ id: string; where: DropWhere } | null>(null)
+  // The order the tree is drawn in, which `planMove` keeps for everything it does not move.
+  const shownTopics = () => flattenTree(buildTree([...topics].sort((a, b) => a.sort_order - b.sort_order))).map((n) => n.row)
+  const plan = (target: string, where: DropWhere) => (dragging ? planMove(shownTopics(), dragging, target, where) : null)
+
+  const reload = () =>
+    listTopics()
+      .then(setTopics)
+      .catch((e) => toast.fromError(e))
+
+  async function dropTopic(target: string, where: DropWhere) {
+    const id = dragging
+    const p = plan(target, where)
+    setDragging(null)
+    setDropAt(null)
+    if (!id || !p) return
+    if ('error' in p) return toast.error(p.error)
+    const before = topics.find((t) => t.id === id)
+    try {
+      // Parent first: the server checks depth on the parent change, and the
+      // order only means anything once the node sits where it is going.
+      if ((before?.parent_id ?? null) !== p.parentId) await updateTopic(id, { parent_id: p.parentId })
+      await reorderTopics(p.order)
+      // A drop inside a folded subject opens it, so the row does not vanish.
+      if (p.parentId)
+        setFolded((f) => {
+          const next = new Set(f)
+          next.delete(`t:${p.parentId}`)
+          return next
+        })
+    } catch (e) {
+      toast.fromError(e)
+    }
+    await reload()
+  }
+
+  const dragOf = (id: string): DragProps => ({
+    onDragStart: () => setDragging(id),
+    onDragOver: (e) => {
+      e.preventDefault()
+      const where = whereIn(e)
+      const p = plan(id, where)
+      if (!p || 'error' in p) return dropAt && setDropAt(null)
+      if (dropAt?.id !== id || dropAt.where !== where) setDropAt({ id, where })
+    },
+    onDragLeave: () => dropAt?.id === id && setDropAt(null),
+    onDrop: (e) => {
+      e.preventDefault()
+      void dropTopic(id, whereIn(e))
+    },
+    onDragEnd: () => (setDragging(null), setDropAt(null)),
+    dragging: dragging === id,
+    mark: dropAt?.id === id && dragging !== id ? dropAt.where : null,
+  })
+
+  async function addTopic(title: string, parent: string | null) {
+    try {
+      const t = await createTopic(title, parent)
+      setTopics((ts) => [...ts, t])
+      setPicked({ kind: 'topic', id: t.id })
+    } catch (e) {
+      toast.fromError(e)
+    }
+  }
+
   useEffect(() => {
     Promise.all([listTopics(), listKeywords()])
       .then(([t, k]) => {
@@ -179,8 +331,34 @@ export function ConfigTree({
   }, [toast])
 
   const sorted = useMemo(() => [...topics].sort((a, b) => a.sort_order - b.sort_order), [topics])
-  const subjects = sorted.filter((t) => t.parent_id === null)
   const kidsOf = (id: string) => sorted.filter((t) => t.parent_id === id)
+  const topicTree = useMemo(() => buildTree(sorted), [sorted])
+
+  /*
+   * One node and, unless folded, its branch. The node being edited also gets
+   * a "+" line for a new entry inside it — the way to start a deeper level
+   * without a "+" on every row of the tree.
+   */
+  const topicNode = ({ row: t, children, depth }: TopicNode): ReactNode => {
+    const open = !folded.has(`t:${t.id}`)
+    const editing = same(picked, { kind: 'topic', id: t.id })
+    return (
+      <div key={t.id}>
+        <Leaf
+          name={t.title}
+          depth={depth}
+          dot={t.accent ?? ancestorsOf(sorted, t.id).reverse().find((a) => a.accent)?.accent ?? null}
+          meta={String(t.posts)}
+          on={editing}
+          fold={children.length ? { open, toggle: () => toggle(`t:${t.id}`) } : undefined}
+          drag={dragOf(t.id)}
+          onClick={() => setPicked({ kind: 'topic', id: t.id })}
+        />
+        {open && children.map(topicNode)}
+        {editing && <AddRow label={`mục trong ${t.title}`} depth={depth + 1} onAdd={(title) => void addTopic(title, t.id)} />}
+      </div>
+    )
+  }
   const moduleRows = useMemo(() => flattenTree(buildTree([...modules].sort(bySiteOrder))), [modules])
   // A module is shown when no ancestor of it is folded.
   const hidden = (id: string): boolean => {
@@ -216,28 +394,8 @@ export function ConfigTree({
       ))}
 
       <Card title={BRANCHES[0].t} note={BRANCHES[0].d} on={picked?.kind === 'topic'} open={branchOpen('topics')} onClick={() => toggle('topics')} />
-      {branchOpen('topics') &&
-        subjects.map((s) => {
-          const kids = kidsOf(s.id)
-          const open = !folded.has(`t:${s.id}`)
-          return (
-            <div key={s.id}>
-              <Leaf
-                name={s.title}
-                depth={0}
-                dot={s.accent}
-                meta={String(s.posts)}
-                on={same(picked, { kind: 'topic', id: s.id })}
-                fold={kids.length ? { open, toggle: () => toggle(`t:${s.id}`) } : undefined}
-                onClick={() => setPicked({ kind: 'topic', id: s.id })}
-              />
-              {open &&
-                kids.map((t) => (
-                  <Leaf key={t.id} name={t.title} depth={1} dot={t.accent ?? s.accent} meta={String(t.posts)} on={same(picked, { kind: 'topic', id: t.id })} onClick={() => setPicked({ kind: 'topic', id: t.id })} />
-                ))}
-            </div>
-          )
-        })}
+      {branchOpen('topics') && topicTree.map(topicNode)}
+      {branchOpen('topics') && <AddRow label="subject mới" depth={0} onAdd={(title) => void addTopic(title, null)} />}
 
       {COPY.slice(1).map((c) => (
         <Card key={c.key} title={c.t} note={c.d} on={same(picked, { kind: 'copy', key: c.key })} onClick={() => setPicked({ kind: 'copy', key: c.key })} />
@@ -280,8 +438,7 @@ export function ConfigTree({
             topic={t}
             parent={t.parent_id ? topics.find((x) => x.id === t.parent_id) : undefined}
             kids={kidsOf(t.id)}
-            subjects={subjects}
-            tree={subjects.flatMap((s) => [s, ...kidsOf(s.id)])}
+            tree={flattenTree(topicTree).map((n) => n.row)}
             count={t.posts}
             used={[...new Set(topics.map((x) => x.accent).filter((c): c is string => !!c))]}
             save={(patch) => void saveTopic(t.id, patch)}

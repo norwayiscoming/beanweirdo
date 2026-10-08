@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react'
+import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import {
   createKeyword,
   listKeywords,
@@ -40,12 +41,20 @@ const select: CSSProperties = {
 
 const label: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 }
 
-/** Subjects in order, each followed by its topics — the tree as one list. */
-export function topicOptions(topics: readonly Topic[]): { subject: Topic; children: Topic[] }[] {
+/**
+ * Subjects in order, each followed by every topic under it at any depth — the
+ * tree as one list. `path` names a topic by its whole branch below the subject
+ * (`roasting › maillard`), since two topics in different branches may share a name.
+ */
+export function topicOptions(topics: readonly Topic[]): { subject: Topic; children: { topic: Topic; path: string }[] }[] {
   const byOrder = [...topics].sort((a, b) => a.sort_order - b.sort_order)
-  return byOrder
-    .filter((t) => t.parent_id === null)
-    .map((subject) => ({ subject, children: byOrder.filter((t) => t.parent_id === subject.id) }))
+  return buildTree(byOrder).map(({ row: subject, children }) => ({
+    subject,
+    children: flattenTree(children).map(({ row: topic }) => ({
+      topic,
+      path: [...ancestorsOf(byOrder, topic.id), topic].map((t) => t.title).join(' › '),
+    })),
+  }))
 }
 
 export function PostPlacement({
@@ -109,9 +118,9 @@ export function PostPlacement({
           {topicOptions(topics).map(({ subject, children }) => (
             <optgroup key={subject.id} label={subject.title}>
               <option value={subject.id}>{subject.title}</option>
-              {children.map((t) => (
+              {children.map(({ topic: t, path }) => (
                 <option key={t.id} value={t.id}>
-                  {subject.title} › {t.title}
+                  {path}
                 </option>
               ))}
             </optgroup>

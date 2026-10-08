@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { watchModules } from './modulesChanged'
 import { bySiteOrder } from '../lib/moduleOrder'
-import { rootsOf } from '../lib/contentTree'
+import { ancestorsOf, rootsOf } from '../lib/contentTree'
 import { supabase } from '../lib/supabaseClient'
 import { groupPosts, resolveRule, toRule, type ListingRule, type PostGroup, type RuleTopic } from '../lib/listingRule'
 import type { PostRow } from './usePublishedPosts'
@@ -217,16 +217,17 @@ export function buildPages(store: Store): PageRow[] {
   for (const t of topics) {
     const tpl = template(t.parent_id === null ? 'template_subject' : 'template_topic')
     const own = override('topic', t.id)
-    const parent = t.parent_id ? topics.find((p) => p.id === t.parent_id) : undefined
+    // Nearest first: a topic with no colour of its own wears the closest ancestor's.
+    const above = ancestorsOf(topics, t.id).reverse()
+    const inherit = <K extends 'accent' | 'on_color' | 'tint' | 'tint2'>(k: K) => above.find((a) => a[k])?.[k]
     const look = present(
       {
         title: t.title,
         blurb: t.intro,
-        // A topic with no colour of its own wears its subject's.
-        accent: t.accent ?? parent?.accent ?? BLANK.accent,
-        on_color: t.on_color ?? parent?.on_color ?? BLANK.on_color,
-        tint: t.tint ?? parent?.tint ?? '',
-        tint2: t.tint2 ?? parent?.tint2 ?? '',
+        accent: t.accent ?? inherit('accent') ?? BLANK.accent,
+        on_color: t.on_color ?? inherit('on_color') ?? BLANK.on_color,
+        tint: t.tint ?? inherit('tint') ?? '',
+        tint2: t.tint2 ?? inherit('tint2') ?? '',
       },
       [tpl?.presentation, own?.presentation],
       modules,

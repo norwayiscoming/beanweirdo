@@ -31,6 +31,8 @@ import { StatusBadge } from './StatusBadge'
 import { MovePostDialog } from './MovePostDialog'
 import { PostAuthorsDialog } from './PostAuthorsDialog'
 import { SectionHead, plusButton } from './SectionHead'
+import { ancestorsOf, buildTree, descendantIds, flattenTree } from '../../lib/contentTree'
+import { planMove } from '../../lib/treeMove'
 
 /**
  * Nội dung — the posts and the three vocabularies that file them, on one
@@ -334,8 +336,11 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const childrenOf = (id: string) => sorted.filter((t) => t.parent_id === id)
   const topicById = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics])
   const live = useMemo(() => posts.filter((p) => p.status !== 'deleted'), [posts])
+  // A post sits under a node when the node is its topic or any ancestor of it.
   const inTopic = (p: PostSummary, id: string) =>
-    id === UNPLACED ? !p.topic_id : p.topic_id === id || topicById.get(p.topic_id ?? '')?.parent_id === id
+    id === UNPLACED ? !p.topic_id : p.topic_id === id || (!!p.topic_id && ancestorsOf(topics, p.topic_id).some((a) => a.id === id))
+  /** The whole tree, parents before their children, at any depth. */
+  const shown = useMemo(() => flattenTree(buildTree(sorted)), [sorted])
   const kwOf = (p: PostSummary) => p.keywords ?? []
   const postsOf = (vocab: Vocab, id: string, from = live) =>
     from.filter((p) => (vocab === 'topic' ? inTopic(p, id) : vocab === 'tpl' ? p.template === id : kwOf(p).includes(id)))
@@ -373,26 +378,23 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   // ── topic tree drag: reorder and reparent are one gesture ─────────────────
   const [drag, setDrag] = useState<string | null>(null)
   const [over, setOver] = useState<string | null>(null)
+  /*
+   * The rail has no drop zones, so the gesture is read from the two rows: onto
+   * a sibling means "stand before it", onto anything else means "file inside
+   * it". Taking a node back out to a shallower level, or any drop that needs
+   * a precise spot, is done in Cấu hình's tree, which has the zones.
+   */
   function drop(targetId: string) {
     const from = drag ? topicById.get(drag) : undefined
     const target = topicById.get(targetId)
     setDrag(null)
     setOver(null)
     if (!from || !target || from.id === target.id) return
-    if (from.parent_id === null) {
-      if (target.parent_id !== null) return
-      const order = subjects.map((s) => s.id).filter((id) => id !== from.id)
-      order.splice(order.indexOf(target.id), 0, from.id)
-      run(() => reorderTopics(order))
-      return
-    }
-    const parent = target.parent_id ?? target.id
-    const siblings = childrenOf(parent).map((c) => c.id).filter((id) => id !== from.id)
-    if (target.parent_id === null) siblings.push(from.id)
-    else siblings.splice(siblings.indexOf(target.id), 0, from.id)
+    const plan = planMove(shown.map((n) => n.row), from.id, target.id, from.parent_id === target.parent_id ? 'before' : 'inside')
+    if ('error' in plan) return setErr(plan.error)
     run(async () => {
-      if (from.parent_id !== parent) await updateTopic(from.id, { parent_id: parent })
-      await reorderTopics(siblings)
+      if (from.parent_id !== plan.parentId) await updateTopic(from.id, { parent_id: plan.parentId })
+      await reorderTopics(plan.order)
     })
   }
   const dragOf = (id: string) => ({
@@ -542,38 +544,24 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const rail = (
     <nav aria-label="Phân loại" className="cw-rail" style={{ borderRight: `1px solid ${paper.rule}`, background: paper.white, paddingBottom: 18 }}>
       <SectionHead id="content.topics" title="Chủ đề" add={{ label: 'subject', onAdd: (title) => run(() => createTopic(title, null)) }}>
-        {subjects.map((s) => (
-          <div key={s.id}>
-            <RailRow
-              name={s.title}
-              big
-              count={postsOf('topic', s.id).length}
-              on={f.topic === s.id}
-              open={cfg?.vocab === 'topic' && cfg.id === s.id}
-              onClick={() => toggle('topic', s.id)}
-              onMore={() => open('topic', s.id)}
-              dot={<Dot own={s.accent} />}
-              flag={s.visibility === 'private' ? 'riêng tư' : undefined}
-              drag={dragOf(s.id)}
-              onPlus={() => setAddingTopic(addingTopic === s.id ? null : s.id)}
-            />
-            {childrenOf(s.id).map((c) => (
+        {shown.map(({ row: t, depth }) => (
+            <div key={t.id}>
               <RailRow
-                key={c.id}
-                name={c.title}
-                indent={30}
-                count={postsOf('topic', c.id).length}
-                on={f.topic === c.id}
-                open={cfg?.vocab === 'topic' && cfg.id === c.id}
-                onClick={() => toggle('topic', c.id)}
-                onMore={() => open('topic', c.id)}
-                dot={<Dot own={c.accent} inherited={s.accent} />}
-                flag={c.visibility === 'private' ? 'riêng tư' : undefined}
-                drag={dragOf(c.id)}
+                name={t.title}
+                big={depth === 0}
+                indent={14 + depth * 16}
+                count={postsOf('topic', t.id).length}
+                on={f.topic === t.id}
+                open={cfg?.vocab === 'topic' && cfg.id === t.id}
+                onClick={() => toggle('topic', t.id)}
+                onMore={() => open('topic', t.id)}
+                dot={<Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
+                flag={t.visibility === 'private' ? 'riêng tư' : undefined}
+                drag={dragOf(t.id)}
+                onPlus={() => setAddingTopic(addingTopic === t.id ? null : t.id)}
               />
-            ))}
-            {addingTopic === s.id && <AddInline text={`topic mới trong ${s.title}`} indent={47} onAdd={(title) => run(() => createTopic(title, s.id))} onDone={() => setAddingTopic(null)} />}
-          </div>
+              {addingTopic === t.id && <AddInline text={`topic mới trong ${t.title}`} indent={31 + depth * 16} onAdd={(title) => run(() => createTopic(title, t.id))} onDone={() => setAddingTopic(null)} />}
+            </div>
         ))}
         {unplaced > 0 && <RailRow name="chưa xếp" count={unplaced} on={f.topic === UNPLACED} onClick={() => toggle('topic', UNPLACED)} />}
       </SectionHead>
@@ -744,7 +732,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
       {selected.length > 0 && (
         <BulkBar
           count={selected.length}
-          topics={subjects.flatMap((s) => [s, ...childrenOf(s.id)])}
+          topics={shown.map((n) => n.row)}
           keywords={keywords}
           busy={busy}
           onField={bulk}
@@ -774,8 +762,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           topic={t}
           parent={t.parent_id ? topicById.get(t.parent_id) : undefined}
           kids={childrenOf(t.id)}
-          subjects={subjects}
-          tree={subjects.flatMap((s) => [s, ...childrenOf(s.id)])}
+          tree={shown.map((n) => n.row)}
           count={postsOf('topic', t.id, posts).filter((p) => p.topic_id === t.id).length}
           used={[...new Set(topics.map((x) => x.accent).filter((c): c is string => !!c))]}
           save={(patch) => run(() => updateTopic(t.id, patch))}
@@ -868,7 +855,7 @@ function BulkBar({
   return (
     <div role="toolbar" aria-label="Sửa nhiều bài" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', background: ink.base, color: paper.cream, padding: '9px 14px', fontFamily: sans, fontSize: 13 }}>
       <b style={{ marginRight: 8, fontWeight: 500 }}>{count} bài</b>
-      {pick('Chủ đề', topics.map((t) => [t.id, t.parent_id ? `  › ${t.title}` : t.title]), (v) => onField('topic_id', v))}
+      {pick('Chủ đề', topics.map((t) => [t.id, `${'  '.repeat(ancestorsOf(topics, t.id).length)}${t.parent_id ? '› ' : ''}${t.title}`]), (v) => onField('topic_id', v))}
       {keywords.length > 0 && pick('+ Tag', keywords.map((k) => [k.id, k.label]), (v) => onField('kw+', v))}
       {keywords.length > 0 && pick('− Tag', keywords.map((k) => [k.id, k.label]), (v) => onField('kw-', v))}
       {pick('Trạng thái', BULK_STATUS.map((b) => [b.action, b.label]), (v) => onStatus(v as StatusAction))}
@@ -912,7 +899,6 @@ export function TopicSettings({
   topic,
   parent,
   kids,
-  subjects,
   tree,
   count,
   used,
@@ -923,7 +909,6 @@ export function TopicSettings({
   topic: Topic
   parent?: Topic
   kids: Topic[]
-  subjects: Topic[]
   tree: Topic[]
   /** Posts filed on this node itself, children not counted. */
   count: number
@@ -998,17 +983,20 @@ export function TopicSettings({
       <Field name="Lời dẫn">
         <textarea aria-label="Lời dẫn" key={topic.intro} defaultValue={topic.intro} rows={3} onBlur={(e) => e.target.value !== topic.intro && save({ intro: e.target.value })} style={{ ...box, resize: 'vertical', lineHeight: 1.5 }} />
       </Field>
-      {parent && subjects.length > 1 && (
-        <Field name="Thuộc subject">
-          <select aria-label="Thuộc subject" value={topic.parent_id ?? ''} onChange={(e) => save({ parent_id: e.target.value })} style={box}>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title}
+      {/* Any node outside this one's own branch can hold it; none at all makes it a subject. */}
+      <Field name="Nằm trong">
+        <select aria-label="Nằm trong" value={topic.parent_id ?? ''} onChange={(e) => save({ parent_id: e.target.value || null })} style={box}>
+          <option value="">— tầng trên cùng (subject) —</option>
+          {tree
+            .filter((t) => !descendantIds(tree, topic.id).includes(t.id))
+            .map((t) => (
+              <option key={t.id} value={t.id}>
+                {'  '.repeat(ancestorsOf(tree, t.id).length)}
+                {t.title}
               </option>
             ))}
-          </select>
-        </Field>
-      )}
+        </select>
+      </Field>
       {onRetire && <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
         {kids.length > 0 ? (
           <span style={{ fontFamily: sans, fontSize: 12, color: ink.muted }}>còn {kids.length} topic</span>
