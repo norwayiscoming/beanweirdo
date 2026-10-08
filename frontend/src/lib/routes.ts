@@ -64,8 +64,8 @@ const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adPortDesign}`]: 'cms',
 })
 
-/** Nội dung (posts and the vocabularies filing them) · Quản lý trang · Cấu hình · Cài đặt hiển thị · Tác giả. */
-export type CmsTab = 'posts' | 'pages' | 'tree' | 'display' | 'authors'
+/** Nội dung (posts and the vocabularies filing them) · Cấu hình (every page and its settings) · Cài đặt hiển thị · Tác giả. */
+export type CmsTab = 'posts' | 'pages' | 'display' | 'authors'
 
 /** Portfolio has two tabs: port pages (create, arrange) and the design system. */
 export type PortTab = 'pages' | 'content' | 'design'
@@ -82,20 +82,20 @@ const portTabs = (w: RouteWords): Record<string, PortTab> => ({
  * two tabs are separate addresses because they are separate places to be — a
  * link to the settings should not open the post list.
  *
- * `/ad-sitemap` and `/ad-page-content` were the two halves that are now one
+ * `/ad-sitemap`, `/ad-page-content`, `/ad-config` were tabs that are now one
  * tab. They still read, because links to them are already out there; only
- * `/ad-config` is written from here on.
+ * `/ad-cau-hinh` is written from here on.
  */
 const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
   [`${w.admin}-${w.adPost}`]: 'posts',
-  // Cấu hình folded into Quản lý trang; its old address still lands there.
+  // Cấu hình and Quản lý trang are one tab since 2026-10-08; every old address lands on it.
   [`${w.admin}-${w.adConfig}`]: 'pages',
-  [`${w.admin}-${w.adTree}`]: 'tree',
+  [`${w.admin}-${w.adTree}`]: 'pages',
   [`${w.admin}-${w.adAuthors}`]: 'authors',
   // Phân loại folded into Nội dung; its old address still lands there.
   [`${w.admin}-${w.adTaxonomy}`]: 'posts',
   [`${w.admin}-${w.adSitemap}`]: 'pages',
-  // Nội dung trang folded into Quản lý trang; its old address still lands there.
+  // Nội dung trang folded into Quản lý trang, now Cấu hình; its old address still lands there.
   [`${w.admin}-${w.adPageContent}`]: 'pages',
   [`${w.admin}-${w.adDisplay}`]: 'display',
   [`${w.admin}-${w.adPortfolio}`]: 'pages',
@@ -104,8 +104,7 @@ const cmsTabs = (w: RouteWords = activeWords()): Record<string, CmsTab> => ({
 })
 const pageOfTab = (w: RouteWords): Record<CmsTab, string> => ({
   posts: `${w.admin}-${w.adPost}`,
-  pages: `${w.admin}-${w.adSitemap}`,
-  tree: `${w.admin}-${w.adTree}`,
+  pages: `${w.admin}-${w.adTree}`,
   display: `${w.admin}-${w.adDisplay}`,
   authors: `${w.admin}-${w.adAuthors}`,
 })

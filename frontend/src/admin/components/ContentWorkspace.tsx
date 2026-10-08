@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   createKeyword,
   createPost,
@@ -9,7 +9,6 @@ import {
   listKeywords,
   listPosts,
   listTopics,
-  renameKeyword,
   reorderTopics,
   saveOverride,
   transitionStatus,
@@ -23,16 +22,15 @@ import {
   type Topic,
 } from '../lib/apiClient'
 import { ink, paper, sans, serif } from '../../design/tokens'
-import { TAG_PAGE, toPath } from '../../lib/routes'
+import { TAG_PAGE } from '../../lib/routes'
 import { useNav } from '../../lib/nav'
 import { TEMPLATE_KEYS, templateName } from '../../lib/templateNames'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { StatusBadge } from './StatusBadge'
 import { MovePostDialog } from './MovePostDialog'
 import { PostAuthorsDialog } from './PostAuthorsDialog'
-import { SectionHead, plusButton } from './SectionHead'
+import { SectionHead } from './SectionHead'
 import { ancestorsOf, buildTree, descendantIds, flattenTree } from '../../lib/contentTree'
-import { planMove } from '../../lib/treeMove'
 
 /**
  * Nội dung — the posts and the three vocabularies that file them, on one
@@ -41,8 +39,13 @@ import { planMove } from '../../lib/treeMove'
  *
  * Left: every vocabulary entry with its live count; a click filters the list.
  * Middle: the posts themselves, bulk-editable. Right, only when asked for (⋯):
- * one entry's settings — rename, colour, merge, retire — beside the very posts
- * it would touch, which the middle column is then filtered to.
+ * merging or deleting one entry, beside the very posts it would touch, which
+ * the middle column is then filtered to.
+ *
+ * Naming, colouring, adding and arranging topics and tags is Cấu hình's job
+ * (owner, 2026-10-08): the tree was in three tabs and a click on the same
+ * entry did a different thing in each. Retiring stays here because only this
+ * screen shows the posts it moves.
  */
 
 type Vocab = 'topic' | 'tpl' | 'kw'
@@ -107,9 +110,9 @@ const quiet: CSSProperties = { ...link, color: ink.muted }
 const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSize: 11.5, padding: '0 7px', lineHeight: '18px', border: `1px solid ${paper.rule}`, borderRadius: 10, color: ink.soft, whiteSpace: 'nowrap', cursor: 'pointer', background: 'none', margin: '1px 3px 1px 0' }
 
 const CSS = `
-.cw-r .cw-more,.cw-r .cw-grip{opacity:0}
+.cw-r .cw-more{opacity:0}
 .cw-r:hover{background:${paper.hover}}
-.cw-r:hover .cw-more,.cw-r:hover .cw-grip,.cw-r.cw-open .cw-more{opacity:1}
+.cw-r:hover .cw-more,.cw-r.cw-open .cw-more{opacity:1}
 .cw-r:focus-visible,.cw-row:focus-within{outline:2px solid ${ink.green};outline-offset:-2px}
 .cw-more:hover{background:${paper.rule}}
 .cw-row .cw-act{opacity:0}
@@ -128,29 +131,7 @@ function Dot({ own, inherited }: { own: string | null; inherited?: string | null
   )
 }
 
-/** The name of a new topic, typed under the subject whose "+" opened it. */
-function AddInline({ text, onAdd, onDone, indent = 16 }: { text: string; onAdd: (title: string) => void; onDone: () => void; indent?: number }) {
-  return (
-    <div style={{ padding: `3px 12px 6px ${indent}px` }}>
-      <input
-        autoFocus
-        aria-label={text}
-        placeholder={text}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') onDone()
-          if (e.key !== 'Enter') return
-          const v = e.currentTarget.value.trim()
-          onDone()
-          if (v) onAdd(v)
-        }}
-        onBlur={onDone}
-        style={{ ...box, padding: '4px 8px', borderColor: ink.green }}
-      />
-    </div>
-  )
-}
-
-/** One entry in the left column: a click filters, ⋯ opens its settings. */
+/** One entry in the left column: a click filters, ⋯ opens merging and deleting. */
 function RailRow({
   name,
   count,
@@ -162,8 +143,6 @@ function RailRow({
   big,
   dot,
   flag,
-  drag,
-  onPlus,
 }: {
   name: string
   count: number
@@ -175,9 +154,6 @@ function RailRow({
   big?: boolean
   dot?: ReactNode
   flag?: string
-  /** A subject's "+": a new topic inside it. */
-  onPlus?: () => void
-  drag?: { draggable: true; onDragStart: () => void; onDragOver: (e: DragEvent) => void; onDrop: () => void; onDragEnd: () => void; over: boolean; dragging: boolean }
 }) {
   return (
     <div
@@ -187,54 +163,28 @@ function RailRow({
       className={`cw-r${open ? ' cw-open' : ''}`}
       onClick={onClick}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onClick())}
-      draggable={drag?.draggable}
-      onDragStart={drag?.onDragStart}
-      onDragOver={drag?.onDragOver}
-      onDrop={drag?.onDrop}
-      onDragEnd={drag?.onDragEnd}
       style={{
         display: 'grid',
-        gridTemplateColumns: `${drag ? '10px ' : ''}${dot ? '9px ' : ''}minmax(0,1fr) auto ${onPlus ? '20px ' : ''}18px`,
+        gridTemplateColumns: `${dot ? '9px ' : ''}minmax(0,1fr) auto 18px`,
         gap: 7,
         alignItems: 'center',
         padding: `5px 8px 5px ${indent}px`,
         cursor: 'pointer',
         background: on ? SEL : undefined,
-        boxShadow: drag?.over && !drag.dragging ? `inset 0 2px 0 ${ink.green}` : on ? `inset 3px 0 0 ${ink.green}` : undefined,
-        opacity: drag?.dragging ? 0.4 : 1,
+        boxShadow: on ? `inset 3px 0 0 ${ink.green}` : undefined,
       }}
     >
-      {drag && (
-        <span className="cw-grip" aria-hidden style={{ color: ink.faint, fontSize: 9, cursor: 'grab' }}>
-          ⋮⋮
-        </span>
-      )}
       {dot}
       <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: ink.base, ...(big ? { fontFamily: serif, fontSize: 15.5 } : { fontFamily: sans, fontSize: 13 }) }}>
         {name}
         {flag && <span style={{ fontFamily: sans, fontSize: 10, color: WARN, marginLeft: 6 }}>{flag}</span>}
       </span>
       <span style={{ fontFamily: sans, fontSize: 11.5, color: count ? ink.muted : ink.faint, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
-      {onPlus && (
-        <span
-          className="cw-more"
-          role="button"
-          aria-label={`Thêm topic vào ${name}`}
-          title={`Thêm topic vào ${name}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onPlus()
-          }}
-          style={{ ...plusButton, width: 18, height: 18, fontSize: 13 }}
-        >
-          +
-        </span>
-      )}
       {onMore ? (
         <span
           className="cw-more"
           role="button"
-          aria-label={`Sửa ${name}`}
+          aria-label={`Gộp hay xoá ${name}`}
           onClick={(e) => {
             e.stopPropagation()
             onMore()
@@ -294,7 +244,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const [cfg, setCfg] = useState<{ vocab: Vocab; id: string } | null>(null)
   const [undo, setUndo] = useState<Undo | null>(null)
   const [busy, setBusy] = useState(false)
-  const [addingTopic, setAddingTopic] = useState<string | null>(null)
   const [moving, setMoving] = useState<PostSummary | null>(null)
   const [naming, setNaming] = useState<PostSummary | null>(null)
 
@@ -374,38 +323,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     if (cfg) setF((o) => ({ ...o, [cfg.vocab]: null }))
     setCfg(null)
   }
-
-  // ── topic tree drag: reorder and reparent are one gesture ─────────────────
-  const [drag, setDrag] = useState<string | null>(null)
-  const [over, setOver] = useState<string | null>(null)
-  /*
-   * The rail has no drop zones, so the gesture is read from the two rows: onto
-   * a sibling means "stand before it", onto anything else means "file inside
-   * it". Taking a node back out to a shallower level, or any drop that needs
-   * a precise spot, is done in Cấu hình's tree, which has the zones.
-   */
-  function drop(targetId: string) {
-    const from = drag ? topicById.get(drag) : undefined
-    const target = topicById.get(targetId)
-    setDrag(null)
-    setOver(null)
-    if (!from || !target || from.id === target.id) return
-    const plan = planMove(shown.map((n) => n.row), from.id, target.id, from.parent_id === target.parent_id ? 'before' : 'inside')
-    if ('error' in plan) return setErr(plan.error)
-    run(async () => {
-      if (from.parent_id !== plan.parentId) await updateTopic(from.id, { parent_id: plan.parentId })
-      await reorderTopics(plan.order)
-    })
-  }
-  const dragOf = (id: string) => ({
-    draggable: true as const,
-    onDragStart: () => setDrag(id),
-    onDragOver: (e: DragEvent) => (e.preventDefault(), setOver(id)),
-    onDrop: () => drop(id),
-    onDragEnd: () => (setDrag(null), setOver(null)),
-    over: over === id,
-    dragging: drag === id,
-  })
 
   // ── post actions ─────────────────────────────────────────────────────────
   const act = (id: string, action: StatusAction) =>
@@ -543,7 +460,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const statusCount = (s: PostStatus) => posts.filter((p) => p.status === s).length
   const rail = (
     <nav aria-label="Phân loại" className="cw-rail" style={{ borderRight: `1px solid ${paper.rule}`, background: paper.white, paddingBottom: 18 }}>
-      <SectionHead id="content.topics" title="Chủ đề" add={{ label: 'subject', onAdd: (title) => run(() => createTopic(title, null)) }}>
+      <SectionHead id="content.topics" title="Chủ đề">
         {shown.map(({ row: t, depth }) => (
             <div key={t.id}>
               <RailRow
@@ -557,10 +474,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                 onMore={() => open('topic', t.id)}
                 dot={<Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
                 flag={t.visibility === 'private' ? 'riêng tư' : undefined}
-                drag={dragOf(t.id)}
-                onPlus={() => setAddingTopic(addingTopic === t.id ? null : t.id)}
               />
-              {addingTopic === t.id && <AddInline text={`topic mới trong ${t.title}`} indent={31 + depth * 16} onAdd={(title) => run(() => createTopic(title, t.id))} onDone={() => setAddingTopic(null)} />}
             </div>
         ))}
         {unplaced > 0 && <RailRow name="chưa xếp" count={unplaced} on={f.topic === UNPLACED} onClick={() => toggle('topic', UNPLACED)} />}
@@ -571,7 +485,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           <RailRow key={t} name={templateName(t)} count={postsOf('tpl', t).length} on={f.tpl === t} onClick={() => toggle('tpl', t)} />
         ))}
       </SectionHead>
-      <SectionHead id="content.tags" title="Tag" add={{ label: 'tag', onAdd: (l) => run(() => createKeyword(l)) }}>
+      <SectionHead id="content.tags" title="Tag">
         {keywords.map((k) => (
           <RailRow
             key={k.id}
@@ -757,15 +671,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     const t = topicById.get(cfg.id)
     if (t)
       settings = (
-        <TopicSettings
+        <TopicRetire
           key={t.id}
           topic={t}
-          parent={t.parent_id ? topicById.get(t.parent_id) : undefined}
           kids={childrenOf(t.id)}
           tree={shown.map((n) => n.row)}
           count={postsOf('topic', t.id, posts).filter((p) => p.topic_id === t.id).length}
-          used={[...new Set(topics.map((x) => x.accent).filter((c): c is string => !!c))]}
-          save={(patch) => run(() => updateTopic(t.id, patch))}
           onRetire={(to) => retireTopic(t, to)}
           onClose={close}
         />
@@ -775,14 +686,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     const k = keywords.find((x) => x.id === cfg.id)
     if (k)
       settings = (
-        <FlatSettings
+        <FlatRetire
           key={k.id}
           kind="Tag"
           entry={k}
           count={postsOf('kw', k.id, posts).length}
           others={keywords.filter((x) => x.id !== k.id)}
-          address={toPath({ area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${k.id}` })}
-          onRename={(l) => run(() => renameKeyword(k.id, l))}
           onRetire={(to) => retireKeyword(k, to)}
           onClose={close}
         />
@@ -809,7 +718,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         {rail}
         {list}
         {settings && (
-          <aside aria-label="Cấu hình" style={{ borderLeft: `1px solid ${paper.rule}`, background: paper.white, padding: '16px 16px 24px', display: 'grid', gap: 16, alignContent: 'start', position: 'sticky', top: 0 }}>
+          <aside aria-label="Gộp hay xoá" style={{ borderLeft: `1px solid ${paper.rule}`, background: paper.white, padding: '16px 16px 24px', display: 'grid', gap: 16, alignContent: 'start', position: 'sticky', top: 0 }}>
             {settings}
           </aside>
         )}
@@ -866,15 +775,17 @@ function BulkBar({
   )
 }
 
-function Head({ kind, count, onClose }: { kind: string; count: number; onClose: () => void }) {
+function Head({ kind, count, onClose }: { kind: string; count: number; onClose?: () => void }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
       <span style={label}>
         {kind} · {count} bài
       </span>
-      <button type="button" aria-label="Đóng" onClick={onClose} style={quiet}>
-        ✕
-      </button>
+      {onClose && (
+        <button type="button" aria-label="Đóng" onClick={onClose} style={quiet}>
+          ✕
+        </button>
+      )}
     </div>
   )
 }
@@ -895,44 +806,30 @@ function NameInput({ value, onSave, big }: { value: string; onSave: (v: string) 
   )
 }
 
+/** A topic's own fields, edited in Cấu hình: name, who sees it, colour, intro, where it sits. */
 export function TopicSettings({
   topic,
   parent,
-  kids,
   tree,
   count,
   used,
   save,
-  onRetire,
-  onClose,
 }: {
   topic: Topic
   parent?: Topic
-  kids: Topic[]
   tree: Topic[]
   /** Posts filed on this node itself, children not counted. */
   count: number
   used: string[]
   save: (patch: Parameters<typeof updateTopic>[1]) => void
-  /** Absent where the screen shows no posts to move (Cấu hình): retiring lives in Nội dung. */
-  onRetire?: (to: string | null) => void
-  onClose: () => void
 }) {
-  const targets = tree.filter((t) => t.id !== topic.id && t.parent_id !== topic.id)
-  const [to, setTo] = useState(parent?.id ?? targets[0]?.id ?? '')
   const setColor = (hex: string | null) => save(hex ? { accent: hex, ...shades(hex) } : { accent: null, on_color: null, tint: null, tint2: null })
   const swatches = [...new Set([...used, ...PALETTE.filter((c) => !used.some((u) => u.toUpperCase() === c))])].slice(0, 9)
-  const address = toPath({ area: 'public', screen: 'module', moduleId: topic.id })
 
   return (
     <>
-      <Head kind={parent ? `${parent.title} › topic` : 'Subject'} count={count} onClose={onClose} />
+      <Head kind={parent ? `${parent.title} › topic` : 'Subject'} count={count} />
       <NameInput value={topic.title} onSave={(title) => save({ title })} big />
-      <Field name="Địa chỉ">
-        <a href={address} target="_blank" rel="noreferrer" style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, color: ink.soft }}>
-          {address} ↗
-        </a>
-      </Field>
       <Field name="Quyền xem">
         <div style={{ display: 'inline-flex', border: `1px solid ${paper.rule}`, width: 'fit-content' }}>
           {(['public', 'private'] as const).map((v) => (
@@ -997,16 +894,57 @@ export function TopicSettings({
             ))}
         </select>
       </Field>
-      {onRetire && <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
+    </>
+  )
+}
+
+/** A tag's own field, edited in Cấu hình: its name. */
+export function FlatSettings({ kind, entry, count, onRename }: { kind: string; entry: { id: string; label: string }; count: number; onRename: (label: string) => void }) {
+  return (
+    <>
+      <Head kind={kind} count={count} />
+      <NameInput value={entry.label} onSave={onRename} />
+      <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.faint }}>{entry.id}</span>
+    </>
+  )
+}
+
+const elsewhere = <span style={{ fontFamily: sans, fontSize: 12, color: ink.muted }}>Đổi tên, màu và chỗ trong cây ở tab Cấu hình.</span>
+
+/** Nội dung's side of a topic: retiring it, with its posts moved somewhere first. */
+function TopicRetire({
+  topic,
+  kids,
+  tree,
+  count,
+  onRetire,
+  onClose,
+}: {
+  topic: Topic
+  kids: Topic[]
+  tree: Topic[]
+  count: number
+  onRetire: (to: string | null) => void
+  onClose: () => void
+}) {
+  const targets = tree.filter((t) => t.id !== topic.id && t.parent_id !== topic.id)
+  const [to, setTo] = useState(topic.parent_id ?? targets[0]?.id ?? '')
+  return (
+    <>
+      <Head kind={topic.parent_id ? 'Topic' : 'Subject'} count={count} onClose={onClose} />
+      <div style={{ fontFamily: serif, fontSize: 22, lineHeight: 1.15, color: ink.base }}>{topic.title}</div>
+      {elsewhere}
+      <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
         {kids.length > 0 ? (
-          <span style={{ fontFamily: sans, fontSize: 12, color: ink.muted }}>còn {kids.length} topic</span>
+          <span style={{ fontFamily: sans, fontSize: 12, color: ink.muted }}>còn {kids.length} mục con, chuyển chúng đi trước khi xoá</span>
         ) : count > 0 ? (
           <>
             <Field name={`Chuyển ${count} bài sang`}>
               <select aria-label={`Chuyển ${count} bài sang`} value={to} onChange={(e) => setTo(e.target.value)} style={box}>
                 {targets.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.parent_id ? `› ${t.title}` : t.title}
+                    {'  '.repeat(ancestorsOf(tree, t.id).length)}
+                    {t.title}
                   </option>
                 ))}
               </select>
@@ -1016,20 +954,17 @@ export function TopicSettings({
         ) : (
           <Confirm text={`Xoá ${topic.title}`} onGo={() => onRetire(null)} />
         )}
-      </div>}
+      </div>
     </>
   )
 }
 
-export function FlatSettings({
+/** Nội dung's side of a tag: merging it into another, or taking it off its posts. */
+function FlatRetire({
   kind,
   entry,
   count,
   others,
-  same,
-  required,
-  address,
-  onRename,
   onRetire,
   onClose,
 }: {
@@ -1037,40 +972,21 @@ export function FlatSettings({
   entry: { id: string; label: string }
   count: number
   others: { id: string; label: string }[]
-  /** What every one of its posts already says elsewhere (a topic, a template). */
-  same?: string | null
-  /** Dạng bài: every post wears one, so its posts must go somewhere. */
-  required?: boolean
-  address?: string
-  onRename: (label: string) => void
-  /** Absent where the screen shows no posts to move (Cấu hình): retiring lives in Nội dung. */
-  onRetire?: (to: string | null) => void
+  onRetire: (to: string | null) => void
   onClose: () => void
 }) {
-  const [to, setTo] = useState(required ? (others.find((o) => o.id === 'note') ?? others[0])?.id ?? '' : '')
+  const [to, setTo] = useState('')
   return (
     <>
       <Head kind={kind} count={count} onClose={onClose} />
-      <NameInput value={entry.label} onSave={onRename} />
-      <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.faint }}>{entry.id}</span>
-      {same && (
-        <div style={{ background: '#F8E6DC', color: ink.base, padding: '8px 10px', fontFamily: sans, fontSize: 12.5 }}>
-          ≡ {count}/{count} bài cũng ở {same}
-        </div>
-      )}
-      {address && (
-        <Field name="Địa chỉ">
-          <a href={address} target="_blank" rel="noreferrer" style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, color: ink.soft }}>
-            {address} ↗
-          </a>
-        </Field>
-      )}
-      {onRetire && <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
+      <div style={{ fontFamily: serif, fontSize: 20, lineHeight: 1.15, color: ink.base }}>{entry.label}</div>
+      {elsewhere}
+      <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
         {count > 0 ? (
           <>
             <Field name={`Chuyển ${count} bài sang`}>
               <select aria-label={`Chuyển ${count} bài sang`} value={to} onChange={(e) => setTo(e.target.value)} style={box}>
-                {!required && <option value="">— bỏ khỏi bài —</option>}
+                <option value="">— bỏ khỏi bài —</option>
                 {others.map((o) => (
                   <option key={o.id} value={o.id}>
                     {o.label}
@@ -1078,12 +994,12 @@ export function FlatSettings({
                 ))}
               </select>
             </Field>
-            <Confirm text={to ? `Chuyển và xoá ${entry.label}` : `Gỡ khỏi ${count} bài và xoá`} disabled={required && !to} onGo={() => onRetire(to || null)} />
+            <Confirm text={to ? `Chuyển và xoá ${entry.label}` : `Gỡ khỏi ${count} bài và xoá`} onGo={() => onRetire(to || null)} />
           </>
         ) : (
-          <Confirm text={`Xoá ${entry.label}`} onGo={() => onRetire(required ? to : null)} disabled={required && !to} />
+          <Confirm text={`Xoá ${entry.label}`} onGo={() => onRetire(null)} />
         )}
-      </div>}
+      </div>
     </>
   )
 }

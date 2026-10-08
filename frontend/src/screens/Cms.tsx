@@ -12,7 +12,7 @@ import {
 } from '../admin/lib/apiClient'
 import { getSite } from '../admin/lib/apiClient'
 import { RoutesPanel } from '../admin/components/RoutesPanel'
-import { PagesManager, type SystemPage } from '../admin/components/PagesManager'
+import type { SystemPage } from '../admin/components/PageSettings'
 import { ModuleImages } from '../admin/components/ModuleImages'
 import { captionColumn, formShapeOf, imageColumn } from '../admin/moduleForm'
 import { FocusPicker } from '../admin/components/FocusPicker'
@@ -92,11 +92,10 @@ const nameRow = 'minmax(0,1fr) 112px 124px 128px'
 const nameRowPlain = 'minmax(0,1fr) 112px'
 
 
-/** The five tabs, named once so the site map and the tab bar cannot drift. */
+/** The four tabs, named once so the site map and the tab bar cannot drift. */
 const TABS = [
   { k: 'posts', t: 'Nội dung' },
-  { k: 'pages', t: 'Quản lý trang' },
-  { k: 'tree', t: 'Cấu hình' },
+  { k: 'pages', t: 'Cấu hình' },
   { k: 'display', t: 'Cài đặt hiển thị' },
   { k: 'authors', t: 'Tác giả' },
 ] as const
@@ -910,7 +909,8 @@ export function Cms() {
       )}
 
       {tab === 'pages' && (
-        <PagesManager
+        <ConfigTree
+          modules={modules}
           renderPractice={() => {
             const practice = site.practice ?? {}
             const save = (patch: { title?: string; accent?: string }) => void saveSite({ practice: { ...practice, ...patch } })
@@ -925,17 +925,6 @@ export function Cms() {
               </div>
             )
           }}
-          renderCopy={(key) => pageCopy[key]}
-          renderModule={(id) => {
-            const m = modules.find((x) => x.id === id)
-            return m ? moduleFields(m) : null
-          }}
-        />
-      )}
-
-      {tab === 'tree' && (
-        <ConfigTree
-          modules={modules}
           renderCopy={(key) => pageCopy[key]}
           renderModule={(id) => {
             const m = modules.find((x) => x.id === id)
