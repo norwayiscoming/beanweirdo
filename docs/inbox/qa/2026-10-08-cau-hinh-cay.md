@@ -1,4 +1,4 @@
-# PR (chưa mở) · nhánh `claude/project-thread-rpmkb1` — tab Cấu hình dạng cây ở `/ad-cau-hinh`
+# PR #63 · nhánh `claude/project-thread-rpmkb1` — tab Cấu hình dạng cây ở `/ad-cau-hinh`
 
 ## [ĐỔI HÀNH VI] Thêm tab thứ năm "Cấu hình" vào Content management
 
@@ -17,7 +17,7 @@ Tôi dựng lại bố cục đó trong một tệp mới, `admin/components/Con
 
 - Cây module cũ không quay lại nguyên dạng: từ #61 trang công khai dựng từ `topics`, module chỉ còn là "hình" mà một trang mượn (`data/useModules.tsx: buildPages`, `presentation.module`). Nên ở đây module chỉ sửa được, không tạo, không xoá, không kéo lồng.
 - Xoá hoặc gộp topic/tag không có ở tab này: `TopicSettings` và `FlatSettings` nhận `onRetire` tuỳ chọn, vắng thì không vẽ khối xoá. Xoá vẫn ở tab Nội dung, nơi thấy được bài sẽ bị chuyển.
-- Địa chỉ: thêm từ `adTree: 'cau-hinh'` (`lib/routeWords.ts: RouteWords, DEFAULT_WORDS, WORD_LABELS, MUST_DIFFER`; `RoutesPanel.tsx: GROUPS`), `CmsTab` thêm `'tree'` (`lib/routes.ts: adminPages, cmsTabs, pageOfTab`). `/ad-config` vẫn mở Quản lý trang như sau #61.
+- Địa chỉ: thêm từ `adTree: 'cau-hinh'` (`lib/routeWords.ts: RouteWords, DEFAULT_WORDS, WORD_LABELS, MUST_DIFFER`; `RoutesPanel.tsx: BLOCKS`), `CmsTab` thêm `'tree'` (`lib/routes.ts: adminPages, cmsTabs, pageOfTab`). `/ad-config` vẫn mở Quản lý trang như sau #61.
 - Thanh tab của CMS xuống dòng khi hẹp (`Cms.tsx`, `flexWrap`) — năm tab không vừa bề ngang điện thoại.
 - `cmsHarness.tsx` trả thêm `vocab=topics` và `vocab=keywords`, mặc định mở tab mới.
 
