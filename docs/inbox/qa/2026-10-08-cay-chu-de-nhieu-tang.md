@@ -1,4 +1,4 @@
-# PR (chưa mở) · nhánh `claude/project-thread-rpmkb1` — cây chủ đề nhiều tầng, kéo vào trong/ra ngoài
+# PR #64 · nhánh `claude/project-thread-rpmkb1` — cây chủ đề nhiều tầng, kéo vào trong/ra ngoài
 
 ## [ĐỔI HÀNH VI] Chủ đề lồng sâu bao nhiêu tầng cũng được
 
