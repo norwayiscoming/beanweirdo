@@ -4,10 +4,10 @@ import { ancestorsOf, descendantIds } from '../../lib/contentTree'
 import { ink, paper, sans } from '../../design/tokens'
 import { Button } from '../../design/Button'
 import { Choice, LineInput, Row } from './Detail'
+import { PALETTE } from '../../lib/tagColor'
 
 /** A topic's and a tag's own fields in the shared detail template, and their delete. */
 
-const PALETTE = ['#9D9167', '#F0B45C', '#F2A0A5', '#7FB87E', '#6FA8C0', '#C25C7C', '#8A6420', '#5C5745']
 
 /** A colour's companions: the dark ink on it and the two washes behind lists. */
 function shades(hex: string): { on_color: string; tint: string; tint2: string } {
@@ -38,23 +38,43 @@ export const VISIBILITY = [
 /** A node's colour — its dot in the tree and its accent on the site — on every site alike. */
 export function ColorRow({ node, parent, used, save }: { node: Node; parent?: Node; used: string[]; save: (patch: Parameters<typeof updateNode>[1]) => void }) {
   const setColor = (hex: string | null) => save(hex ? { accent: hex, ...shades(hex) } : { accent: null, on_color: null, tint: null, tint2: null })
+  return <ColorField value={node.accent} fallback={parent?.accent ?? null} fallbackLabel={parent ? `theo ${parent.title}` : 'chưa có màu'} used={used} onChange={setColor} />
+}
+
+/**
+ * Màu: no colour of its own (the first dot, dashed in the colour it falls back
+ * to), a swatch, or a typed hex. Nodes and tags pick the same way.
+ */
+export function ColorField({
+  value,
+  fallback,
+  fallbackLabel,
+  used,
+  onChange,
+}: {
+  value: string | null
+  fallback: string | null
+  fallbackLabel: string
+  used: string[]
+  onChange: (hex: string | null) => void
+}) {
   const swatches = [...new Set([...used, ...PALETTE.filter((c) => !used.some((u) => u.toUpperCase() === c))])].slice(0, 9)
-  const on = (c: string | null) => (c ? node.accent?.toUpperCase() === c.toUpperCase() : !node.accent)
+  const on = (c: string | null) => (c ? value?.toUpperCase() === c.toUpperCase() : !value)
   return (
     <Row label="Màu">
       <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <button
           type="button"
-          aria-label={parent ? `theo ${parent.title}` : 'chưa có màu'}
+          aria-label={fallbackLabel}
           aria-pressed={on(null)}
-          onClick={() => node.accent && setColor(null)}
-          style={{ ...dot, border: `1.5px ${parent?.accent ? 'dashed' : 'solid'} ${parent?.accent ?? ink.faint}`, outline: on(null) ? `1.5px solid ${ink.base}` : 'none' }}
+          onClick={() => value && onChange(null)}
+          style={{ ...dot, border: `1.5px ${fallback ? 'dashed' : 'solid'} ${fallback ?? ink.faint}`, outline: on(null) ? `1.5px solid ${ink.base}` : 'none' }}
         />
         {swatches.map((c) => (
-          <button key={c} type="button" aria-label={c} aria-pressed={on(c)} onClick={() => setColor(c)} style={{ ...dot, background: c, outline: on(c) ? `1.5px solid ${ink.base}` : 'none' }} />
+          <button key={c} type="button" aria-label={c} aria-pressed={on(c)} onClick={() => onChange(c)} style={{ ...dot, background: c, outline: on(c) ? `1.5px solid ${ink.base}` : 'none' }} />
         ))}
         <span style={{ width: 92 }}>
-          <LineInput label="mã màu" value={node.accent ?? ''} placeholder="#hex" mono onSave={(v) => /^#[0-9a-f]{6}$/i.test(v.trim()) && setColor(v.trim())} />
+          <LineInput label="mã màu" value={value ?? ''} placeholder="#hex" mono onSave={(v) => /^#[0-9a-f]{6}$/i.test(v.trim()) && onChange(v.trim())} />
         </span>
       </span>
     </Row>

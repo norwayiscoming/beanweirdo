@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabaseClient'
 import { groupPosts, resolveRule, toRule, type ListingRule, type PostGroup, type RuleTopic } from '../lib/listingRule'
 import type { PostRow } from './usePublishedPosts'
 import { TAG_PAGE } from '../lib/routes'
+import { tagColor, type Tag } from '../lib/tagColor'
 import type { ModuleLayout } from '../content/layouts'
 export type { ModuleLayout }
 
@@ -106,7 +107,7 @@ type UseModulesResult = {
    */
   groupsOf: (pageId: string) => PostGroup<PostRow>[]
   /** A post's theme tags, by name, in the order they were given. Optional so stubs need not care. */
-  tagsOf?: (postId: string) => { id: string; label: string }[]
+  tagsOf?: (postId: string) => Tag[]
   /** Read everything again — after the CMS changes a rule or a page. */
   reload: () => void
 }
@@ -123,7 +124,7 @@ type PageRecord = {
 }
 type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
 type TopicRecord = RuleTopic & { intro: string; accent: string | null; on_color: string | null; tint: string | null; tint2: string | null; status: string }
-type KeywordRecord = { id: string; label: string }
+type KeywordRecord = { id: string; label: string; color?: string | null }
 
 export type Store = {
   modules: ModuleRow[]
@@ -383,7 +384,8 @@ async function loadStore(): Promise<Store> {
   const [modules, topics, keywords, pages, overrides, rules, postKeywords, posts] = await Promise.all([
     all<ModuleRow>(supabase.from('modules').select('*').order('sort_order', { ascending: true }), true),
     all<TopicRecord>(supabase.from('nodes').select('*').eq('site', 'blog')),
-    all<KeywordRecord>(supabase.from('keywords').select('id, label')),
+    // `*`: `color` (0033) may not exist yet, and naming it would empty the list.
+    all<KeywordRecord>(supabase.from('keywords').select('*')),
     all<PageRecord>(supabase.from('pages').select('*')),
     all<Override>(supabase.from('page_overrides').select('*')),
     all<ListingRule>(supabase.from('listing_rules').select('*')),
@@ -454,8 +456,9 @@ function useModulesQuery(enabled: boolean): UseModulesResult {
         labelOf: (_g, key) => store.keywords.find((k) => k.id === key)?.label ?? key,
       })
     }
-    const labels = new Map(store.keywords.map((k) => [k.id, k.label]))
-    const tagsOf = (postId: string) => (store.postKeywords.get(postId) ?? []).map((id) => ({ id, label: labels.get(id) ?? id }))
+    const byId = new Map(store.keywords.map((k) => [k.id, k]))
+    const tagsOf = (postId: string) =>
+      (store.postKeywords.get(postId) ?? []).map((id) => ({ id, label: byId.get(id)?.label ?? id, color: tagColor(id, byId.get(id)?.color) }))
     return { data, loading, error, postsOf, groupsOf, tagsOf, reload: () => setRound((r) => r + 1) }
   }, [store, loading, error])
 }

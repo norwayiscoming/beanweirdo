@@ -16,6 +16,7 @@ import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useNav } from '../lib/nav'
 import { usePostAuthors } from '../data/usePostAuthors'
 import { Byline } from '../components/Byline'
+import { TagBadges } from '../components/TagBadges'
 import { openModule } from '../lib/moduleTarget'
 
 const status = {
@@ -87,6 +88,8 @@ export function Article() {
         moduleId={post.module_id}
       />
       <Byline authors={authors} />
+      {/* Every template shows the post's tags the same way, as #badges under the trail. */}
+      <TagBadges tags={tagsOf?.(post.id) ?? []} style={{ margin: '4px 0 12px' }} />
     </>
   )
   const moduleTitle = module_?.title ?? post.module_id
