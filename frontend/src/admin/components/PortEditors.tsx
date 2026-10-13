@@ -220,6 +220,13 @@ export function toSlug(name: string): string {
   return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
+/** What a new port page can start from, wherever one is made. */
+export const PRESET_CHOICES: { value: PresetKey; label: string }[] = [
+  { value: 'bibi', label: 'mẫu bibi' },
+  { value: 'bibe', label: 'mẫu bibe' },
+  { value: 'blank', label: 'trang trống' },
+]
+
 /** A new port page from a preset, named by the owner; it starts as a draft at the end of the list. */
 export async function createFromPreset(key: PresetKey, title: string, pages: Node[], moduleIds: string[]): Promise<Node> {
   const slug = uniqueSlug(toSlug(title) || (key === 'blank' ? 'trang' : key), pages)
@@ -700,6 +707,91 @@ const rowBox: CSSProperties = { borderTop: `1px solid ${paper.rule}`, padding: '
 /** "+ Thêm …" as the detail template writes it: a green line of text, not a box. */
 const addLine: CSSProperties = { ...frame, marginTop: 8 }
 
+const NEW = '__new'
+
+/**
+ * "+ Thêm khối" under the home blocks: a page already made but not on the
+ * home yet, or a new page made right here. Either way the page's own "Hiện ở
+ * trang chủ" ends up on, since that switch is the same list.
+ */
+function AddFeature({ pages, onAdd, onNewPage }: { pages: Node[]; onAdd: (pageId: string) => void; onNewPage: (name: string, preset: PresetKey) => Promise<Node> }) {
+  const [open, setOpen] = useState(false)
+  const [which, setWhich] = useState(NEW)
+  const [name, setName] = useState('')
+  const [from, setFrom] = useState<PresetKey>('bibi')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const close = () => {
+    setOpen(false)
+    setName('')
+    setErr('')
+  }
+  const ready = which !== NEW || !!name.trim()
+  const save = async () => {
+    if (!ready || busy) return
+    if (which !== NEW) {
+      onAdd(which)
+      return close()
+    }
+    setBusy(true)
+    try {
+      onAdd((await onNewPage(name.trim(), from)).id)
+      close()
+    } catch (e) {
+      setErr((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+  if (!open)
+    return (
+      <button
+        type="button"
+        className="cfg-btn"
+        style={addLine}
+        onClick={() => {
+          setWhich(pages[0]?.id ?? NEW)
+          setOpen(true)
+        }}
+      >
+        + Thêm khối
+      </button>
+    )
+  const label = { fontFamily: sans, fontSize: 13, fontWeight: 600, color: ink.strong }
+  return (
+    <div style={{ ...rowBox, display: 'grid', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, ...label }}>
+        Trang <Choice label="Trang cho khối mới" options={[...pages.map((p) => ({ value: p.id, label: p.title })), { value: NEW, label: '+ Trang mới' }]} value={which} onChange={setWhich} />
+      </div>
+      {which === NEW && (
+        <>
+          <input
+            autoFocus
+            aria-label="Tên trang mới"
+            placeholder="tên trang mới"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => (e.key === 'Enter' ? void save() : e.key === 'Escape' && close())}
+            style={{ ...boxed, maxWidth: 420 }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, ...label }}>
+            bắt đầu từ <Choice label="bắt đầu từ" options={PRESET_CHOICES} value={from} onChange={setFrom} />
+          </div>
+        </>
+      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button type="button" disabled={!ready || busy} onClick={() => void save()} className="cfg-btn" style={{ ...frame, background: ready ? ink.moss : paper.hover, borderColor: ready ? ink.moss : desk.field, color: ready ? paper.white : ink.muted, cursor: ready ? 'pointer' : 'not-allowed' }}>
+          {busy ? 'Đang tạo…' : 'Lưu'}
+        </button>
+        <button type="button" onClick={close} className="cfg-btn" style={{ ...frame, borderColor: 'transparent', background: 'transparent', color: ink.strong }}>
+          Huỷ
+        </button>
+      </div>
+      {err && <div style={{ color: '#8E1E42', fontFamily: sans, fontSize: 12.5 }}>{err}</div>}
+    </div>
+  )
+}
+
 /**
  * Portfolio › Nội dung trang — the content every port page shares, edited the
  * way Content management edits site copy: grouped fields, autosaved (rule 08.3).
@@ -713,10 +805,13 @@ export function ContentTab({
   setStored,
   pages,
   only,
+  onNewPage,
 }: {
   content: PortContent
   setStored: (f: (s: Record<string, unknown>) => Record<string, unknown>) => void
   pages: Node[]
+  /** Makes a port page from the home's "+ Thêm khối"; it starts as a draft, as one made in Mục lục does. */
+  onNewPage: (name: string, preset: PresetKey) => Promise<Node>
   /** The part Cấu hình has open; its heading and address are the detail template's. */
   only: PortPart
 }) {
@@ -736,9 +831,13 @@ export function ContentTab({
     setGroup('header', { ...header, links: list.map((l): NavOverride => ({ key: l.key, label: l.label, hidden: l.hidden })) })
 
   // Featured pages: what the owner chose, or every published page before any choice.
+  // A draft keeps its block here, so one added from "+ Thêm khối" is ready the day
+  // it is published; the public home skips it until then (homeCards).
+  const kept = pages.filter((p) => p.status !== 'archived')
   const features: Feature[] = home.features.length
-    ? home.features.filter((f) => published.some((p) => p.id === f.pageId))
+    ? home.features.filter((f) => kept.some((p) => p.id === f.pageId))
     : published.map((p) => ({ pageId: p.id, label: '', intro: '', image: '' }))
+  const addFeature = (pageId: string) => saveFeatures([...features, { pageId, label: '', intro: '', image: '' }])
   const saveFeatures = (list: Feature[]) => setGroup('home', { ...home, features: list })
   const featDrag = useRowDrag((from, to) => {
     const next = [...features]
@@ -814,15 +913,18 @@ export function ContentTab({
         {text('Tiêu đề', home.title, (v) => setGroup('home', { ...home, title: v }))}
         {text('Giới thiệu', home.intro, (v) => setGroup('home', { ...home, intro: v }), true)}
       </div>
-      <div style={fieldLabel}>Trang giới thiệu · bật “Hiện ở trang chủ” trên từng trang ở Mục lục</div>
+      <div style={fieldLabel}>Khối trên trang chủ · mỗi khối là một trang port, kéo để đổi thứ tự</div>
       {features.map((f, i) => {
-        const page = published.find((p) => p.id === f.pageId)
+        const page = kept.find((p) => p.id === f.pageId)
         const set = (patch: Partial<Feature>) => saveFeatures(features.map((x, j) => (j === i ? { ...x, ...patch } : x)))
         return (
           <div key={f.pageId} {...dragProps(featDrag, i)} style={{ ...rowBox, opacity: featDrag.from === i ? 0.5 : 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, fontFamily: sans, fontSize: 13 }}>
               {grip}
-              <span style={{ fontFamily: serif, fontSize: 18, flex: 1 }}>{page?.title}</span>
+              <span style={{ fontFamily: serif, fontSize: 18, flex: 1 }}>
+                {page?.title}
+                {page?.status === 'draft' && <span style={{ fontFamily: sans, fontSize: 12, color: ink.soft, marginLeft: 10 }}>nháp · hiện khi trang được đăng</span>}
+              </span>
               <button style={{ border: 0, background: 'none', color: ink.soft, cursor: 'pointer', fontSize: 15 }} aria-label="Bỏ khỏi trang tổng" onClick={() => saveFeatures(features.filter((_, j) => j !== i))}>
                 ×
               </button>
@@ -835,6 +937,7 @@ export function ContentTab({
           </div>
         )
       })}
+      <AddFeature pages={kept.filter((p) => !features.some((f) => f.pageId === p.id))} onAdd={addFeature} onNewPage={onNewPage} />
 
         </>
       )}

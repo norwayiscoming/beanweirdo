@@ -33,7 +33,7 @@ import { radius } from '../../design/controls'
 import { retireKeyword, retireTopic } from '../lib/retire'
 import { Switch, desk, frame, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
 import { RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
-import { Builder, ContentTab, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
+import { Builder, ContentTab, PRESET_CHOICES, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
 import { SiteTabs, useRememberedTab } from './SiteTabs'
 import {
@@ -621,21 +621,18 @@ export function ConfigTree({
   const tocList = (toc: Toc, rows: TocItem[]): ListItem[] =>
     rows.map((r) => ({ id: r.id, name: r.name, meta: r.meta, dot: r.dot, onOpen: pick(r.picked), drag: r.movable ? dragOf(toc, toc.items, r.id) : undefined, actions: deleteOf(r.picked) }))
   const dragNote = (nest: boolean) => (nest ? 'kéo ⋮⋮ để đổi chỗ hay đưa vào trong' : 'kéo ⋮⋮ để đổi chỗ')
+  const newPortPage = async (name: string, key: PresetKey) => {
+    const p = await createFromPreset(key, name, port.pages, src.moduleIds)
+    port.setPages((ps) => [...ps, p])
+    return p
+  }
   const addPortPage: AddSpec = {
     label: 'Thêm trang',
     placeholder: 'tên trang mới',
-    choose: {
-      label: 'bắt đầu từ',
-      options: [
-        { value: 'bibi', label: 'mẫu bibi' },
-        { value: 'bibe', label: 'mẫu bibe' },
-        { value: 'blank', label: 'trang trống' },
-      ],
-    },
+    choose: { label: 'bắt đầu từ', options: PRESET_CHOICES },
     onSave: (name, key) =>
       run(async () => {
-        const p = await createFromPreset((key ?? 'blank') as PresetKey, name, port.pages, src.moduleIds)
-        port.setPages((ps) => [...ps, p])
+        const p = await newPortPage(name, (key ?? 'blank') as PresetKey)
         setPicked({ kind: 'port-page', id: p.id })
       }),
   }
@@ -693,7 +690,7 @@ export function ConfigTree({
       previewKey = portRound
       body = port.loaded ? (
         <Section title={picked.part === 'home' || picked.part === 'about' ? 'Nội dung trang' : 'Thông tin'}>
-          <ContentTab key={picked.part} only={picked.part} content={port.content} setStored={port.setContentStored} pages={port.pages} />
+          <ContentTab key={picked.part} only={picked.part} content={port.content} setStored={port.setContentStored} pages={port.pages} onNewPage={newPortPage} />
         </Section>
       ) : null
       break

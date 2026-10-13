@@ -51,6 +51,7 @@ vi.mock('./PortEditors', () => ({
   ContentTab: ({ only }: { only: string }) => <div>port:{only}</div>,
   Builder: () => null,
   createFromPreset: vi.fn(),
+  PRESET_CHOICES: [{ value: 'bibi', label: 'mẫu bibi' }, { value: 'bibe', label: 'mẫu bibe' }, { value: 'blank', label: 'trang trống' }],
 }))
 
 const { ConfigTree } = await import('./ConfigTree')
