@@ -4,31 +4,30 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const topic = (id: string, parent_id: string | null, sort_order: number, posts = 0) => ({
-  id, parent_id, title: id, intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order, visibility: 'public', posts,
+  id, parent_id, title: id, intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order, status: 'published', posts,
 })
 
 const api = vi.hoisted(() => ({
   getLayout: vi.fn(),
-  listTopics: vi.fn(),
+  listNodes: vi.fn(),
   listKeywords: vi.fn(),
   listTags: vi.fn(),
-  updateTopic: vi.fn(),
+  updateNode: vi.fn(),
   renameKeyword: vi.fn(),
-  reorderTopics: vi.fn(),
-  createTopic: vi.fn(),
+  reorderNodes: vi.fn(),
+  createNode: vi.fn(),
   createKeyword: vi.fn(),
   createPage: vi.fn(),
   createRule: vi.fn(),
   saveOverride: vi.fn(),
   deleteOverride: vi.fn(),
   deletePage: vi.fn(),
-  deletePortPage: vi.fn(),
   updatePage: vi.fn(),
   updateSite: vi.fn(),
   updateRule: vi.fn(),
   listPosts: vi.fn(),
   updatePost: vi.fn(),
-  deleteTopic: vi.fn(),
+  deleteNode: vi.fn(),
   deleteKeyword: vi.fn(),
 }))
 vi.mock('../lib/apiClient', () => api)
@@ -71,12 +70,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
   api.getLayout.mockResolvedValue(layout)
-  api.listTopics.mockResolvedValue([topic('coffee', null, 1), topic('sensory', 'coffee', 2, 3), topic('tea', null, 3)])
+  api.listNodes.mockResolvedValue([topic('coffee', null, 1), topic('sensory', 'coffee', 2, 3), topic('tea', null, 3)])
   api.listKeywords.mockResolvedValue([{ id: 'heat', label: 'heat', posts: 2 }])
   api.listTags.mockResolvedValue([])
-  api.updateTopic.mockResolvedValue({})
-  api.reorderTopics.mockResolvedValue(undefined)
-  api.createTopic.mockImplementation(async (title: string, parent: string | null) => topic(title, parent, 9))
+  api.updateNode.mockResolvedValue({})
+  api.reorderNodes.mockResolvedValue(undefined)
+  api.createNode.mockImplementation(async (title: string, parent: string | null) => topic(title, parent, 9))
   api.createRule.mockResolvedValue({ id: 'r2' })
   api.saveOverride.mockResolvedValue(undefined)
   api.updateSite.mockResolvedValue({})
@@ -145,14 +144,14 @@ describe('Cấu hình', () => {
     expect(within(screen.getByRole('list', { name: 'Các subject' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['01coffee0 bài', '02tea0 bài'])
     await userEvent.click(screen.getByRole('button', { name: '+ Thêm subject' }))
     await userEvent.type(screen.getByLabelText('Thêm subject'), 'cacao')
-    expect(api.createTopic).not.toHaveBeenCalled()
+    expect(api.createNode).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
-    expect(api.createTopic).toHaveBeenCalledWith('cacao', null)
+    expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'cacao', parent_id: null })
 
     await userEvent.click(rowButton('coffee'))
     await userEvent.click(screen.getByRole('button', { name: '+ Thêm mục con' }))
     await userEvent.type(screen.getByLabelText('Thêm mục con'), 'aroma{Enter}')
-    expect(api.createTopic).toHaveBeenCalledWith('aroma', 'coffee')
+    expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'aroma', parent_id: 'coffee' })
   })
 
   it('drags only from the grip, says where the drop will land, and undoes the move', async () => {
@@ -166,20 +165,20 @@ describe('Cấu hình', () => {
     expect(await screen.findByText('vào trong coffee')).toBeTruthy()
     dropOn(coffee, 20, ['drop'])
 
-    await waitFor(() => expect(api.reorderTopics).toHaveBeenCalledWith(['coffee', 'sensory', 'tea']))
-    expect(api.updateTopic).toHaveBeenCalledWith('tea', { parent_id: 'coffee' })
+    await waitFor(() => expect(api.reorderNodes).toHaveBeenCalledWith(['coffee', 'sensory', 'tea']))
+    expect(api.updateNode).toHaveBeenCalledWith('tea', { parent_id: 'coffee' })
     expect(await screen.findByText('Đã chuyển tea vào trong coffee')).toBeTruthy()
 
     // Undo waits for the save, so it cannot race the move it undoes.
     await waitFor(() => expect(screen.getByRole('button', { name: 'Hoàn tác' })).toHaveProperty('disabled', false))
     await userEvent.click(screen.getByRole('button', { name: 'Hoàn tác' }))
-    await waitFor(() => expect(api.updateTopic).toHaveBeenCalledWith('tea', { parent_id: null }))
-    expect(api.reorderTopics).toHaveBeenLastCalledWith(['coffee', 'sensory', 'tea'])
+    await waitFor(() => expect(api.updateNode).toHaveBeenCalledWith('tea', { parent_id: null }))
+    expect(api.reorderNodes).toHaveBeenLastCalledWith(['coffee', 'sensory', 'tea'])
   })
 
   it('moves the row the moment it is dropped, before the server answers', async () => {
     await renderScreen()
-    api.updateTopic.mockReturnValue(new Promise(() => {}))
+    api.updateNode.mockReturnValue(new Promise(() => {}))
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo tea' }))
     dropOn(rowButton('coffee').parentElement as HTMLElement, 20)
     await waitFor(() => expect((rowButton('tea').parentElement as HTMLElement).style.marginLeft).toBe('16px'))
@@ -251,14 +250,14 @@ describe('Cấu hình', () => {
     api.listPosts.mockResolvedValue([{ id: 'p1', topic_id: 'sensory', keywords: [] }])
     api.getLayout.mockResolvedValue(layout)
     api.updatePost.mockResolvedValue({})
-    api.deleteTopic.mockResolvedValue(undefined)
+    api.deleteNode.mockResolvedValue(undefined)
     await renderScreen()
     await userEvent.click(rowButton('sensory'))
     await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá…' }))
     await userEvent.selectOptions(screen.getByLabelText('Chuyển 3 bài sang'), 'tea')
     await userEvent.click(screen.getByRole('button', { name: 'Chuyển bài và xoá sensory' }))
-    await waitFor(() => expect(api.deleteTopic).toHaveBeenCalledWith('sensory'))
+    await waitFor(() => expect(api.deleteNode).toHaveBeenCalledWith('sensory'))
     expect(api.updatePost).toHaveBeenCalledWith('p1', { topic_id: 'tea' })
     expect(await screen.findByText('1 bài → tea · đã xoá sensory')).toBeTruthy()
   })
@@ -269,7 +268,7 @@ describe('Cấu hình', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá…' }))
     expect(screen.getByText(/còn 1 mục con/)).toBeTruthy()
-    expect(api.deleteTopic).not.toHaveBeenCalled()
+    expect(api.deleteNode).not.toHaveBeenCalled()
   })
 
   it('keeps Xoá in the same place on a page that cannot be deleted, greyed with the reason', async () => {

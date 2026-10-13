@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { type Keyword, type Topic, type updateTopic } from '../lib/apiClient'
+import { type Keyword, type Node, type NodeStatus, type updateNode } from '../lib/apiClient'
 import { ancestorsOf, descendantIds } from '../../lib/contentTree'
 import { ink, paper, sans } from '../../design/tokens'
 import { radius } from '../../design/controls'
@@ -20,6 +20,16 @@ function shades(hex: string): { on_color: string; tint: string; tint2: string } 
 
 const dot = { all: 'unset', cursor: 'pointer', width: 14, height: 14, borderRadius: '50%', boxSizing: 'border-box', outlineOffset: 2 } as const
 
+/** One set for every site's nodes (owner's choice, 2026-10-13), in the words the blog uses for its posts. */
+export const STATUS_CHOICES: { value: NodeStatus; label: string }[] = [
+  { value: 'published', label: 'đã đăng' },
+  { value: 'draft', label: 'nháp' },
+  { value: 'archived', label: 'lưu trữ' },
+]
+
+export const statusLabel = (s: NodeStatus) => STATUS_CHOICES.find((c) => c.value === s)?.label ?? s
+
+/** Curated pages (`pages`, 0028) still say who may read them this way. */
 export const VISIBILITY = [
   { value: 'public' as const, label: 'công khai' },
   { value: 'private' as const, label: 'riêng tư' },
@@ -33,11 +43,11 @@ export function TopicFields({
   used,
   save,
 }: {
-  topic: Topic
-  parent?: Topic
-  tree: Topic[]
+  topic: Node
+  parent?: Node
+  tree: Node[]
   used: string[]
-  save: (patch: Parameters<typeof updateTopic>[1]) => void
+  save: (patch: Parameters<typeof updateNode>[1]) => void
 }) {
   const setColor = (hex: string | null) => save(hex ? { accent: hex, ...shades(hex) } : { accent: null, on_color: null, tint: null, tint2: null })
   const swatches = [...new Set([...used, ...PALETTE.filter((c) => !used.some((u) => u.toUpperCase() === c))])].slice(0, 9)
@@ -79,7 +89,7 @@ export function TopicFields({
         </select>
       </Row>
       <Row label="Trạng thái">
-        <Choice label="Trạng thái" options={VISIBILITY} value={topic.visibility} onChange={(visibility) => save({ visibility })} />
+        <Choice label="Trạng thái" options={STATUS_CHOICES} value={topic.status} onChange={(status) => save({ status })} />
       </Row>
     </>
   )
@@ -97,7 +107,7 @@ function Panel({ children }: { children: ReactNode }) {
 }
 
 /** Deleting a topic: its children must move first; its own posts go where the owner says. */
-export function RetireTopic({ topic, tree, kids, count, onRetire, onCancel }: { topic: Topic; tree: Topic[]; kids: number; count: number; onRetire: (to: Topic | null) => void; onCancel: () => void }) {
+export function RetireTopic({ topic, tree, kids, count, onRetire, onCancel }: { topic: Node; tree: Node[]; kids: number; count: number; onRetire: (to: Node | null) => void; onCancel: () => void }) {
   const targets = tree.filter((t) => t.id !== topic.id && t.parent_id !== topic.id)
   const [to, setTo] = useState(topic.parent_id ?? targets[0]?.id ?? '')
   if (kids > 0)

@@ -35,16 +35,16 @@ const post = (id: string, over: Record<string, unknown>) => ({
 })
 
 const topics = [
-  { id: 'bean-weirdo', parent_id: null, title: 'bean weirdo', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 1, visibility: 'public', posts: 0 },
-  { id: 'sensory', parent_id: 'bean-weirdo', title: 'sensory', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 2, visibility: 'public', posts: 1 },
-  { id: 'art', parent_id: null, title: 'art', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 3, visibility: 'public', posts: 0 },
-  { id: 'book-film', parent_id: 'art', title: 'book & film', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 4, visibility: 'public', posts: 2 },
+  { id: 'bean-weirdo', parent_id: null, title: 'bean weirdo', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 1, status: 'published', posts: 0 },
+  { id: 'sensory', parent_id: 'bean-weirdo', title: 'sensory', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 2, status: 'published', posts: 1 },
+  { id: 'art', parent_id: null, title: 'art', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 3, status: 'published', posts: 0 },
+  { id: 'book-film', parent_id: 'art', title: 'book & film', intro: '', accent: null, on_color: null, tint: null, tint2: null, image_url: null, sort_order: 4, status: 'published', posts: 2 },
 ]
 
 let posts: ReturnType<typeof post>[] = []
 const api = vi.hoisted(() => ({
   listPosts: vi.fn(),
-  listTopics: vi.fn(),
+  listNodes: vi.fn(),
   listKeywords: vi.fn(),
   listTags: vi.fn(),
   transitionStatus: vi.fn(),
@@ -60,7 +60,7 @@ const { ContentWorkspace } = await import('./ContentWorkspace')
 beforeEach(() => {
   Object.values(api).forEach((f) => f.mockReset())
   api.listPosts.mockImplementation(() => Promise.resolve(posts))
-  api.listTopics.mockResolvedValue(topics)
+  api.listNodes.mockResolvedValue(topics)
   api.listKeywords.mockResolvedValue([])
   api.listTags.mockResolvedValue([{ id: 'note', label: 'note' }, { id: 'book-film', label: 'book-film' }])
   api.transitionStatus.mockResolvedValue({})

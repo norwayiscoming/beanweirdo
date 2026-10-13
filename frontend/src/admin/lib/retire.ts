@@ -1,17 +1,17 @@
 import {
   createKeyword,
-  createTopic,
+  createNode,
   deleteKeyword,
-  deleteTopic,
+  deleteNode,
   getLayout,
   listPosts,
-  reorderTopics,
+  reorderNodes,
   saveOverride,
   updatePost,
-  updateTopic,
+  updateNode,
   type Keyword,
   type LayoutOverride,
-  type Topic,
+  type Node,
 } from './apiClient'
 import { TAG_PAGE } from '../../lib/routes'
 
@@ -45,18 +45,18 @@ async function forward(type: 'topic' | 'keyword', from: string, to: string): Pro
 }
 
 /** Posts filed on the topic itself move to `to`; a topic with children is refused before this is offered. */
-export async function retireTopic(t: Topic, to: { id: string; title: string } | null, topics: Topic[]): Promise<Retired> {
+export async function retireTopic(t: Node, to: { id: string; title: string } | null, topics: Node[]): Promise<Retired> {
   const moved = (await listPosts('all')).filter((p) => p.topic_id === t.id)
   const siblings = topics.filter((x) => x.parent_id === t.parent_id).sort((a, b) => a.sort_order - b.sort_order).map((s) => s.id)
   await Promise.all(moved.map((p) => updatePost(p.id, { topic_id: to?.id ?? null })))
   const unforward = to ? await forward('topic', t.id, to.id) : null
-  await deleteTopic(t.id)
+  await deleteNode(t.id)
   return {
     msg: to ? `${moved.length} bài → ${to.title} · đã xoá ${t.title}` : `Đã xoá ${t.title}`,
     revert: async () => {
-      const back = await createTopic(t.title, t.parent_id)
-      await updateTopic(back.id, { intro: t.intro, visibility: t.visibility, accent: t.accent, on_color: t.on_color, tint: t.tint, tint2: t.tint2, image_url: t.image_url })
-      await reorderTopics(siblings.map((s) => (s === t.id ? back.id : s)))
+      const back = await createNode({ site: 'blog', title: t.title, parent_id: t.parent_id })
+      await updateNode(back.id, { intro: t.intro, status: t.status, accent: t.accent, on_color: t.on_color, tint: t.tint, tint2: t.tint2, image_url: t.image_url })
+      await reorderNodes(siblings.map((s) => (s === t.id ? back.id : s)))
       await Promise.all(moved.map((p) => updatePost(p.id, { topic_id: back.id })))
       await unforward?.()
     },

@@ -5,21 +5,14 @@ import { useModules } from '../data/useModules'
 import { usePostAddresses } from '../data/usePostAddresses'
 import { toPath } from '../lib/routes'
 import { activeWords } from '../lib/routeWords'
+import type { Node } from 'api-contract'
 import { parseBlocks, type Block, type PortPost } from './blocks'
 import { resolveDesign, type Design } from './tokens'
 import { navLinks, resolveContent, type NavPage, type PortContent } from './content'
 import type { Chrome, HomeCard } from './PortfolioView'
 
-type PortPage = {
-  id: string
-  slug: string
-  title: string
-  intro: string
-  palette: string
-  blocks: Block[]
-  status: 'draft' | 'published' | 'archived'
-  sortOrder: number
-}
+/** A node of site 'port' (0032), with its look resolved and its blocks parsed. */
+type PortPage = Pick<Node, 'id' | 'slug' | 'title' | 'intro' | 'status' | 'sort_order'> & { look: string; blocks: Block[] }
 
 const toPortPost = (p: PostRow): PortPost => ({
   id: p.id,
@@ -71,7 +64,7 @@ export function usePortSources(): { posts: PortPost[]; moduleTitles: Record<stri
 }
 
 /**
- * One public port page, read directly with the anon key. RLS (0025) only
+ * One public port page, read directly with the anon key. RLS (0032) only
  * returns published pages, so a draft still comes back as "not found" even
  * when its exact address is typed in.
  */
@@ -84,25 +77,12 @@ export function usePublicPort(slug: string | null): { page: PortPage | null; des
     let alive = true
     setLoading(true)
     Promise.all([
-      slug ? supabase.from('portfolio_pages').select('*').eq('slug', slug).maybeSingle() : Promise.resolve({ data: null }),
+      slug ? supabase.from('nodes').select('*').eq('site', 'port').eq('slug', slug).maybeSingle() : Promise.resolve({ data: null }),
       supabase.from('portfolio_design').select('data').eq('id', true).maybeSingle(),
     ]).then(([p, d]: [{ data: Record<string, unknown> | null }, { data: { data: unknown } | null }]) => {
       if (!alive) return
       const row = p.data
-      setPage(
-        row
-          ? {
-              id: String(row.id),
-              slug: String(row.slug),
-              title: String(row.title),
-              intro: String(row.intro ?? ''),
-              palette: String(row.palette ?? 'biz'),
-              blocks: parseBlocks(row.blocks),
-              status: row.status === 'published' || row.status === 'archived' ? row.status : 'draft',
-              sortOrder: Number(row.sort_order ?? 0),
-            }
-          : null,
-      )
+      setPage(row ? toPortPage(row) : null)
       setDesign(resolveDesign(d.data?.data))
       setLoading(false)
     })
@@ -125,7 +105,7 @@ export function usePortChrome(): { content: PortContent; pages: PortPage[]; load
     let alive = true
     Promise.all([
       supabase.from('site_settings').select('data').eq('id', true).maybeSingle(),
-      supabase.from('portfolio_pages').select('*').order('sort_order', { ascending: true }),
+      supabase.from('nodes').select('*').eq('site', 'port').order('sort_order', { ascending: true }),
     ]).then(([s, p]: [{ data: { data: Record<string, unknown> } | null }, { data: Record<string, unknown>[] | null }]) => {
       if (!alive) return
       setState({
@@ -146,10 +126,10 @@ const toPortPage = (row: Record<string, unknown>): PortPage => ({
   slug: String(row.slug),
   title: String(row.title),
   intro: String(row.intro ?? ''),
-  palette: String(row.palette ?? 'biz'),
+  look: String(row.look ?? 'biz'),
   blocks: parseBlocks(row.blocks),
   status: row.status === 'published' || row.status === 'archived' ? row.status : 'draft',
-  sortOrder: Number(row.sort_order ?? 0),
+  sort_order: Number(row.sort_order ?? 0),
 })
 
 /**
@@ -185,10 +165,10 @@ export function homeCards(content: PortContent, pages: PortPage[], design: Desig
     return [{
       href: toPath({ area: 'public', screen: 'portfolioPage', slug: page.slug }),
       title: page.title,
-      label: f.label || design.palettes[page.palette]?.name || '',
+      label: f.label || design.palettes[page.look]?.name || '',
       intro: f.intro || page.intro,
       image: f.image,
-      palette: page.palette,
+      palette: page.look,
     }]
   })
 }

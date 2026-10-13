@@ -15,8 +15,14 @@ import type {
   AuthorRef,
   AuthorResponse,
   AuthorUpdateRequest,
+  Node,
+  NodeCreateRequest,
+  NodeListResponse,
+  NodePatch,
+  NodeResponse,
   PostAuthorsRequest,
   PostAuthorsResponse,
+  Site,
 } from 'api-contract'
 import { supabase } from '../../lib/supabaseClient'
 import type { SiteOverrides } from '../../content/site'
@@ -542,41 +548,9 @@ export async function listTemplates(): Promise<TemplateSummary[]> {
 
 // ── Portfolio ───────────────────────────────────────────────────────────────
 
-/** Portfolio page lifecycle — see migrations 0025 and 0026. */
-export type PortStatus = 'draft' | 'published' | 'archived'
-
-export type PortPageInput = {
-  slug: string
-  title: string
-  intro?: string
-  palette?: string
-  blocks?: unknown[]
-  status?: PortStatus
-  sortOrder?: number
-}
-
-export type PortPageRecord = Required<PortPageInput> & { id: string; updatedAt: string }
-
-/** GET /api/portfolio — every port page (drafts included) and the saved design tokens. */
-export async function getPortfolio(): Promise<{ pages: PortPageRecord[]; design: Record<string, unknown> }> {
-  return request<{ pages: PortPageRecord[]; design: Record<string, unknown> }>('/api/portfolio')
-}
-
-export async function createPortPage(input: PortPageInput): Promise<PortPageRecord> {
-  const r = await request<{ page: PortPageRecord }>('/api/portfolio', { method: 'POST', body: JSON.stringify(input) })
-  return r.page
-}
-
-export async function updatePortPage(id: string, patch: Partial<PortPageInput>): Promise<PortPageRecord> {
-  const r = await request<{ page: PortPageRecord }>(`/api/portfolio?id=${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(patch),
-  })
-  return r.page
-}
-
-export async function deletePortPage(id: string): Promise<void> {
-  await request(`/api/portfolio?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+/** GET /api/portfolio — the saved design tokens. Port pages are nodes (below). */
+export async function getPortDesign(): Promise<Record<string, unknown>> {
+  return (await request<{ design: Record<string, unknown> }>('/api/portfolio')).design
 }
 
 /** PATCH /api/portfolio?part=design — merges one level deep; `null` resets a key to its default. */
@@ -588,55 +562,37 @@ export async function updatePortDesign(patch: Record<string, unknown>): Promise<
   return r.design
 }
 
-// ── Tầng nội dung: cây chủ đề và tag theme (migration 0027) ──────────────────
+// ── Trang của mọi site (0032) và tag theme (0027) ────────────────────────────
 
-export type Topic = {
-  id: string
-  /** null = subject; còn lại là topic con của subject đó. */
-  parent_id: string | null
-  title: string
-  intro: string
-  accent: string | null
-  on_color: string | null
-  tint: string | null
-  tint2: string | null
-  image_url: string | null
-  sort_order: number
-  visibility: PostVisibility
-  /** Số bài (trừ thùng rác) đang nằm ở nút này. */
-  posts: number
-}
+export type { Node, NodeStatus } from 'api-contract'
 
 export type Keyword = { id: string; label: string; posts: number }
 
-export async function listTopics(): Promise<Topic[]> {
-  return (await request<{ topics: Topic[] }>('/api/tags?vocab=topics')).topics
+/** Without `site`: every site's nodes. */
+export async function listNodes(site?: Site): Promise<Node[]> {
+  return (await request<NodeListResponse>(`/api/tags?vocab=nodes${site ? `&site=${site}` : ''}`)).nodes
 }
 
-export async function createTopic(title: string, parent_id: string | null): Promise<Topic> {
-  const r = await request<{ topic: Topic }>('/api/tags?vocab=topics', { method: 'POST', body: JSON.stringify({ title, parent_id }) })
-  return r.topic
+export async function createNode(input: NodeCreateRequest): Promise<Node> {
+  return (await request<NodeResponse>('/api/tags?vocab=nodes', { method: 'POST', body: JSON.stringify(input) })).node
 }
 
-export async function updateTopic(
-  id: string,
-  patch: Partial<Pick<Topic, 'title' | 'intro' | 'parent_id' | 'visibility' | 'accent' | 'on_color' | 'tint' | 'tint2' | 'image_url'>>,
-): Promise<Topic> {
-  const r = await request<{ topic: Topic }>(`/api/tags?vocab=topics&id=${encodeURIComponent(id)}`, {
+export async function updateNode(id: string, patch: NodePatch): Promise<Node> {
+  const r = await request<NodeResponse>(`/api/tags?vocab=nodes&id=${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(patch),
   })
-  return r.topic
+  return r.node
 }
 
 /** Thứ tự mới của một tầng: các id theo thứ tự. */
-export async function reorderTopics(order: string[]): Promise<void> {
-  await request('/api/tags?vocab=topics', { method: 'PUT', body: JSON.stringify({ order }) })
+export async function reorderNodes(order: string[]): Promise<void> {
+  await request('/api/tags?vocab=nodes', { method: 'PUT', body: JSON.stringify({ order }) })
 }
 
-/** Máy chủ từ chối (409) khi nút còn bài hoặc còn topic con. */
-export async function deleteTopic(id: string): Promise<void> {
-  await request(`/api/tags?vocab=topics&id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+/** Máy chủ từ chối (409) khi nút còn bài hoặc còn mục con. */
+export async function deleteNode(id: string): Promise<void> {
+  await request(`/api/tags?vocab=nodes&id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export async function listKeywords(): Promise<Keyword[]> {

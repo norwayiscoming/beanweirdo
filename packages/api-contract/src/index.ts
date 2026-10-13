@@ -13,3 +13,4 @@
  */
 export type * from './authors'
 export type * from './errors'
+export type * from './nodes'

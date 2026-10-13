@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import {
   listModules,
   listTemplates,
-  listTopics,
+  listNodes,
   type Module,
   type TemplateSummary,
-  type Topic,
+  type Node,
 } from '../lib/apiClient'
 import { topicOptions } from '../components/PostPlacement'
 import { ink, paper } from '../../design/tokens'
@@ -44,7 +44,7 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
   const [modules, setModules] = useState<Module[]>([])
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
   const [module_id, setModuleId] = useState('')
-  const [topics, setTopics] = useState<Topic[]>([])
+  const [topics, setTopics] = useState<Node[]>([])
   const [topic_id, setTopicId] = useState('')
   const [templateId, setTemplateId] = useState('')
   const [en, setEn] = useState('')
@@ -57,7 +57,7 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
       setModules(mods)
       if (mods.length > 0) setModuleId(mods[0].id)
     })
-    listTopics().then(setTopics)
+    listNodes('blog').then(setTopics)
     listTemplates().then((ts) => {
       setTemplates(ts)
       if (ts.length > 0) setTemplateId(ts[0].id)

@@ -25,7 +25,7 @@ export function PortfolioPage() {
     <PortfolioView
       title={page.title}
       intro={page.intro}
-      palette={page.palette}
+      palette={page.look}
       blocks={page.blocks}
       design={design}
       posts={src.posts}

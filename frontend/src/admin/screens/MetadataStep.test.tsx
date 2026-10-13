@@ -19,7 +19,7 @@ vi.mock('../lib/apiClient', () => ({
     { id: 't-longform', name: 'Long-form', renderer: 'longform', description: '' },
   ]),
   createTag: (label: string) => createTag(label),
-  listTopics: vi.fn().mockResolvedValue([
+  listNodes: vi.fn().mockResolvedValue([
     { id: 'bean-weirdo', parent_id: null, title: 'bean weirdo', sort_order: 1 },
     { id: 'roasting', parent_id: 'bean-weirdo', title: 'roasting', sort_order: 1 },
   ]),

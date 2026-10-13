@@ -122,7 +122,7 @@ type PageRecord = {
   visibility: 'public' | 'private'
 }
 type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
-type TopicRecord = RuleTopic & { intro: string; accent: string | null; on_color: string | null; tint: string | null; tint2: string | null; visibility: string }
+type TopicRecord = RuleTopic & { intro: string; accent: string | null; on_color: string | null; tint: string | null; tint2: string | null; status: string }
 type KeywordRecord = { id: string; label: string }
 
 export type Store = {
@@ -238,7 +238,7 @@ export function buildPages(store: Store): PageRow[] {
       // The topic tree is where the owner nests the blog; a borrowed module's
       // old parent must not file the page somewhere else in the sidebar.
       parent_id: t.parent_id,
-      visibility: t.visibility === 'private' ? 'private' : 'public',
+      visibility: t.status === 'published' ? 'public' : 'private',
       aliases: own?.aliases ?? [],
       source: 'topic',
       node: t.id,
@@ -382,7 +382,7 @@ async function loadStore(): Promise<Store> {
     })
   const [modules, topics, keywords, pages, overrides, rules, postKeywords, posts] = await Promise.all([
     all<ModuleRow>(supabase.from('modules').select('*').order('sort_order', { ascending: true }), true),
-    all<TopicRecord>(supabase.from('topics').select('*')),
+    all<TopicRecord>(supabase.from('nodes').select('*').eq('site', 'blog')),
     all<KeywordRecord>(supabase.from('keywords').select('id, label')),
     all<PageRecord>(supabase.from('pages').select('*')),
     all<Override>(supabase.from('page_overrides').select('*')),

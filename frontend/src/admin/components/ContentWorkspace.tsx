@@ -3,14 +3,14 @@ import {
   createPost,
   listKeywords,
   listPosts,
-  listTopics,
+  listNodes,
   transitionStatus,
   updatePost,
   type Keyword,
   type PostStatus,
   type PostSummary,
   type StatusAction,
-  type Topic,
+  type Node,
 } from '../lib/apiClient'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useNav } from '../../lib/nav'
@@ -20,6 +20,7 @@ import { StatusBadge } from './StatusBadge'
 import { MovePostDialog } from './MovePostDialog'
 import { PostAuthorsDialog } from './PostAuthorsDialog'
 import { SectionHead } from './SectionHead'
+import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 
 /**
@@ -156,7 +157,7 @@ function RailRow({
 export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const nav = useNav()
   const addresses = usePostAddresses()
-  const [topics, setTopics] = useState<Topic[]>([])
+  const [topics, setTopics] = useState<Node[]>([])
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [posts, setPosts] = useState<PostSummary[]>([])
   const [err, setErr] = useState<string | null>(null)
@@ -170,7 +171,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
 
   const load = useCallback(
     () =>
-      Promise.all([listTopics(), listKeywords(), listPosts('all')])
+      Promise.all([listNodes('blog'), listKeywords(), listPosts('all')])
         .then(([t, k, p]) => {
           setTopics(t)
           setKeywords(k)
@@ -316,7 +317,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                 on={f.topic === t.id}
                 onClick={() => toggle('topic', t.id)}
                 dot={<Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
-                flag={t.visibility === 'private' ? 'riêng tư' : undefined}
+                flag={t.status !== 'published' ? statusLabel(t.status) : undefined}
               />
             </div>
         ))}
@@ -540,7 +541,7 @@ function BulkBar({
   onClear,
 }: {
   count: number
-  topics: Topic[]
+  topics: Node[]
   keywords: Keyword[]
   busy: boolean
   onField: (field: 'topic_id' | 'kw+' | 'kw-', value: string) => void

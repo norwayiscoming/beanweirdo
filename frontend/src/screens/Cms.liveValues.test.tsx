@@ -31,12 +31,12 @@ vi.mock('../admin/lib/apiClient', () => ({
   listTags: () => Promise.resolve([]),
   createTag: vi.fn(), renameTag: vi.fn(), deleteTag: vi.fn(),
   // Cây chủ đề và tag theme cũng nằm ở tab này (migration 0027).
-  listTopics: () => Promise.resolve([]),
+  listNodes: () => Promise.resolve([]),
   // Cấu hình (bước 3c) đọc tầng feature.
   getLayout: () => Promise.resolve({ pages: [], overrides: [], rules: [] }),
   listKeywords: () => Promise.resolve([]),
   // Cấu hình cũng giữ các trang port.
-  getPortfolio: () => Promise.resolve({ pages: [], design: {} }),
+  getPortDesign: () => Promise.resolve({}),
   createModule: vi.fn(), deleteModule: vi.fn(), reorderModules: vi.fn(),
   reorderPosts: vi.fn(), updateModule: vi.fn(), updatePost: vi.fn(),
   uploadImage: vi.fn(), transitionStatus: vi.fn(),
