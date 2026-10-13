@@ -82,9 +82,14 @@ beforeEach(() => {
 })
 
 const tree = () => screen.getByRole('navigation', { name: 'Cây cấu hình' })
-/** A row of the tree, by the name it starts with. */
-const rowButton = (name: string) => within(tree()).getByRole('button', { name: new RegExp(`^.?${name}`) })
+/** A card of the tree, by the name it starts with. */
+const card = (name: string) => within(tree()).getByRole('button', { name: new RegExp(`^${name}`) })
+/** A row of a list on the right, by its name (the number is hidden from readers). */
+const listRow = (list: string, name: string) => within(screen.getByRole('list', { name: list })).getByRole('button', { name: new RegExp(`^${name}`) })
+/** The names and facts of a list on the right, without the numbers. */
+const rowsOf = (list: string) => within(screen.getByRole('list', { name: list })).getAllByRole('listitem').map((li) => li.querySelector('.cfg-item')?.textContent?.replace(/^\d+/, ''))
 const heading = () => screen.getByRole('heading', { level: 2 }).textContent
+const crumbs = () => screen.getByLabelText('Đang sửa').textContent
 
 const renderScreen = async () => {
   render(
@@ -96,7 +101,13 @@ const renderScreen = async () => {
     />,
   )
   await screen.findByRole('navigation', { name: 'Cây cấu hình' })
-  await waitFor(() => rowButton('sensory'))
+  await waitFor(() => expect(card('Mục lục').textContent).toContain('2 subject'))
+}
+
+/** Opens a topic the way the owner does: the Mục lục card, then down the lists. */
+const openTopic = async (...path: string[]) => {
+  await userEvent.click(card('Mục lục'))
+  for (const [i, name] of path.entries()) await userEvent.click(listRow(i === 0 ? 'Các subject' : 'Mục con', name))
 }
 
 /** jsdom has no DragEvent: build the drop by hand, at a height inside the row. */
@@ -109,6 +120,7 @@ const dropOn = (row: HTMLElement, clientY: number, types: ('dragOver' | 'drop')[
     fireEvent(row, ev)
   }
 }
+const li = (el: HTMLElement) => el.closest('li') as HTMLElement
 
 describe('Cấu hình', () => {
   it('opens on the blog home, with its fields on the right and its public page previewed', async () => {
@@ -118,37 +130,36 @@ describe('Cấu hình', () => {
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/details')
   })
 
-  it('a click on the left only picks; nothing on the left can be typed into', async () => {
+  it('keeps only the cards on the left; what a card holds is listed on the right, and the crumbs go back', async () => {
     await renderScreen()
-    await userEvent.click(rowButton('sensory'))
-    expect(screen.getByLabelText('Đang sửa').textContent).toBe('Personal Blog › Mục lục › coffee')
+    expect(within(tree()).queryByRole('button', { name: /coffee|sensory|heat/ })).toBeNull()
+    expect(within(tree()).queryByRole('textbox')).toBeNull()
+
+    await openTopic('coffee', 'sensory')
+    expect(crumbs()).toBe('Personal Blog › Mục lục › coffee')
     expect(screen.getByLabelText('Tên')).toHaveProperty('value', 'sensory')
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/module/sensory')
-    expect(within(tree()).queryByRole('textbox')).toBeNull()
-  })
+    // The card stays lit while something inside it is open.
+    expect(card('Mục lục').getAttribute('aria-current')).toBe('true')
 
-  it('a click on a group card opens it on the right, and only its arrow folds it', async () => {
-    await renderScreen()
-    await userEvent.click(rowButton('Mục lục'))
+    await userEvent.click(within(screen.getByLabelText('Đang sửa')).getByRole('button', { name: 'coffee' }))
+    expect(screen.getByLabelText('Tên')).toHaveProperty('value', 'coffee')
+    await userEvent.click(within(screen.getByLabelText('Đang sửa')).getByRole('button', { name: 'Mục lục' }))
     expect(heading()).toBe('Mục lục')
-    expect(rowButton('sensory')).toBeTruthy()
-
-    await userEvent.click(within(tree()).getByRole('button', { name: 'Gập Mục lục' }))
-    expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
   })
 
-  it('adds a subject from the tree card, and an entry inside the topic being edited', async () => {
+  it('adds a subject in Mục lục, and an entry inside the topic being edited', async () => {
     await renderScreen()
-    await userEvent.click(rowButton('Mục lục'))
+    await userEvent.click(card('Mục lục'))
     // The group lists its subjects; adding one is the last line, and nothing is created before Lưu.
-    expect(within(screen.getByRole('list', { name: 'Các subject' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['01coffee0 bài', '02tea0 bài'])
+    expect(rowsOf('Các subject')).toEqual(['coffee0 bài', 'tea0 bài'])
     await userEvent.click(screen.getByRole('button', { name: '+ Thêm subject' }))
     await userEvent.type(screen.getByLabelText('Thêm subject'), 'cacao')
     expect(api.createNode).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
     expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'cacao', parent_id: null })
 
-    await userEvent.click(rowButton('coffee'))
+    await userEvent.click(listRow('Các subject', 'coffee'))
     await userEvent.click(screen.getByRole('button', { name: '+ Thêm mục con' }))
     await userEvent.type(screen.getByLabelText('Thêm mục con'), 'aroma{Enter}')
     expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'aroma', parent_id: 'coffee' })
@@ -156,11 +167,12 @@ describe('Cấu hình', () => {
 
   it('drags only from the grip, says where the drop will land, and undoes the move', async () => {
     await renderScreen()
+    await userEvent.click(card('Mục lục'))
     // The row itself never starts a drag, so a slipping click cannot move a node.
-    expect(rowButton('tea').closest('[draggable="true"]')).toBeNull()
+    expect(listRow('Các subject', 'tea').closest('[draggable="true"]')).toBeNull()
 
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo tea' }))
-    const coffee = rowButton('coffee').parentElement as HTMLElement
+    const coffee = li(listRow('Các subject', 'coffee'))
     dropOn(coffee, 20, ['dragOver'])
     expect(await screen.findByText('vào trong coffee')).toBeTruthy()
     dropOn(coffee, 20, ['drop'])
@@ -178,16 +190,17 @@ describe('Cấu hình', () => {
 
   it('moves the row the moment it is dropped, before the server answers', async () => {
     await renderScreen()
+    await userEvent.click(card('Mục lục'))
     api.updateNode.mockReturnValue(new Promise(() => {}))
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo tea' }))
-    dropOn(rowButton('coffee').parentElement as HTMLElement, 20)
-    await waitFor(() => expect((rowButton('tea').parentElement as HTMLElement).style.marginLeft).toBe('16px'))
+    dropOn(li(listRow('Các subject', 'coffee')), 20)
+    await waitFor(() => expect(rowsOf('Các subject')).toEqual(['coffee0 bài']))
     expect(screen.getByText(/đang lưu/)).toBeTruthy()
   })
 
   it('shows a topic’s page beside its fields, and gives it settings of its own', async () => {
     await renderScreen()
-    await userEvent.click(rowButton('sensory'))
+    await openTopic('coffee', 'sensory')
     // It follows the topic template, which is named but has no row of its own any more.
     expect(screen.getByText(/quy chế chung của trang topic/)).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: '+ cài đặt riêng' }))
@@ -200,22 +213,22 @@ describe('Cấu hình', () => {
 
     await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
     expect(heading()).toBe('Trang chủ port')
-    expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
     // Same names as the blog: Mục lục holds the top bar's pages and About, Phần chung the rest.
-    expect(rowButton('Mục lục')).toBeTruthy()
-    expect(rowButton('Phần chung')).toBeTruthy()
-    await userEvent.click(rowButton('About'))
-    expect(screen.getByLabelText('Đang sửa').textContent).toBe('Port › Mục lục')
+    expect(card('Phần chung')).toBeTruthy()
+    await userEvent.click(card('Mục lục'))
+    await userEvent.click(listRow('Các trang', 'About'))
+    expect(crumbs()).toBe('Port › Mục lục')
   })
 
   it('drags the port’s Mục lục into the top bar order, keeping labels and home in place', async () => {
     await renderScreen()
     await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
+    await userEvent.click(card('Mục lục'))
     // A draft is not on the top bar, so it cannot be moved along it.
     expect(screen.queryByRole('img', { name: 'Kéo Draft' })).toBeNull()
 
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo About' }))
-    const beta = rowButton('Beta').parentElement as HTMLElement
+    const beta = li(listRow('Các trang', 'Beta'))
     // The middle of a row is not "inside" on a flat list.
     dropOn(beta, 15, ['dragOver'])
     expect(await screen.findByText('trước Beta')).toBeTruthy()
@@ -229,7 +242,7 @@ describe('Cấu hình', () => {
 
   it('keeps one card per thing: Mục lục is the topic tree, and nothing without a page is left', async () => {
     await renderScreen()
-    await userEvent.click(rowButton('Mục lục'))
+    await userEvent.click(card('Mục lục'))
     expect(screen.getByText('copy:index')).toBeTruthy()
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/muc-luc')
     for (const gone of ['Điều hướng', 'Mẫu', 'Lưu trữ', 'Cây chủ đề']) expect(within(tree()).queryByRole('button', { name: new RegExp(`^${gone}`) })).toBeNull()
@@ -238,7 +251,7 @@ describe('Cấu hình', () => {
   it('puts the menu and home switches on the subject itself, named as the port names them', async () => {
     api.updatePage.mockResolvedValue(undefined)
     await renderScreen()
-    await userEvent.click(rowButton('tea'))
+    await openTopic('tea')
     const menu = screen.getByRole('group', { name: 'Hiện trên menu' })
     // A subject not yet in the stored list is shown.
     expect(within(menu).getByRole('button', { name: 'hiện' }).getAttribute('aria-pressed')).toBe('true')
@@ -252,7 +265,7 @@ describe('Cấu hình', () => {
     api.updatePost.mockResolvedValue({})
     api.deleteNode.mockResolvedValue(undefined)
     await renderScreen()
-    await userEvent.click(rowButton('sensory'))
+    await openTopic('coffee', 'sensory')
     await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá…' }))
     await userEvent.selectOptions(screen.getByLabelText('Chuyển 3 bài sang'), 'tea')
@@ -262,11 +275,13 @@ describe('Cấu hình', () => {
     expect(await screen.findByText('1 bài → tea · đã xoá sensory')).toBeTruthy()
   })
 
-  it('refuses to delete a topic that still has children, and says why', async () => {
+  it('deletes from a row’s own ⋮ in the list, which opens the item with its delete panel', async () => {
     await renderScreen()
-    await userEvent.click(rowButton('coffee'))
-    await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
+    await userEvent.click(card('Mục lục'))
+    await userEvent.click(screen.getByRole('button', { name: 'Thao tác coffee' }))
     await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá…' }))
+    expect(screen.getByLabelText('Tên')).toHaveProperty('value', 'coffee')
+    // A topic with children cannot go, and says why.
     expect(screen.getByText(/còn 1 mục con/)).toBeTruthy()
     expect(api.deleteNode).not.toHaveBeenCalled()
   })
@@ -284,8 +299,11 @@ describe('Cấu hình', () => {
     vi.mocked(createFromPreset).mockResolvedValue({ id: 'n1', title: 'reading room', slug: 'reading-room', status: 'draft' } as never)
     await renderScreen()
     await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
-    await userEvent.click(rowButton('Mục lục'))
-    expect(within(screen.getByRole('list', { name: 'Các trang' })).getAllByRole('button').map((b) => b.textContent?.replace(/^\d+/, ''))).toEqual(['Beta/beta', 'Alpha/alpha', 'About/about', 'Draftnháp · /draft'])
+    await userEvent.click(card('Mục lục'))
+    expect(rowsOf('Các trang')).toEqual(['Beta/beta', 'Alpha/alpha', 'About/about', 'Draftnháp · /draft'])
+    // A page is deleted from its row; About is a system page and has no ⋮.
+    expect(screen.getByRole('button', { name: 'Thao tác Beta' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Thao tác About' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: '+ Thêm trang' }))
     await userEvent.type(screen.getByLabelText('Thêm trang'), 'reading room')
     await userEvent.click(screen.getByRole('button', { name: 'mẫu bibe' }))
@@ -293,14 +311,12 @@ describe('Cấu hình', () => {
     await waitFor(() => expect(createFromPreset).toHaveBeenCalledWith('bibe', 'reading room', expect.anything(), []))
   })
 
-  it('walks the tree with the arrow keys and folds with ← →', async () => {
+  it('walks the cards with the arrow keys', async () => {
     await renderScreen()
-    rowButton('coffee').focus()
+    card('Trang chủ blog').focus()
     await userEvent.keyboard('{ArrowDown}')
-    expect(document.activeElement).toBe(rowButton('sensory'))
-    await userEvent.keyboard('{ArrowUp}{ArrowLeft}')
-    expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
-    await userEvent.keyboard('{ArrowRight}')
-    expect(rowButton('sensory')).toBeTruthy()
+    expect(document.activeElement).toBe(card('Mục lục'))
+    await userEvent.keyboard('{ArrowDown}{ArrowUp}')
+    expect(document.activeElement).toBe(card('Mục lục'))
   })
 })

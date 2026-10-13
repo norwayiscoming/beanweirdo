@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { radius } from '../../design/controls'
+import type { DropWhere } from '../../lib/treeMove'
 
 /**
  * The one shape every detail panel of Cấu hình is drawn in (owner, 2026-10-13).
@@ -18,6 +19,9 @@ import { radius } from '../../design/controls'
  *   left; an input shows its underline only when it is being typed in;
  * - `ItemList`: the children of the item, read like a book's contents, with
  *   "+ Thêm …" as the last line, which opens one new line and a Lưu button.
+ *   Since the owner asked for the tree on the left to hold only the cards
+ *   (2026-10-13), this list is also where children are dragged into order
+ *   and where each one's own ⋮ deletes it.
  *
  * Fields drawn by older editors inside a panel (the port's blocks, a page's
  * fixed copy) lose their boxes through `DETAIL_CSS`, scoped to `.cfg-detail`.
@@ -34,7 +38,10 @@ export type DetailAction = {
 const crumbStyle = { fontFamily: sans, fontSize: 11.5, color: ink.muted } as const
 const quiet = { all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 12, color: ink.soft } as const
 
-function Menu({ actions }: { actions: DetailAction[] }) {
+/** One step of where the item sits; a step with `open` goes back to it. */
+export type Crumb = { label: string; open?: () => void }
+
+function Menu({ actions, label = 'Thao tác' }: { actions: DetailAction[]; label?: string }) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -51,7 +58,7 @@ function Menu({ actions }: { actions: DetailAction[] }) {
   }, [open])
   return (
     <div ref={box} style={{ position: 'relative' }}>
-      <button type="button" aria-label="Thao tác" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} style={{ ...quiet, fontSize: 16, padding: '0 6px', color: open ? ink.base : ink.soft }}>
+      <button type="button" aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} style={{ ...quiet, fontSize: 16, padding: '0 6px', color: open ? ink.base : ink.soft }}>
         ⋮
       </button>
       {open && (
@@ -87,7 +94,7 @@ export function DetailHead({
   actions,
 }: {
   /** Where the item sits, outermost first, without the item itself. */
-  crumbs: string[]
+  crumbs: Crumb[]
   title: string
   /** When set, the name is typed straight into the title. */
   rename?: (v: string) => void
@@ -101,7 +108,18 @@ export function DetailHead({
     <header style={{ margin: '4px 0 6px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         <div aria-label="Đang sửa" style={{ ...crumbStyle, flex: 1 }}>
-          {crumbs.join(' › ')}
+          {crumbs.map((c, i) => (
+            <span key={i}>
+              {i > 0 && ' › '}
+              {c.open ? (
+                <button type="button" onClick={c.open} className="cfg-crumb" style={{ ...quiet, ...crumbStyle }}>
+                  {c.label}
+                </button>
+              ) : (
+                c.label
+              )}
+            </span>
+          ))}
         </div>
         {address && (
           <a href={address} target="_blank" rel="noreferrer" style={{ ...quiet, color: ink.soft }}>
@@ -195,7 +213,31 @@ export function LineInput({ label, value, onSave, multiline, placeholder, mono }
   return multiline ? <textarea key={value} rows={2} {...common} style={{ ...common.style, resize: 'vertical' }} /> : <input key={value} {...common} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
 }
 
-export type ListItem = { id: string; name: string; meta?: string; dot?: string | null; onOpen: () => void }
+export const WHERE_WORDS: Record<DropWhere, string> = { before: 'trước', after: 'sau', inside: 'vào trong' }
+
+/** A row that can be dragged and dropped on; `mark` is where a drop held over it would land. */
+export type ItemDrag = {
+  onDragStart: (e: DragEvent<HTMLElement>) => void
+  onDragOver: (e: DragEvent<HTMLElement>) => void
+  onDragLeave: () => void
+  onDrop: (e: DragEvent<HTMLElement>) => void
+  onDragEnd: () => void
+  dragging: boolean
+  mark: DropWhere | null
+}
+
+export type ListItem = {
+  id: string
+  name: string
+  meta?: string
+  dot?: string | null
+  /** Indent under the row above, for a list that is a tree (Phần chung). */
+  depth?: number
+  onOpen: () => void
+  drag?: ItemDrag
+  /** The row's own ⋮: the same actions its detail's ⋮ holds. */
+  actions?: DetailAction[]
+}
 
 /** What "+ Thêm …" asks before it saves: a name, and optionally one choice. */
 export type AddSpec = {
@@ -259,19 +301,64 @@ export function ItemList({ label, items, add, empty }: { label: string; items: L
     <div>
       {items.length === 0 && empty && <p style={{ fontFamily: sans, fontSize: 12.5, color: ink.faint, margin: '8px 0 0 28px' }}>{empty}</p>}
       <ol aria-label={label} style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-        {items.map((it, i) => (
-          <li key={it.id} style={{ borderTop: `1px solid ${paper.rule}`, ...(i === items.length - 1 ? { borderBottom: `1px solid ${paper.rule}` } : {}) }}>
-            <button type="button" onClick={it.onOpen} className="cfg-item" style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', width: '100%', display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 4px 8px 0' }}>
-              <span aria-hidden style={{ fontFamily: sans, fontSize: 11, color: ink.faint, width: 18, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              {it.dot && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: it.dot, flex: 'none', alignSelf: 'center' }} />}
-              <span style={{ fontFamily: serif, fontSize: 16, color: ink.base }}>{it.name}</span>
-              <span aria-hidden style={{ flex: 1, borderBottom: `1px dotted ${ink.faint}`, transform: 'translateY(-4px)', minWidth: 20 }} />
-              {it.meta && <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.muted, whiteSpace: 'nowrap' }}>{it.meta}</span>}
-            </button>
-          </li>
-        ))}
+        {items.map((it, i) => {
+          const mark = it.drag?.mark
+          return (
+            <li
+              key={it.id}
+              className="cfg-row"
+              onDragOver={it.drag?.onDragOver}
+              onDragLeave={it.drag?.onDragLeave}
+              onDrop={it.drag?.onDrop}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                borderTop: `1px solid ${paper.rule}`,
+                ...(i === items.length - 1 ? { borderBottom: `1px solid ${paper.rule}` } : {}),
+                // Where the drop will land: a line above or below, or the whole row lit for "inside".
+                boxShadow: mark === 'before' ? `inset 0 2px 0 ${ink.green}` : mark === 'after' ? `inset 0 -2px 0 ${ink.green}` : 'none',
+                outline: mark === 'inside' ? `2px solid ${ink.green}` : 'none',
+                outlineOffset: -2,
+                opacity: it.drag?.dragging ? 0.45 : 1,
+              }}
+            >
+              {it.drag ? (
+                // Only the grip starts a drag, so a click that slips never moves anything.
+                <span
+                  className="cfg-grip"
+                  draggable
+                  role="img"
+                  aria-label={`Kéo ${it.name}`}
+                  title={`Kéo ${it.name}`}
+                  onDragStart={it.drag.onDragStart}
+                  onDragEnd={it.drag.onDragEnd}
+                  style={{ flex: 'none', width: 16, textAlign: 'center', color: ink.faint, fontSize: 11, cursor: 'grab', userSelect: 'none' }}
+                >
+                  ⋮⋮
+                </span>
+              ) : (
+                <span style={{ width: 16, flex: 'none' }} />
+              )}
+              <button type="button" onClick={it.onOpen} className="cfg-item" style={{ all: 'unset', boxSizing: 'border-box', cursor: 'pointer', flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 10, padding: '8px 4px 8px 0', paddingLeft: (it.depth ?? 0) * 18 }}>
+                <span aria-hidden style={{ fontFamily: sans, fontSize: 11, color: ink.faint, width: 18, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                {it.dot && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: it.dot, flex: 'none', alignSelf: 'center' }} />}
+                <span style={{ fontFamily: serif, fontSize: 16, color: ink.base }}>{it.name}</span>
+                <span aria-hidden style={{ flex: 1, borderBottom: `1px dotted ${ink.faint}`, transform: 'translateY(-4px)', minWidth: 20 }} />
+                {/* While something is held over the row, its facts give way to where the drop will land. */}
+                {mark ? (
+                  <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.green, whiteSpace: 'nowrap' }}>
+                    {WHERE_WORDS[mark]} {it.name}
+                  </span>
+                ) : (
+                  it.meta && <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.muted, whiteSpace: 'nowrap' }}>{it.meta}</span>
+                )}
+              </button>
+              {it.actions ? <Menu actions={it.actions} label={`Thao tác ${it.name}`} /> : <span style={{ width: 22, flex: 'none' }} />}
+            </li>
+          )
+        })}
       </ol>
       {add && <AddLine spec={add} />}
     </div>
@@ -293,4 +380,7 @@ export const DETAIL_CSS = `
 .cfg-detail input:focus, .cfg-detail textarea:focus, .cfg-detail select:focus, .cfg-line:focus, .cfg-line-on { border-bottom-color: ${ink.base} !important; }
 .cfg-detail .cfg-item:hover { background: linear-gradient(90deg, ${paper.hover}, transparent); }
 .cfg-detail .cfg-item:focus-visible { outline: 2px solid ${ink.green}; outline-offset: -2px; }
+.cfg-detail .cfg-row .cfg-grip { opacity: 0; }
+.cfg-detail .cfg-row:hover .cfg-grip, .cfg-detail .cfg-row:focus-within .cfg-grip { opacity: 1; }
+.cfg-detail .cfg-crumb:hover { color: ${ink.base}; text-decoration: underline; text-underline-offset: 3px; }
 `
