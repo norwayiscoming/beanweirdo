@@ -69,8 +69,8 @@ let AUTHORS: Row[] = [
   { id: 'a3', name: 'Khách mời cũ', slug: 'khach-moi', avatar_url: null, bio: 'Viết hai bài về sensory năm ngoái.', active: false, created_at: '', post_count: 2 },
 ]
 
-const topic = (id: string, title: string, sort_order: number, parent_id: string | null, accent: string | null, posts: number): Row => ({
-  id, parent_id, title, intro: '', accent, on_color: null, tint: null, tint2: null, image_url: null, sort_order, visibility: 'public', posts,
+const topic = (id: string, title: string, sort_order: number, parent_id: string | null, accent: string | null, posts: number, site = 'blog', extra: Row = {}): Row => ({
+  id, site, slug: id, parent_id, title, intro: '', look: null, blocks: [], status: 'published', accent, on_color: null, tint: null, tint2: null, image_url: null, sort_order, posts, updated_at: '', ...extra,
 })
 let TOPICS: Row[] = [
   topic('tu-duy', 'tư duy', 1, null, '#F2A0A5', 4),
@@ -80,6 +80,8 @@ let TOPICS: Row[] = [
   topic('sensory', 'sensory', 5, 'bean', null, 3),
   topic('maillard', 'phản ứng Maillard', 6, 'roasting', null, 2),
   topic('ghi', 'ghi', 6, null, '#F0B45C', 12),
+  topic('p1', 'business', 1, null, null, 0, 'port', { slug: 'business', look: 'biz' }),
+  topic('p2', 'bean', 2, null, null, 0, 'port', { slug: 'bean', look: 'baen', status: 'draft' }),
 ]
 const KEYWORDS: Row[] = [
   { id: 'heat', label: 'heat', posts: 4 },
@@ -119,21 +121,21 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     return json({ author: AUTHORS.find((a) => a.id === id) })
   }
   if (url.includes('vocab=authors')) return json({ authors: AUTHORS })
-  if (url.includes('vocab=topics') && method === 'PATCH') {
+  if (url.includes('vocab=nodes') && method === 'PATCH') {
     const id = decodeURIComponent(url.split('id=')[1])
     TOPICS = TOPICS.map((t) => (t.id === id ? { ...t, ...body } : t))
-    return json({ topic: TOPICS.find((t) => t.id === id) })
+    return json({ node: TOPICS.find((t) => t.id === id) })
   }
-  if (url.includes('vocab=topics') && method === 'PUT') {
+  if (url.includes('vocab=nodes') && method === 'PUT') {
     const order = body.order as string[]
     TOPICS = TOPICS.map((t) => ({ ...t, sort_order: order.indexOf(t.id as string) + 1 }))
-    console.log('PUT topics', order.join(' → '))
+    console.log('PUT nodes', order.join(' → '))
     return json({ order })
   }
-  if (url.includes('vocab=topics') && method === 'POST') {
-    const t = topic(String(body.title), String(body.title), TOPICS.length + 1, (body.parent_id as string | null) ?? null, null, 0)
+  if (url.includes('vocab=nodes') && method === 'POST') {
+    const t = topic(String(body.slug ?? body.title), String(body.title), TOPICS.length + 1, (body.parent_id as string | null) ?? null, null, 0, String(body.site), body)
     TOPICS = [...TOPICS, t]
-    return json({ topic: t })
+    return json({ node: t })
   }
   if (url.includes('vocab=layout')) {
     const rule = { id: 'r1', tier: 'topic', nodes: [], exclude: [], kinds: [], templates: [], sort: 'newest', group_by: 'none', limit_n: null, include_children: true, match: 'any', pinned: [], manual_order: [], new_first: true, from_page: true }
@@ -144,16 +146,13 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
       rules: [rule],
     })
   }
-  if (url.includes('vocab=topics')) return json({ topics: TOPICS })
+  if (url.includes('vocab=nodes')) {
+    const site = new URL(url, 'http://x').searchParams.get('site')
+    return json({ nodes: TOPICS.filter((t) => !site || t.site === site) })
+  }
   if (url.includes('vocab=keywords')) return json({ keywords: KEYWORDS })
   if (url.includes('/api/portfolio'))
-    return json({
-      pages: [
-        { id: 'p1', slug: 'business', title: 'business', status: 'published', blocks: [], palette: 'biz', sort_order: 0 },
-        { id: 'p2', slug: 'bean', title: 'bean', status: 'draft', blocks: [], palette: 'baen', sort_order: 1 },
-      ],
-      design: {},
-    })
+    return json({ design: {} })
   if (url.includes('/api/modules')) return json({ modules: MODULES })
   if (url.includes('/api/posts')) return json({ posts: [] })
   if (url.includes('/api/tags')) return json({ tags: [] })

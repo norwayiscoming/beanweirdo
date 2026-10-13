@@ -2,19 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { createPortal } from 'react-dom'
 import { ScaledPreview } from './ScaledPreview'
 import { Choice, Row, Section } from './Detail'
+import { STATUS_CHOICES } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useRowDrag } from '../lib/useRowDrag'
 import { useTags } from '../../data/useTags'
 import {
-  createPortPage,
-  getPortfolio,
+  createNode,
+  getPortDesign,
+  listNodes,
   updatePortDesign,
-  updatePortPage,
+  updateNode,
   updateSite,
   getSite,
   uploadImage,
-  type PortPageRecord,
-  type PortStatus,
+  type Node,
 } from '../lib/apiClient'
 import { PortfolioView } from '../../portfolio/PortfolioView'
 import docHtml from '../../portfolio/design-doc.html?raw'
@@ -196,17 +197,17 @@ export function useSplit(key: string, initial: number, side: 'left' | 'right', m
 
 /** Port pages, the design system and the fixed copy — what every port editor reads. */
 export function usePortAdmin() {
-  const [pages, setPages] = useState<PortPageRecord[]>([])
+  const [pages, setPages] = useState<Node[]>([])
   const [stored, setStored] = useState<Record<string, unknown>>({})
   const [contentStored, setContentStored] = useState<Record<string, unknown>>({})
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([getPortfolio(), getSite()]).then(
-      ([r, site]) => {
-        setPages(r.pages)
-        setStored(r.design)
+    Promise.all([listNodes('port'), getPortDesign(), getSite()]).then(
+      ([nodes, design, site]) => {
+        setPages(nodes)
+        setStored(design)
         setContentStored(((site as Record<string, unknown>).portfolio as Record<string, unknown>) ?? {})
         setLoaded(true)
       },
@@ -221,7 +222,7 @@ export function usePortAdmin() {
 
 // ── tab 1: port pages ───────────────────────────────────────────────────────
 
-function uniqueSlug(base: string, pages: PortPageRecord[]) {
+function uniqueSlug(base: string, pages: Node[]) {
   const taken = new Set(pages.map((p) => p.slug))
   if (!taken.has(base)) return base
   for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`
@@ -233,17 +234,10 @@ export function toSlug(name: string): string {
 }
 
 /** A new port page from a preset, named by the owner; it starts as a draft at the end of the list. */
-export async function createFromPreset(key: PresetKey, title: string, pages: PortPageRecord[], moduleIds: string[]): Promise<PortPageRecord> {
+export async function createFromPreset(key: PresetKey, title: string, pages: Node[], moduleIds: string[]): Promise<Node> {
   const slug = uniqueSlug(toSlug(title) || (key === 'blank' ? 'trang' : key), pages)
-  return createPortPage({ slug, title, blocks: preset(key, moduleIds), palette: key === 'bibe' ? 'baen' : 'biz', sortOrder: pages.length })
+  return createNode({ site: 'port', slug, title, blocks: preset(key, moduleIds), look: key === 'bibe' ? 'baen' : 'biz', status: 'draft' })
 }
-
-/** The port page's status, in the words the blog uses for its posts. */
-export const STATUS_CHOICES: { value: PortStatus; label: string }[] = [
-  { value: 'published', label: 'đã đăng' },
-  { value: 'draft', label: 'nháp' },
-  { value: 'archived', label: 'lưu trữ' },
-]
 
 type Sources = ReturnType<typeof usePortSources>
 
@@ -257,12 +251,12 @@ export function Builder({
   previewSlot,
   flags,
 }: {
-  page: PortPageRecord
+  page: Node
   design: Design
   src: Sources
   content: PortContent
-  pages: PortPageRecord[]
-  onSaved: (p: PortPageRecord) => void
+  pages: Node[]
+  onSaved: (p: Node) => void
   /** The fields are drawn here and the live page goes to this element, Cấu hình's preview column. */
   previewSlot: HTMLElement | null
   /** Hiện trên menu / Hiện ở trang chủ, which live in the port's shared copy, not on the page. */
@@ -274,7 +268,7 @@ export function Builder({
   const postHref = usePostHref()
 
   const save = useCallback(
-    (patch: Record<string, unknown>) => updatePortPage(page.id, patch).then(onSaved),
+    (patch: Record<string, unknown>) => updateNode(page.id, patch).then(onSaved),
     [page.id, onSaved],
   )
   const { push, error } = useDebounced<Record<string, unknown>>(save, (a, b) => ({ ...a, ...b }))
@@ -320,7 +314,7 @@ export function Builder({
           <textarea aria-label="Intro" style={{ ...boxed, minHeight: 44, resize: 'vertical' }} value={draft.intro} placeholder="bấm để viết…" onChange={(e) => set({ intro: e.target.value })} />
         </Row>
         <Row label="Giao diện">
-          <select aria-label="Giao diện" style={boxed} value={draft.palette} onChange={(e) => set({ palette: e.target.value })}>
+          <select aria-label="Giao diện" style={boxed} value={draft.look ?? 'biz'} onChange={(e) => set({ look: e.target.value })}>
             {Object.entries(design.palettes).map(([k, p]) => (
               <option key={k} value={k}>{p.name}</option>
             ))}
@@ -405,7 +399,7 @@ export function Builder({
         <PortfolioView
           title={draft.title}
           intro={draft.intro}
-          palette={draft.palette}
+          palette={draft.look ?? 'biz'}
           blocks={draft.blocks}
           design={design}
           posts={src.posts}
@@ -725,7 +719,7 @@ export function ContentTab({
 }: {
   content: PortContent
   setStored: (f: (s: Record<string, unknown>) => Record<string, unknown>) => void
-  pages: PortPageRecord[]
+  pages: Node[]
   /** The part Cấu hình has open; its heading and address are the detail template's. */
   only: PortPart
 }) {

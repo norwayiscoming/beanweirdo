@@ -25,7 +25,7 @@ const topic = (id: string, parent_id: string | null, sort_order: number, extra =
   on_color: null,
   tint: null,
   tint2: null,
-  visibility: 'public',
+  status: 'published',
   ...extra,
 })
 const post = (id: string, topic_id: string, module_id: string, template = 'longform', published_at = '2026-09-01') => ({

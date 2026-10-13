@@ -11,7 +11,7 @@ import {
   type LayoutPage,
   type StoredRule,
   type Tag,
-  type Topic,
+  type Node,
 } from '../lib/apiClient'
 import { useRowDrag } from '../lib/useRowDrag'
 import { findPage, type PageRow } from '../../data/useModules'
@@ -113,7 +113,7 @@ const moved = <T,>(list: readonly T[], from: number, to: number): T[] => {
   return next
 }
 
-export type Vocab = { topics: Topic[]; keywords: Keyword[]; kinds: Tag[] }
+export type Vocab = { topics: Node[]; keywords: Keyword[]; kinds: Tag[] }
 
 /** A set of options to switch on and off. */
 function Chips({ options, value, onChange }: { options: { id: string; label: string }[]; value: string[]; onChange: (v: string[]) => void }) {

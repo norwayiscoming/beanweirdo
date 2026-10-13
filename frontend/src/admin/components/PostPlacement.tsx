@@ -3,12 +3,12 @@ import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import {
   createKeyword,
   listKeywords,
-  listTopics,
+  listNodes,
   type Keyword,
   type Module,
   type PostDetail,
   type PostVisibility,
-  type Topic,
+  type Node,
 } from '../lib/apiClient'
 import { ink, paper, sans } from '../../design/tokens'
 
@@ -46,7 +46,7 @@ const label: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 }
  * tree as one list. `path` names a topic by its whole branch below the subject
  * (`roasting › maillard`), since two topics in different branches may share a name.
  */
-export function topicOptions(topics: readonly Topic[]): { subject: Topic; children: { topic: Topic; path: string }[] }[] {
+export function topicOptions(topics: readonly Node[]): { subject: Node; children: { topic: Node; path: string }[] }[] {
   const byOrder = [...topics].sort((a, b) => a.sort_order - b.sort_order)
   return buildTree(byOrder).map(({ row: subject, children }) => ({
     subject,
@@ -75,12 +75,12 @@ export function PostPlacement({
   /** Stop an old address forwarding to this post. */
   onForget?: (slug: string) => void
 }) {
-  const [topics, setTopics] = useState<Topic[]>([])
+  const [topics, setTopics] = useState<Node[]>([])
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [slugError, setSlugError] = useState<string | null>(null)
 
   useEffect(() => {
-    void listTopics().then(setTopics)
+    void listNodes('blog').then(setTopics)
     void listKeywords().then(setKeywords)
   }, [])
 

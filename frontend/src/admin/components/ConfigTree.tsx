@@ -3,21 +3,20 @@ import { createPortal } from 'react-dom'
 import {
   createKeyword,
   createPage,
-  createTopic,
+  createNode,
   deletePage,
-  deletePortPage,
+  deleteNode,
   getLayout,
   listKeywords,
   listTags,
-  listTopics,
+  listNodes,
   renameKeyword,
-  reorderTopics,
+  reorderNodes,
   updatePage,
   updateSite,
-  updateTopic,
+  updateNode,
   type Module,
-  type PortPageRecord,
-  type Topic,
+  type Node,
 } from '../lib/apiClient'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { planMove, type DropWhere } from '../../lib/treeMove'
@@ -32,8 +31,8 @@ import { ink, paper, sans, serif } from '../../design/tokens'
 import { radius } from '../../design/controls'
 import { retireKeyword, retireTopic } from '../lib/retire'
 import { Choice, DETAIL_CSS, DetailHead, ItemList, Row, Section, type AddSpec, type DetailAction, type ListItem } from './Detail'
-import { RetireTag, RetireTopic, TopicFields } from './NodeFields'
-import { Builder, ContentTab, createFromPreset, STATUS_CHOICES, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
+import { RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
+import { Builder, ContentTab, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
 import { SiteTabs, useRememberedTab } from './SiteTabs'
 import {
@@ -383,7 +382,7 @@ export function ConfigTree({
   }, [port.content])
 
   const loadLayout = () => getLayout().then(setLayout)
-  const loadVocab = () => Promise.all([listTopics(), listKeywords(), listTags()]).then(([topics, keywords, kinds]) => setVocab({ topics, keywords, kinds }))
+  const loadVocab = () => Promise.all([listNodes('blog'), listKeywords(), listTags()]).then(([topics, keywords, kinds]) => setVocab({ topics, keywords, kinds }))
   useEffect(() => {
     loadLayout().catch((e: Error) => setErr(e.message))
     loadVocab().catch((e: Error) => setErr(e.message))
@@ -430,13 +429,13 @@ export function ConfigTree({
     return {
       // Parent first: the order only means anything once the node sits where it is going.
       apply: async () => {
-        if (from !== p.parentId) await updateTopic(id, { parent_id: p.parentId })
-        await reorderTopics(p.order)
+        if (from !== p.parentId) await updateNode(id, { parent_id: p.parentId })
+        await reorderNodes(p.order)
       },
       revert: async () => {
         placeLocally(id, from, oldOrder)
-        if (from !== p.parentId) await updateTopic(id, { parent_id: from })
-        await reorderTopics(oldOrder)
+        if (from !== p.parentId) await updateNode(id, { parent_id: from })
+        await reorderNodes(oldOrder)
       },
     }
   }
@@ -788,12 +787,12 @@ export function ConfigTree({
         setPicked({ kind: 'port-page', id: p.id })
       }),
   }
-  const addTopic = (parent: Topic | null): AddSpec => ({
+  const addTopic = (parent: Node | null): AddSpec => ({
     label: parent ? 'Thêm mục con' : 'Thêm subject',
     placeholder: parent ? `tên mục mới trong ${parent.title}` : 'tên subject',
     onSave: (name) =>
       run(async () => {
-        await createTopic(name, parent?.id ?? null)
+        await createNode({ site: 'blog', title: name, parent_id: parent?.id ?? null })
         if (parent)
           setFolded((f) => {
             const next = new Set(f)
@@ -808,7 +807,7 @@ export function ConfigTree({
    * (the header link's hidden flag) and on the port home (its feature cards).
    * Only a published page is on either.
    */
-  const portFlags = (p: PortPageRecord): ReactNode => {
+  const portFlags = (p: Node): ReactNode => {
     if (p.status !== 'published')
       return (
         <Row label="Hiện trên menu">
@@ -862,7 +861,7 @@ export function ConfigTree({
       crumbs = ['Port', 'Mục lục']
       title = p.title
       address = p.status === 'published' ? `/${p.slug}` : ''
-      facts = [STATUS_CHOICES.find((s) => s.value === p.status)?.label ?? p.status]
+      facts = [statusLabel(p.status)]
       actions = [
         {
           label: 'Xoá trang…',
@@ -870,7 +869,7 @@ export function ConfigTree({
           onPick: () => {
             if (!window.confirm(`Xoá trang “${p.title}”? Thao tác này không hoàn tác được.`)) return
             run(async () => {
-              await deletePortPage(p.id)
+              await deleteNode(p.id)
               port.setPages((ps) => ps.filter((x) => x.id !== p.id))
               setPicked({ kind: 'group', id: 'port-pages' })
             })
@@ -934,10 +933,10 @@ export function ConfigTree({
       const kids = sorted.filter((x) => x.parent_id === t.id)
       crumbs = ['Personal Blog', 'Mục lục', ...ancestorsOf(sorted, t.id).map((x) => x.title)]
       title = t.title
-      rename = (v) => run(() => updateTopic(t.id, { title: v }))
+      rename = (v) => run(() => updateNode(t.id, { title: v }))
       address = toPath({ area: 'public', screen: 'module', moduleId: t.id })
       preview = address
-      facts = [posts(t.posts), t.visibility === 'public' ? 'công khai' : 'riêng tư']
+      facts = [posts(t.posts), statusLabel(t.status)]
       actions = [{ label: 'Xoá…', danger: true, onPick: () => setRetiring(true) }]
       body = (
         <>
@@ -959,7 +958,7 @@ export function ConfigTree({
               parent={t.parent_id ? vocab.topics.find((x) => x.id === t.parent_id) : undefined}
               tree={shownTopics}
               used={[...new Set(vocab.topics.map((x) => x.accent).filter((c): c is string => !!c))]}
-              save={(patch) => run(() => updateTopic(t.id, patch))}
+              save={(patch) => run(() => updateNode(t.id, patch))}
             />
             <NavFlags layout={layout} navRef={`topic:${t.id}`} defaults={{ sidebar: true, home: t.parent_id === null }} run={run} />
           </Section>

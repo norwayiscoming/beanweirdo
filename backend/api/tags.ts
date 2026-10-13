@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { withCors } from '../lib/cors.js'
 import { requireAuth } from '../lib/auth.js'
 import { getSupabase } from '../lib/supabase.js'
-import { handleKeywords, handleTopics, slug, vocabOf } from '../lib/vocab.js'
+import { handleKeywords, handleNodes, slug, vocabOf } from '../lib/vocab.js'
 import { handleLayout } from '../lib/layout.js'
 import { handleAuthors } from '../lib/authorsApi.js'
 
@@ -14,7 +14,7 @@ import { handleAuthors } from '../lib/authorsApi.js'
  *   PATCH  /api/tags?id=…       rename one, and everything wearing it
  *   DELETE /api/tags?id=…       remove one, after saying where its things go
  *
- *   ?vocab=topics | keywords    the topic tree and theme tags (lib/vocab.ts)
+ *   ?vocab=nodes | keywords     every site's pages and theme tags (lib/vocab.ts)
  *   ?vocab=layout | rules | pages | overrides   the feature layer (lib/layout.ts)
  *   ?vocab=authors              author profiles (lib/authorsApi.ts)
  *
@@ -43,7 +43,7 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
 
   // The content layer's two vocabularies live on this endpoint too.
   const vocab = vocabOf(req)
-  if (vocab === 'topics') return handleTopics(req, res, supabase)
+  if (vocab === 'nodes') return handleNodes(req, res, supabase)
   if (vocab === 'keywords') return handleKeywords(req, res, supabase)
   const layout = typeof req.query.vocab === 'string' ? req.query.vocab : ''
   if (['layout', 'rules', 'pages', 'overrides'].includes(layout)) return handleLayout(req, res, supabase, layout)

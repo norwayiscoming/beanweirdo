@@ -23,7 +23,7 @@ vi.mock('../lib/apiClient', async () => {
     ...real,
     getPost: (...a: unknown[]) => getPost(...a),
     // The placement row (migration 0027) loads the content layer's vocabularies.
-    listTopics: vi.fn(async () => []),
+    listNodes: vi.fn(async () => []),
     listKeywords: vi.fn(async () => []),
     listTags: vi.fn(async () => []),
     listModules: (...a: unknown[]) => listModules(...a),
