@@ -1,5 +1,5 @@
 /**
- * The nine marks the back office draws.
+ * The marks the back office draws.
  *
  * They were Unicode characters typed straight into JSX, which meant every
  * machine drew them with whatever face had the glyph and nothing could set
@@ -110,3 +110,53 @@ export const IconAlert = ({ size = 16, style }: IconProps) =>
 
 export const IconInfo = ({ size = 16, style }: IconProps) =>
   svg(size, style, <path d="M12 10v10M12 4v2" />)
+
+/** The ⋮ that opens a row's or a page's actions. */
+export const IconMore = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <circle cx="12" cy="5" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="12" cy="19" r="2" />
+    </>,
+    true,
+  )
+
+/** Six dots: the handle a row is dragged by. */
+export const IconGrip = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <circle cx="9" cy="6" r="1.7" />
+      <circle cx="15" cy="6" r="1.7" />
+      <circle cx="9" cy="12" r="1.7" />
+      <circle cx="15" cy="12" r="1.7" />
+      <circle cx="9" cy="18" r="1.7" />
+      <circle cx="15" cy="18" r="1.7" />
+    </>,
+    true,
+  )
+
+export const IconEdit = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
+    </>,
+  )
+
+/** Opens somewhere else — a new tab. */
+export const IconExternal = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <path d="M14 4h6v6M20 4l-9 9" />
+      <path d="M18 14v6H4V6h6" />
+    </>,
+  )

@@ -1,20 +1,12 @@
 /**
- * The one button in the back office.
+ * The one button in the back office, in three shapes: `Button` (a label, maybe
+ * an icon), `IconButton` (an icon alone) and `ButtonLink` (looks the same, goes
+ * somewhere). Every screen draws these instead of styling a `<button>` inline,
+ * which is how the admin ended up with three button looks side by side.
  *
- * Before this there was none: `admin.css` carried `.admin-btn`,
- * `.admin-btn-ghost` and `.admin-tab`, used 3, 4 and 0 times, and none of the
- * three on the Content-management screens — everything there wrote its own
- * inline style, which is how most of them ended up as bare text.
- *
- * Every level draws a visible border at rest. A control that only appears on
- * hover is a control nobody finds, and a control with no border is the thing
- * the owner was pointing at when they said the buttons look like text.
- *
- * The paint is in `admin.css` (`.ab-*`) because hover, disabled and
- * `:focus-visible` cannot be expressed inline; the measurements are in
- * `design/controls.ts`.
+ * The paint is in `admin.css` (`.ab-*`); see `design/controls.ts` for the levels.
  */
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes, ReactNode } from 'react'
 import type { Level, Size } from './controls'
 
 type Common = {
@@ -24,21 +16,26 @@ type Common = {
 
 type ButtonProps = Common &
   Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> & {
-    /** Drawn before the label, at the size the button's own size implies. */
+    /** Drawn before the label. */
     icon?: ReactNode
+    /** A keyboard shortcut shown after the label, e.g. "⌘S". Only drawn; the screen binds the key. */
+    shortcut?: string
     children: ReactNode
   }
+
+const cls = (level: Level, size: Size, extra = '') => `ab ab-${level} ab-${size}${extra}`
 
 /**
  * `type="button"` by default on purpose: inside the several forms in the CMS a
  * bare `<button>` submits, and a row action that reloads the page is a bug that
  * only shows up once someone presses Enter in a field next to it.
  */
-export function Button({ level = 'ghost', size = 'md', icon, children, type = 'button', ...rest }: ButtonProps) {
+export function Button({ level = 'secondary', size = 'md', icon, shortcut, children, type = 'button', ...rest }: ButtonProps) {
   return (
-    <button type={type} className={`ab ab-${level} ab-${size}`} {...rest}>
+    <button type={type} className={cls(level, size)} {...rest}>
       {icon}
       {children}
+      {shortcut && <kbd className="ab-kbd">{shortcut}</kbd>}
     </button>
   )
 }
@@ -53,21 +50,27 @@ type IconButtonProps = Common &
     children: ReactNode
   }
 
-/**
- * Square, at the height of the text button beside it, so a toolbar mixing the
- * two keeps one baseline. `lg` is not offered: an icon alone is never the
- * loudest thing on a screen.
- */
-export function IconButton({ level = 'ghost', size = 'md', label, children, type = 'button', ...rest }: IconButtonProps) {
+/** Square, at the height of the text button beside it, so a toolbar keeps one line. */
+export function IconButton({ level = 'quiet', size = 'md', label, children, type = 'button', ...rest }: IconButtonProps) {
   return (
-    <button
-      type={type}
-      className={`ab ab-${level} ab-icon${size === 'sm' ? ' ab-icon-sm' : ''}`}
-      aria-label={label}
-      title={label}
-      {...rest}
-    >
+    <button type={type} className={cls(level, size, ' ab-icon')} aria-label={label} title={label} {...rest}>
       {children}
     </button>
+  )
+}
+
+type ButtonLinkProps = Common &
+  Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'className'> & {
+    icon?: ReactNode
+    children: ReactNode
+  }
+
+/** A link drawn as a button — "Xem trang", "Xem trước" — so it opens in a new tab like a link. */
+export function ButtonLink({ level = 'secondary', size = 'md', icon, children, ...rest }: ButtonLinkProps) {
+  return (
+    <a className={cls(level, size)} {...rest}>
+      {icon}
+      {children}
+    </a>
   )
 }

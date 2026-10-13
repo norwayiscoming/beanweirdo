@@ -6,6 +6,8 @@ import { ScaledPreview, useWidth } from './ScaledPreview'
 import { SiteTabs, useRememberedTab } from './SiteTabs'
 import { desk } from './Detail'
 import { radius } from '../../design/controls'
+import { Button, IconButton } from '../../design/Button'
+import { IconClose } from '../../design/icons'
 
 /**
  * Cài đặt hiển thị — one half per site. Personal Blog: its addresses, the
@@ -109,7 +111,7 @@ function BlogDesignPanel({ stored, onSave }: { stored: BlogDesign; onSave: (patc
   const stacked = rootWidth > 0 && rootWidth < 860
   const group = (title: string, body: ReactNode, extra?: ReactNode) => (
     <>
-      <div style={{ ...sectionHead, display: 'flex', justifyContent: 'space-between' }}>
+      <div style={{ ...sectionHead, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{title}</span>
         {extra}
       </div>
@@ -148,9 +150,9 @@ function BlogDesignPanel({ stored, onSave }: { stored: BlogDesign; onSave: (patc
             ))}
           </div>,
           changed && (
-            <button type="button" onClick={() => save(Object.fromEntries(Object.keys(stored).map((k) => [k, null])))} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: ink.soft }}>
+            <Button level="quiet" size="sm" onClick={() => save(Object.fromEntries(Object.keys(stored).map((k) => [k, null])))}>
               Trả về mặc định
-            </button>
+            </Button>
           ),
         )}
         {BLOG_COLORS.map((g) => (
@@ -176,9 +178,15 @@ function BlogDesignPanel({ stored, onSave }: { stored: BlogDesign; onSave: (patc
                         <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, color: own ? ink.base : ink.soft }}>
                           {value.toUpperCase()}
                           {own && (
-                            <button type="button" aria-label={`${g.names[name] ?? name}: về mặc định`} onClick={(e) => (e.preventDefault(), save({ [key]: null }))} style={{ all: 'unset', cursor: 'pointer', marginLeft: 6, color: ink.soft }}>
-                              ×
-                            </button>
+                            // Shrunk to the line it sits in, so a reset colour does not make its row taller than the rest.
+                            <IconButton
+                              size="sm"
+                              label={`${g.names[name] ?? name}: về mặc định`}
+                              onClick={(e) => (e.preventDefault(), save({ [key]: null }))}
+                              style={{ width: 18, height: 18, marginLeft: 4, verticalAlign: 'middle' }}
+                            >
+                              <IconClose size={12} />
+                            </IconButton>
                           )}
                         </span>
                       </span>

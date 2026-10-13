@@ -341,7 +341,7 @@ function AuthorDialog({
           <h2 style={{ fontFamily: serif, fontSize: 18, fontWeight: 400, margin: 0, color: ink.base }}>
             {creating ? 'Thêm tác giả' : 'Sửa tác giả'}
           </h2>
-          <IconButton level="ghost" label="Đóng" onClick={onClose}>
+          <IconButton label="Đóng" onClick={onClose}>
             <IconClose size={16} />
           </IconButton>
         </div>
@@ -417,7 +417,9 @@ function AuthorDialog({
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-            <Button onClick={onClose}>Huỷ</Button>
+            <Button level="quiet" onClick={onClose}>
+              Huỷ
+            </Button>
             <Button type="submit" level="primary" disabled={busy || uploading || !form.name.trim()}>
               {busy ? 'Đang lưu…' : 'Lưu'}
             </Button>

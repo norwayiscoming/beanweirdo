@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { ink, paper, sans } from '../../design/tokens'
 
 /**
  * The row of site tabs (Personal Blog | Port | …) that splits an admin screen
@@ -8,16 +7,9 @@ import { ink, paper, sans } from '../../design/tokens'
  */
 export function SiteTabs<T extends string>({ tabs, labels, value, onChange }: { tabs: readonly T[]; labels: Record<T, string>; value: T; onChange: (t: T) => void }) {
   return (
-    <div role="tablist" style={{ display: 'inline-flex', border: `1px solid ${paper.rule}`, background: paper.white }}>
-      {tabs.map((s, i) => (
-        <button
-          key={s}
-          type="button"
-          role="tab"
-          aria-selected={value === s}
-          onClick={() => onChange(s)}
-          style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 13, padding: '7px 18px', borderLeft: i ? `1px solid ${paper.rule}` : undefined, background: value === s ? ink.base : 'transparent', color: value === s ? paper.cream : ink.soft }}
-        >
+    <div role="tablist" className="ab-seg">
+      {tabs.map((s) => (
+        <button key={s} type="button" role="tab" aria-selected={value === s} onClick={() => onChange(s)}>
           {labels[s]}
         </button>
       ))}

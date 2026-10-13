@@ -100,7 +100,7 @@ export function PlateUpload({
   return (
     <div ref={wrapRef} style={{ position: 'relative', display: 'flex', gap: 6 }}>
       {/*
-        `secondary` chứ không phải `ghost`: nút này nằm trên ảnh chứ không nằm
+        `secondary` chứ không phải `quiet`: nút này nằm trên ảnh chứ không nằm
         trên giấy, nên nó cần nền đặc và viền đậm hơn mới đọc được trên một tấm
         ảnh sáng. Hình dạng vẫn là hình dạng chung — cùng bán kính bo, cùng độ
         dày viền, cùng bộ icon.

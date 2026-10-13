@@ -87,30 +87,20 @@ function AlignRow({
         ]
 
   return (
-    <div style={{ display: 'flex', gap: 4, opacity: enabled ? 1 : 0.3 }}>
+    <div className="ab-seg" style={{ opacity: enabled ? 1 : 0.3 }}>
       {stops.map((s) => {
         const on = enabled && Math.round(value) === s.at
         return (
           <button
             key={s.at}
+            type="button"
             title={s.title}
             aria-label={s.title}
             aria-pressed={on}
             disabled={!enabled}
             onClick={() => onPick(s.at)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 30,
-              height: 28,
-              padding: 0,
-              borderRadius: radius,
-              cursor: enabled ? 'pointer' : 'default',
-              border: `1px solid ${on ? ink.base : ink.border}`,
-              background: on ? paper.hover : 'transparent',
-              color: on ? ink.base : ink.soft,
-            }}
+            // Square cells: the joined group is sized for words, these hold a drawing.
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 32, padding: 0, cursor: enabled ? 'pointer' : 'default' }}
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
               <path d={s.d} />
@@ -398,7 +388,7 @@ export function FocusPicker({
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <AlignRow axis="x" value={focus.x} enabled={panX} onPick={(x) => setFocus({ ...focus, x })} />
             <AlignRow axis="y" value={focus.y} enabled={panY} onPick={(y) => setFocus({ ...focus, y })} />
-            <Button level="ghost" size="sm" onClick={onCancel}>
+            <Button level="quiet" size="sm" onClick={onCancel}>
               Huỷ
             </Button>
             <Button level="primary" size="sm" onClick={() => onSave(withFocus(url, focus))}>

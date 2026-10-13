@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ScaledPreview } from './ScaledPreview'
-import { Choice, Row, Section, desk, frame } from './Detail'
+import { Choice, Row, Section, desk } from './Detail'
+import { Button, IconButton } from '../../design/Button'
+import { IconClose, IconGrip, IconPlus } from '../../design/icons'
 import { ColorRow, STATUS_CHOICES } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useRowDrag } from '../lib/useRowDrag'
@@ -79,8 +81,6 @@ const boxed: CSSProperties = {
   outline: 'none',
 }
 const small: CSSProperties = { ...boxed, padding: '6px 8px', fontSize: 12 }
-const btn: CSSProperties = { ...frame }
-const quiet: CSSProperties = { ...btn, border: `1px solid ${paper.rule}`, color: ink.soft }
 
 function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
@@ -319,7 +319,7 @@ export function Builder({
         {error && <div style={{ color: ink.danger, fontFamily: sans, fontSize: 12, paddingTop: 6 }}>{error}</div>}
       </Section>
 
-      <Section title="Nội dung trang" note={`${draft.blocks.length} khối · kéo ⋮⋮ để xếp, bấm để sửa`}>
+      <Section title="Nội dung trang" note={`${draft.blocks.length} khối · kéo ⠿ để xếp, bấm để sửa`}>
         {draft.blocks.map((b, i) => (
           <div
             key={b.id}
@@ -343,22 +343,23 @@ export function Builder({
               onClick={() => setActive(active === b.id ? null : b.id)}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', cursor: 'pointer', fontFamily: sans, fontSize: 14 }}
             >
-              <span style={{ cursor: 'grab', color: ink.soft, letterSpacing: -2, width: 18, textAlign: 'center' }} aria-label="Kéo để đổi thứ tự">⋮⋮</span>
+              <span className="ab-grip" aria-label="Kéo để đổi thứ tự">
+                <IconGrip size={14} />
+              </span>
               <span style={{ fontSize: 12.5, color: ink.soft, width: 20, fontVariantNumeric: 'tabular-nums' }}>{String(i + 1).padStart(2, '0')}</span>
               {/* A chip per block kind, so a page of eight blocks can be read by type at a glance. */}
               <span style={{ ...BLOCK_CHIP[b.type], fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 999, whiteSpace: 'nowrap' }}>{BLOCK_NAMES[b.type]}</span>
               <span style={{ flex: 1, minWidth: 0, color: ink.strong, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary(b, src.moduleTitles).replace(/^ · /, '')}</span>
-              <button
-                className="cfg-btn"
-                style={{ ...frame, width: 28, height: 28, padding: 0, fontSize: 16, borderColor: desk.field }}
+              <IconButton
+                size="sm"
+                label="bỏ khối"
                 onClick={(e) => {
                   e.stopPropagation()
                   setBlocks(draft.blocks.filter((x) => x.id !== b.id))
                 }}
-                aria-label="bỏ khối"
               >
-                ×
-              </button>
+                <IconClose size={14} />
+              </IconButton>
             </div>
             {active === b.id && (
               <div style={{ padding: '4px 4px 10px 26px' }}>
@@ -374,17 +375,19 @@ export function Builder({
             )}
           </div>
         ))}
-        <button
-          className="cfg-btn"
-          style={{ ...frame, marginTop: 12 }}
-          onClick={() => {
-            const b = newBlock('cards', src.moduleIds[0])
-            setBlocks([...draft.blocks, b])
-            setActive(b.id)
-          }}
-        >
-          + Thêm khối
-        </button>
+        <div style={{ marginTop: 12 }}>
+          <Button
+            level="add"
+            icon={<IconPlus size={14} />}
+            onClick={() => {
+              const b = newBlock('cards', src.moduleIds[0])
+              setBlocks([...draft.blocks, b])
+              setActive(b.id)
+            }}
+          >
+            Thêm khối
+          </Button>
+        </div>
       </Section>
     </>
   )
@@ -692,9 +695,9 @@ function ImageField({ label, value, onChange }: { label: string; value: string; 
       <div style={{ display: 'grid', gridTemplateColumns: '56px minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
         <div style={{ width: 56, height: 56, background: value ? `center/cover no-repeat url("${value.split('#')[0]}")` : paper.rule, border: `1px solid ${paper.rule}` }} />
         <input style={small} value={value} placeholder="URL ảnh" onChange={(e) => onChange(e.target.value)} />
-        <button style={{ ...btn, padding: '6px 10px', fontSize: 13 }} disabled={busy} onClick={() => ref.current?.click()}>
+        <Button size="sm" disabled={busy} onClick={() => ref.current?.click()}>
           {busy ? 'Đang tải…' : 'Tải ảnh'}
-        </button>
+        </Button>
         <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => upload(e.target.files?.[0])} />
       </div>
       {err && <div style={{ color: '#8E1E42', fontFamily: sans, fontSize: 12, marginTop: 4 }}>{err}</div>}
@@ -704,8 +707,8 @@ function ImageField({ label, value, onChange }: { label: string; value: string; 
 
 const two: CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '0 22px' }
 const rowBox: CSSProperties = { borderTop: `1px solid ${paper.rule}`, padding: '10px 0 6px' }
-/** "+ Thêm …" as the detail template writes it: a green line of text, not a box. */
-const addLine: CSSProperties = { ...frame, marginTop: 8 }
+/** "+ Thêm …" sits on its own line under the list it adds to. */
+const addLine: CSSProperties = { marginTop: 8 }
 
 const NEW = '__new'
 
@@ -745,17 +748,18 @@ function AddFeature({ pages, onAdd, onNewPage }: { pages: Node[]; onAdd: (pageId
   }
   if (!open)
     return (
-      <button
-        type="button"
-        className="cfg-btn"
-        style={addLine}
-        onClick={() => {
-          setWhich(pages[0]?.id ?? NEW)
-          setOpen(true)
-        }}
-      >
-        + Thêm khối
-      </button>
+      <div style={addLine}>
+        <Button
+          level="add"
+          icon={<IconPlus />}
+          onClick={() => {
+            setWhich(pages[0]?.id ?? NEW)
+            setOpen(true)
+          }}
+        >
+          Thêm khối
+        </Button>
+      </div>
     )
   const label = { fontFamily: sans, fontSize: 13, fontWeight: 600, color: ink.strong }
   return (
@@ -780,12 +784,12 @@ function AddFeature({ pages, onAdd, onNewPage }: { pages: Node[]; onAdd: (pageId
         </>
       )}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button type="button" disabled={!ready || busy} onClick={() => void save()} className="cfg-btn" style={{ ...frame, background: ready ? ink.moss : paper.hover, borderColor: ready ? ink.moss : desk.field, color: ready ? paper.white : ink.muted, cursor: ready ? 'pointer' : 'not-allowed' }}>
+        <Button level="primary" disabled={!ready || busy} onClick={() => void save()}>
           {busy ? 'Đang tạo…' : 'Lưu'}
-        </button>
-        <button type="button" onClick={close} className="cfg-btn" style={{ ...frame, borderColor: 'transparent', background: 'transparent', color: ink.strong }}>
+        </Button>
+        <Button level="quiet" onClick={close}>
           Huỷ
-        </button>
+        </Button>
       </div>
       {err && <div style={{ color: '#8E1E42', fontFamily: sans, fontSize: 12.5 }}>{err}</div>}
     </div>
@@ -855,7 +859,11 @@ export function ContentTab({
       )}
     </Field>
   )
-  const grip = <span style={{ cursor: 'grab', color: ink.soft }} aria-label="Kéo để đổi thứ tự">⋮⋮</span>
+  const grip = (
+    <span className="ab-grip" aria-label="Kéo để đổi thứ tự">
+      <IconGrip size={14} />
+    </span>
+  )
   const dragProps = (d: ReturnType<typeof useRowDrag>, i: number) => ({
     draggable: true,
     onDragStart: () => d.setFrom(i),
@@ -925,9 +933,9 @@ export function ContentTab({
                 {page?.title}
                 {page?.status === 'draft' && <span style={{ fontFamily: sans, fontSize: 12, color: ink.soft, marginLeft: 10 }}>nháp · hiện khi trang được đăng</span>}
               </span>
-              <button style={{ border: 0, background: 'none', color: ink.soft, cursor: 'pointer', fontSize: 15 }} aria-label="Bỏ khỏi trang tổng" onClick={() => saveFeatures(features.filter((_, j) => j !== i))}>
-                ×
-              </button>
+              <IconButton size="sm" label="Bỏ khỏi trang tổng" onClick={() => saveFeatures(features.filter((_, j) => j !== i))}>
+                <IconClose size={14} />
+              </IconButton>
             </div>
             <div style={two}>
               {text('Nhãn', f.label, (v) => set({ label: v }))}
@@ -965,7 +973,7 @@ export function ContentTab({
       {show('sign') && (
         <>
       {about.signs.map((sg, i) => (
-        <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px minmax(0,1fr) 24px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+        <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px minmax(0,1fr) 28px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
           <label style={{ fontFamily: sans, fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
             <input type="radio" name="about-sign" checked={about.signUse === i} onChange={() => setGroup('about', { ...about, signUse: i })} />
             Dùng
@@ -975,9 +983,9 @@ export function ContentTab({
             value={sg}
             onChange={(e) => setGroup('about', { ...about, signs: about.signs.map((x, j) => (j === i ? e.target.value : x)) })}
           />
-          <button
-            style={{ border: 0, background: 'none', color: ink.soft, cursor: 'pointer', fontSize: 15 }}
-            aria-label="Xoá ký tên"
+          <IconButton
+            size="sm"
+            label="Xoá ký tên"
             onClick={() => {
               const signs = about.signs.filter((_, j) => j !== i)
               // Keep pointing at the same signature when one above it is removed.
@@ -985,13 +993,15 @@ export function ContentTab({
               setGroup('about', { ...about, signs, signUse })
             }}
           >
-            ×
-          </button>
+            <IconClose size={14} />
+          </IconButton>
         </div>
       ))}
-      <button style={addLine} onClick={() => setGroup('about', { ...about, signs: [...about.signs, ''] })}>
-        + Thêm ký tên
-      </button>
+      <div style={addLine}>
+        <Button level="add" icon={<IconPlus size={14} />} onClick={() => setGroup('about', { ...about, signs: [...about.signs, ''] })}>
+          Thêm ký tên
+        </Button>
+      </div>
         </>
       )}
 
@@ -1006,18 +1016,20 @@ export function ContentTab({
         const set = (patch: Partial<LinkItem>) =>
           setGroup('about', { ...about, reach: about.reach.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
         return (
-          <div key={i} style={{ display: 'grid', gridTemplateColumns: '140px minmax(0,1fr) 24px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '140px minmax(0,1fr) 28px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
             <input style={small} value={l.label} placeholder="Nhãn" onChange={(e) => set({ label: e.target.value })} />
             <input style={small} value={l.url} placeholder="Link" onChange={(e) => set({ url: e.target.value })} />
-            <button style={{ border: 0, background: 'none', color: ink.soft, cursor: 'pointer', fontSize: 15 }} aria-label="Xoá link" onClick={() => setGroup('about', { ...about, reach: about.reach.filter((_, j) => j !== i) })}>
-              ×
-            </button>
+            <IconButton size="sm" label="Xoá link" onClick={() => setGroup('about', { ...about, reach: about.reach.filter((_, j) => j !== i) })}>
+              <IconClose size={14} />
+            </IconButton>
           </div>
         )
       })}
-      <button style={addLine} onClick={() => setGroup('about', { ...about, reach: [...about.reach, { label: '', url: '' }] })}>
-        + Thêm link
-      </button>
+      <div style={addLine}>
+        <Button level="add" icon={<IconPlus size={14} />} onClick={() => setGroup('about', { ...about, reach: [...about.reach, { label: '', url: '' }] })}>
+          Thêm link
+        </Button>
+      </div>
         </>
       )}
     </div>
@@ -1181,12 +1193,12 @@ export function DesignTab({
   }
 
   const head = (t: string, group: keyof Design) => (
-    <div style={{ ...sectionHead, display: 'flex', justifyContent: 'space-between' }}>
+    <div style={{ ...sectionHead, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
       <span>{t}</span>
       {group in stored && (
-        <button style={{ border: 0, background: 'none', cursor: 'pointer', fontFamily: sans, fontSize: 13, color: ink.soft }} onClick={() => reset(group)}>
+        <Button level="quiet" size="sm" onClick={() => reset(group)}>
           Mặc định
-        </button>
+        </Button>
       )}
     </div>
   )
@@ -1225,20 +1237,23 @@ export function DesignTab({
               ))}
             </div>
             {!(key in DEFAULT_DESIGN.palettes) && (
-              <button style={{ ...quiet, border: 0, padding: 0, color: '#8E1E42' }} onClick={() => put('palettes', key, null)}>Xoá bảng màu</button>
+              <Button level="danger" size="sm" onClick={() => put('palettes', key, null)}>
+                Xoá bảng màu
+              </Button>
             )}
           </div>
         ))}
-        <button
-          style={quiet}
+        <Button
+          level="add"
+          icon={<IconPlus size={14} />}
           onClick={() => {
             let n = Object.keys(design.palettes).length + 1
             while (`p${n}` in design.palettes) n++
             put('palettes', `p${n}`, { ...DEFAULT_DESIGN.palettes.biz, name: `Bảng màu ${n}` })
           }}
         >
-          + Thêm bảng màu
-        </button>
+          Thêm bảng màu
+        </Button>
 
         {head('Màu ngữ cảnh', 'signal')}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
@@ -1248,19 +1263,21 @@ export function DesignTab({
 
         {head('Kiểu chữ', 'fonts')}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <button style={{ ...btn, padding: '5px 10px', fontSize: 13 }} disabled={uploading} onClick={() => fileRef.current?.click()}>
+          <Button size="sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
             {uploading ? 'Đang tải…' : 'Cập nhật'}
-          </button>
+          </Button>
           <input ref={fileRef} type="file" accept=".woff2,.woff,.ttf,.otf" style={{ display: 'none' }} onChange={(e) => addFont(e.target.files?.[0])} />
           {fontError && <span style={{ color: '#8E1E42', fontFamily: sans, fontSize: 12 }}>{fontError}</span>}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
           {design.fonts.library.map((f) => (
-            <span key={f} style={{ fontFamily: `"${f}"`, fontSize: 15, border: `1px solid ${paper.rule}`, background: paper.white, padding: '4px 8px' }}>
+            <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontFamily: `"${f}"`, fontSize: 15, border: `1px solid ${paper.rule}`, background: paper.white, padding: '4px 8px' }}>
               {f}
               {![design.fonts.display, design.fonts.body, design.fonts.meta].includes(f) && (
-                <button
-                  style={{ border: 0, background: 'none', cursor: 'pointer', color: ink.soft, marginLeft: 6 }}
+                <IconButton
+                  size="sm"
+                  label={`Xoá ${f}`}
+                  style={{ height: 20, width: 20, marginRight: -4 }}
                   onClick={() => {
                     put('fonts', 'library', design.fonts.library.filter((x) => x !== f))
                     if (f in design.fonts.files) {
@@ -1268,10 +1285,9 @@ export function DesignTab({
                       put('fonts', 'files', rest)
                     }
                   }}
-                  aria-label={`Xoá ${f}`}
                 >
-                  ×
-                </button>
+                  <IconClose size={12} />
+                </IconButton>
               )}
             </span>
           ))}

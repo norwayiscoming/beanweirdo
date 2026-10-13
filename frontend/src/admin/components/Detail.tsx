@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
-import { ink, paper, sans } from '../../design/tokens'
-import { radius } from '../../design/controls'
+import { ink, sans } from '../../design/tokens'
+import { ctl, radius } from '../../design/controls'
+import { Button, ButtonLink, IconButton } from '../../design/Button'
+import { IconExternal, IconGrip, IconMore, IconPlus } from '../../design/icons'
 import type { DropWhere } from '../../lib/treeMove'
 
 /**
@@ -33,7 +35,7 @@ export const desk = {
   panel: '#FFFFFF',
   line: '#E3DFD5',
   /** The frame of a field: dark enough to see on white, lighter than a button's. */
-  field: '#CFCABE',
+  field: '#D1D5DB',
   /** Behind the address and a selected row. */
   soft: '#E4F0DF',
 } as const
@@ -48,27 +50,6 @@ export type DetailAction = {
 
 /** One step of where the item sits; a step with `open` goes back to it. */
 export type Crumb = { label: string; open?: () => void }
-
-/** A framed button, the one shape every control on the panel takes. */
-export const frame = {
-  all: 'unset',
-  boxSizing: 'border-box',
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
-  height: 34,
-  padding: '0 14px',
-  borderRadius: radius,
-  border: `1px solid ${ink.border}`,
-  background: desk.panel,
-  fontFamily: sans,
-  fontSize: 13.5,
-  fontWeight: 500,
-  color: ink.base,
-  whiteSpace: 'nowrap',
-} as const
 
 /**
  * The ⋮ that holds a row's or a page's actions — the one shape for "more
@@ -108,37 +89,28 @@ export function Menu({ actions, label = 'Thao tác', small }: { actions: DetailA
     const need = actions.reduce((h, a) => h + (a.off ? 56 : 38), 12)
     setAt(window.innerHeight - r.bottom < need && r.top > need ? { bottom: window.innerHeight - r.top + 4, right } : { top: r.bottom + 4, right })
   }
-  const size = small ? 28 : 34
   return (
     <div ref={box} style={{ position: 'relative', flex: 'none' }}>
-      <button
-        type="button"
-        aria-label={label}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={toggle}
-        className="cfg-btn"
-        style={{ ...frame, width: size, height: size, padding: 0, fontSize: 17, borderColor: small ? desk.field : ink.border, background: open ? paper.hover : desk.panel }}
-      >
-        ⋮
-      </button>
+      <IconButton label={label} size={small ? 'sm' : 'md'} level={small ? 'quiet' : 'secondary'} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+        <IconMore />
+      </IconButton>
       {at && (
-        <div role="menu" style={{ position: 'fixed', ...at, zIndex: 50, width: 230, background: desk.panel, border: `1px solid ${ink.border}`, borderRadius: radius, boxShadow: '0 10px 24px rgba(35,33,26,.14)', padding: '4px 0', textAlign: 'left' }}>
+        <div role="menu" className="ab-menu" style={at}>
           {actions.map((a) => (
             <button
               key={a.label}
               type="button"
               role="menuitem"
               disabled={!!a.off}
+              data-danger={a.danger}
               onClick={() => {
                 setAt(null)
                 a.onPick?.()
               }}
-              className="cfg-menuitem"
-              style={{ all: 'unset', boxSizing: 'border-box', display: 'block', width: '100%', padding: '9px 14px', cursor: a.off ? 'default' : 'pointer', fontFamily: sans, fontSize: 14, fontWeight: 500, color: a.off ? ink.muted : a.danger ? ink.danger : ink.base }}
+              className="ab-menuitem"
             >
               {a.label}
-              {a.off && <span style={{ display: 'block', fontSize: 12.5, fontWeight: 400, color: ink.soft, marginTop: 2 }}>{a.off}</span>}
+              {a.off && <small>{a.off}</small>}
             </button>
           ))}
         </div>
@@ -173,7 +145,7 @@ export function DetailHead({
           <span key={i}>
             {i > 0 && ' › '}
             {c.open ? (
-              <button type="button" onClick={c.open} className="cfg-crumb" style={{ all: 'unset', cursor: 'pointer', color: ink.strong, textDecoration: 'underline', textDecorationColor: ink.faint, textUnderlineOffset: 3 }}>
+              <button type="button" onClick={c.open} className="cfg-crumb">
                 {c.label}
               </button>
             ) : (
@@ -203,9 +175,9 @@ export function DetailHead({
         </h2>
         <div style={{ display: 'flex', gap: 8 }}>
           {address && (
-            <a href={address} target="_blank" rel="noreferrer" className="cfg-btn" style={frame}>
-              Xem trang ↗
-            </a>
+            <ButtonLink href={address} target="_blank" rel="noreferrer" icon={<IconExternal />}>
+              Xem trang
+            </ButtonLink>
           )}
           <Menu actions={actions} />
         </div>
@@ -251,22 +223,12 @@ export function Row({ label, children }: { label: string; children: ReactNode })
 /** A short set of choices as joined buttons; the one in force is filled. */
 export function Choice<T extends string>({ label, options, value, onChange }: { label: string; options: { value: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   return (
-    <span role="group" aria-label={label} style={{ display: 'inline-flex', flexWrap: 'wrap', border: `1px solid ${ink.border}`, borderRadius: radius, overflow: 'hidden', verticalAlign: 'middle' }}>
-      {options.map((o, i) => {
-        const on = o.value === value
-        return (
-          <button
-            key={o.value}
-            type="button"
-            aria-pressed={on}
-            onClick={() => !on && onChange(o.value)}
-            className="cfg-seg"
-            style={{ all: 'unset', cursor: 'pointer', padding: '8px 14px', fontFamily: sans, fontSize: 13.5, fontWeight: 500, background: on ? ink.moss : desk.panel, color: on ? paper.white : ink.strong, borderLeft: i ? `1px solid ${desk.field}` : 'none' }}
-          >
-            {o.label}
-          </button>
-        )
-      })}
+    <span role="group" aria-label={label} className="ab-seg">
+      {options.map((o) => (
+        <button key={o.value} type="button" aria-pressed={o.value === value} onClick={() => o.value !== value && onChange(o.value)}>
+          {o.label}
+        </button>
+      ))}
     </span>
   )
 }
@@ -274,10 +236,8 @@ export function Choice<T extends string>({ label, options, value, onChange }: { 
 /** On or off, as a switch with its state written beside it. */
 export function Switch({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button type="button" role="switch" aria-label={label} aria-checked={value} onClick={() => onChange(!value)} className="cfg-switch" style={{ all: 'unset', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 10, fontFamily: sans, fontSize: 14, color: ink.base }}>
-      <span aria-hidden style={{ position: 'relative', width: 38, height: 22, borderRadius: 999, background: value ? ink.green : desk.field, flex: 'none', transition: 'background .15s' }}>
-        <span style={{ position: 'absolute', top: 3, left: value ? 19 : 3, width: 16, height: 16, borderRadius: '50%', background: paper.white, boxShadow: '0 1px 2px rgba(0,0,0,.25)', transition: 'left .15s' }} />
-      </span>
+    <button type="button" role="switch" aria-label={label} aria-checked={value} onClick={() => onChange(!value)} className="ab-switch">
+      <span aria-hidden />
       {value ? 'Hiện' : 'Ẩn'}
     </button>
   )
@@ -345,9 +305,9 @@ function AddLine({ spec }: { spec: AddSpec }) {
   if (!open)
     return (
       <div style={{ paddingTop: 12 }}>
-        <button type="button" onClick={() => setOpen(true)} className="cfg-btn" style={frame}>
-          + {spec.label}
-        </button>
+        <Button level="add" icon={<IconPlus />} onClick={() => setOpen(true)}>
+          {spec.label}
+        </Button>
       </div>
     )
   return (
@@ -367,12 +327,12 @@ function AddLine({ spec }: { spec: AddSpec }) {
         </div>
       )}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button type="button" disabled={!name.trim()} onClick={save} className="cfg-btn" style={{ ...frame, background: name.trim() ? ink.moss : paper.hover, borderColor: name.trim() ? ink.moss : desk.field, color: name.trim() ? paper.white : ink.muted, cursor: name.trim() ? 'pointer' : 'not-allowed' }}>
+        <Button level="primary" disabled={!name.trim()} onClick={save}>
           Lưu
-        </button>
-        <button type="button" onClick={close} className="cfg-btn" style={{ ...frame, borderColor: 'transparent', background: 'transparent', color: ink.strong }}>
+        </Button>
+        <Button level="quiet" onClick={close}>
           Huỷ
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -409,16 +369,15 @@ export function ItemList({ label, items, add, empty }: { label: string; items: L
               {it.drag ? (
                 // Only the grip starts a drag, so a click that slips never moves anything.
                 <span
-                  className="cfg-grip"
+                  className="ab-grip"
                   draggable
                   role="img"
                   aria-label={`Kéo ${it.name}`}
                   title={`Kéo ${it.name}`}
                   onDragStart={it.drag.onDragStart}
                   onDragEnd={it.drag.onDragEnd}
-                  style={{ flex: 'none', width: 20, textAlign: 'center', color: ink.soft, fontSize: 14, letterSpacing: -2, cursor: 'grab', userSelect: 'none' }}
                 >
-                  ⋮⋮
+                  <IconGrip size={14} />
                 </span>
               ) : (
                 <span style={{ width: 20, flex: 'none' }} />
@@ -463,20 +422,15 @@ export const DETAIL_CSS = `
 }
 .cfg-detail input::placeholder, .cfg-detail textarea::placeholder { color: ${ink.muted}; }
 .cfg-detail input:hover, .cfg-detail textarea:hover, .cfg-detail select:hover { border-color: ${ink.soft} !important; }
-.cfg-detail input:focus, .cfg-detail textarea:focus, .cfg-detail select:focus { border-color: ${ink.base} !important; box-shadow: 0 0 0 3px ${desk.soft} !important; }
+.cfg-detail input:focus, .cfg-detail textarea:focus, .cfg-detail select:focus { border-color: ${ctl.blue} !important; box-shadow: 0 0 0 3px ${ctl.blueSoft} !important; }
 .cfg-detail .cfg-line { border: 1px solid transparent; border-radius: ${radius}px; background: transparent; outline: none; padding: 2px 6px; margin-left: -7px; }
 .cfg-detail .cfg-line:hover { border-color: ${desk.field}; }
-.cfg-detail .cfg-line:focus { border-color: ${ink.base}; background: ${desk.panel}; box-shadow: 0 0 0 3px ${desk.soft}; }
+.cfg-detail .cfg-line:focus { border-color: ${ctl.blue}; background: ${desk.panel}; box-shadow: 0 0 0 3px ${ctl.blueSoft}; }
 .cfg-detail .cfg-field + .cfg-field { border-top: 1px solid ${desk.line}; }
-.cfg-detail .cfg-btn:hover { background: ${paper.hover} !important; }
-.cfg-detail .cfg-btn:focus-visible, .cfg-detail .cfg-seg:focus-visible, .cfg-detail .cfg-switch:focus-visible, .cfg-detail .cfg-item:focus-visible, .cfg-detail .cfg-crumb:focus-visible { outline: 3px solid ${ink.green}; outline-offset: 2px; }
-.cfg-detail .cfg-seg:hover[aria-pressed=false] { background: ${paper.hover} !important; }
-.cfg-detail .cfg-menuitem:hover:not(:disabled) { background: ${paper.hover}; }
-.cfg-detail .cfg-item:hover { background: ${paper.hover}; }
-.cfg-detail .cfg-crumb:hover { color: ${ink.base}; text-decoration-color: ${ink.base}; }
-.cfg-detail .cfg-row .cfg-grip { opacity: .55; }
-.cfg-detail .cfg-row:hover .cfg-grip, .cfg-detail .cfg-row:focus-within .cfg-grip { opacity: 1; }
+.cfg-detail .cfg-item:focus-visible, .cfg-detail .cfg-crumb:focus-visible { outline: 2px solid ${ctl.blue}; outline-offset: 2px; }
+.cfg-detail .cfg-item:hover { background: ${ctl.hover}; }
+.cfg-detail .cfg-crumb { all: unset; cursor: pointer; color: ${ink.strong}; text-decoration: underline; text-decoration-color: ${ink.faint}; text-underline-offset: 3px; }
+.cfg-detail .cfg-crumb:hover { color: ${ctl.blueDeep}; text-decoration-color: currentColor; }
 .cfg-detail label, .cfg-detail .cfg-sec { font-family: ${sans}; }
 @media (max-width: 640px) { .cfg-detail .cfg-field { grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; } }
-@media (prefers-reduced-motion: reduce) { .cfg-detail .cfg-switch span, .cfg-detail .cfg-switch span span { transition: none !important; } }
 `

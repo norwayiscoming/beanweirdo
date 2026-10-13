@@ -15,6 +15,7 @@ import {
   type StoredRoutes,
 } from '../../lib/routeWords'
 import type { Module } from '../lib/apiClient'
+import { Button } from '../../design/Button'
 
 /** Ô nào đứng cạnh ô nào, và cái gì chúng làm ra. */
 type Block = {
@@ -176,14 +177,9 @@ export function RoutesPanel({
             {saved && !changed && (
               <span style={{ fontFamily: sans, fontSize: 13, color: ink.soft }}>đã lưu</span>
             )}
-            <button
-              className="admin-btn-ghost"
-              disabled={!changed || bad}
-              onClick={save}
-              style={{ opacity: !changed || bad ? 0.4 : 1 }}
-            >
+            <Button level="primary" disabled={!changed || bad} onClick={save}>
               Lưu đường dẫn
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -228,13 +224,9 @@ export function RoutesPanel({
                   style={field(Boolean(errors[k]))}
                 />
                 {draft[k] !== DEFAULT_WORDS[k] && (
-                  <button
-                    className="admin-btn-ghost"
-                    onClick={() => set(k, DEFAULT_WORDS[k])}
-                    style={{ fontSize: 13 }}
-                  >
+                  <Button size="sm" onClick={() => set(k, DEFAULT_WORDS[k])}>
                     {DEFAULT_WORDS[k]}
-                  </button>
+                  </Button>
                 )}
               </div>
               {errors[k] && (
