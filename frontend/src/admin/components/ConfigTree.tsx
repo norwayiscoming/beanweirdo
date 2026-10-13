@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   createKeyword,
@@ -31,7 +31,7 @@ import type { PresetKey } from '../../portfolio/blocks'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { radius } from '../../design/controls'
 import { retireKeyword, retireTopic } from '../lib/retire'
-import { Choice, DETAIL_CSS, DetailHead, ItemList, Row, Section, type AddSpec, type DetailAction, type ListItem } from './Detail'
+import { Choice, DETAIL_CSS, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
 import { RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
 import { Builder, ContentTab, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
@@ -60,8 +60,7 @@ import {
  * for three things, which are the rules of the screen:
  *
  * - the tree only picks. Nothing is typed or saved on the left; a click on a
- *   card or a row opens it on the right, and that is all a click does.
- *   Folding is its own arrow, dragging is its own grip;
+ *   card opens it on the right, and that is all a click does;
  * - everything about one thing sits together on the right — a topic's name,
  *   colour and place in the tree beside the page it gets;
  * - the public page is always previewed beside the fields.
@@ -76,6 +75,11 @@ import {
  * `SiteSpec` — a home card, a Mục lục whose order is the site's navigation
  * and which drags the same way, other pages, and Phần chung. A new site is a
  * new spec, not new tree code.
+ *
+ * Later still that day the owner asked for the values to move out of the
+ * tree: the left keeps only the cards, and what a card holds (the topics,
+ * the tags, the port's pages) is listed, dragged, added and deleted in the
+ * detail on the right, where an item's own children are listed in turn.
  */
 
 type Group = 'port-pages' | 'port-parts' | 'topics' | 'tags' | 'curated' | 'modules'
@@ -96,30 +100,12 @@ type Picked =
 
 const same = (a: Picked, b: Picked) => JSON.stringify(a) === JSON.stringify(b)
 
-/** One gap per level, and the guide line sits in it — as the old module tree drew it. */
-const INDENT = 16
-
 const posts = (n: number) => `${n} bài`
 
-/** A row of the tree that the arrow keys walk: every card and every leaf carries it. */
+/** A card of the tree, which the arrow keys walk. */
 const ROW = 'data-cfg-row'
 
-function FoldButton({ name, open, onToggle }: { name: string; open: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label={`${open ? 'Gập' : 'Mở'} ${name}`}
-      aria-expanded={open}
-      tabIndex={-1}
-      onClick={onToggle}
-      style={{ all: 'unset', width: 22, textAlign: 'center', fontSize: 10, color: ink.muted, cursor: 'pointer', flex: 'none' }}
-    >
-      {open ? '▾' : '▸'}
-    </button>
-  )
-}
-
-function Card({ title, note, on, fold, onClick }: { title: string; note: string; on: boolean; fold?: { open: boolean; toggle: () => void }; onClick: () => void }) {
+function Card({ title, note, on, onClick }: { title: string; note: string; on: boolean; onClick: () => void }) {
   return (
     <div
       style={{
@@ -133,40 +119,15 @@ function Card({ title, note, on, fold, onClick }: { title: string; note: string;
       <button
         type="button"
         {...{ [ROW]: '' }}
-        data-fold={fold ? (fold.open ? 'open' : 'closed') : undefined}
         aria-current={on || undefined}
         onClick={onClick}
-        onKeyDown={(e) => fold && foldKey(e, fold)}
         style={{ all: 'unset', flex: 1, minWidth: 0, padding: '12px 14px 13px', cursor: 'pointer' }}
       >
         <div style={{ fontFamily: serif, fontSize: 17, lineHeight: 1.15, letterSpacing: '-.02em', color: ink.base }}>{title}</div>
         <div style={{ fontFamily: sans, fontWeight: 300, fontSize: 11.5, lineHeight: 1.4, color: ink.muted, marginTop: 5 }}>{note}</div>
       </button>
-      {fold && (
-        <div style={{ padding: '12px 6px 0 0' }}>
-          <FoldButton name={title} open={fold.open} onToggle={fold.toggle} />
-        </div>
-      )}
     </div>
   )
-}
-
-/** ← folds and → opens the row in focus; ↑↓ are handled once, by the tree. */
-function foldKey(e: KeyboardEvent, fold: { open: boolean; toggle: () => void }) {
-  if ((e.key === 'ArrowLeft' && fold.open) || (e.key === 'ArrowRight' && !fold.open)) {
-    e.preventDefault()
-    fold.toggle()
-  }
-}
-
-type DragProps = {
-  onDragStart: (e: DragEvent<HTMLElement>) => void
-  onDragOver: (e: DragEvent<HTMLElement>) => void
-  onDragLeave: () => void
-  onDrop: (e: DragEvent<HTMLElement>) => void
-  onDragEnd: () => void
-  dragging: boolean
-  mark: DropWhere | null
 }
 
 /**
@@ -186,114 +147,15 @@ function whereIn(e: { clientY: number; currentTarget: HTMLElement }, nest: boole
   return 'inside'
 }
 
-const WHERE_WORDS: Record<DropWhere, string> = { before: 'trước', after: 'sau', inside: 'vào trong' }
-
-function Leaf({
-  name,
-  depth,
-  on,
-  dot,
-  meta,
-  fold,
-  drag,
-  onClick,
-}: {
-  name: string
-  depth: number
-  on: boolean
-  dot?: string | null
-  meta?: string
-  /** Present on a row that has children: whether they are shown, and the toggle. */
-  fold?: { open: boolean; toggle: () => void }
-  /** Present on a row that can be dragged and dropped on. */
-  drag?: DragProps
-  onClick: () => void
-}) {
-  const mark = drag?.mark
-  return (
-    <div
-      className="cfg-leaf"
-      onDragOver={drag?.onDragOver}
-      onDragLeave={drag?.onDragLeave}
-      onDrop={drag?.onDrop}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        marginLeft: depth * INDENT,
-        borderLeft: `1px solid ${paper.rule}`,
-        // Where the drop will land: a line above or below, or the whole row lit for "inside".
-        boxShadow: mark === 'before' ? `inset 0 2px 0 ${ink.green}` : mark === 'after' ? `inset 0 -2px 0 ${ink.green}` : 'none',
-        outline: mark === 'inside' ? `2px solid ${ink.green}` : 'none',
-        outlineOffset: -2,
-        borderRadius: mark === 'inside' ? radius : 0,
-        opacity: drag?.dragging ? 0.45 : 1,
-      }}
-    >
-      {fold ? <FoldButton name={name} open={fold.open} onToggle={fold.toggle} /> : <span style={{ width: 22, flex: 'none' }} />}
-      <button
-        type="button"
-        {...{ [ROW]: '' }}
-        data-fold={fold ? (fold.open ? 'open' : 'closed') : undefined}
-        aria-current={on || undefined}
-        onClick={onClick}
-        onKeyDown={(e) => fold && foldKey(e, fold)}
-        style={{
-          all: 'unset',
-          flex: 1,
-          minWidth: 0,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '6px 8px',
-          borderRadius: radius,
-          cursor: 'pointer',
-          background: on ? paper.hover : 'transparent',
-          boxShadow: on ? `inset 0 0 0 1px ${ink.border}` : 'none',
-          fontFamily: sans,
-          fontSize: 13,
-          color: ink.base,
-        }}
-      >
-        {dot !== undefined && (
-          <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', boxSizing: 'border-box', background: dot ?? 'transparent', border: dot ? 'none' : `1.5px solid ${paper.rule}` }} />
-        )}
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: on ? 500 : 400 }}>{name}</span>
-        {/* While something is held over the row, its count gives way to where the drop will land. */}
-        {mark ? (
-          <span style={{ fontSize: 11, color: ink.green, whiteSpace: 'nowrap' }}>
-            {WHERE_WORDS[mark]} {name}
-          </span>
-        ) : (
-          meta && <span style={{ fontSize: 11, color: ink.faint, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{meta}</span>
-        )}
-      </button>
-      {drag && (
-        // Only the grip starts a drag, so a click that slips never moves a node.
-        <span
-          className="cfg-grip"
-          draggable
-          role="img"
-          aria-label={`Kéo ${name}`}
-          title={`Kéo ${name}`}
-          onDragStart={drag.onDragStart}
-          onDragEnd={drag.onDragEnd}
-          style={{ flex: 'none', width: 18, textAlign: 'center', color: ink.faint, fontSize: 11, cursor: 'grab', userSelect: 'none' }}
-        >
-          ⋮⋮
-        </span>
-      )}
-    </div>
-  )
-}
-
-/** A name to type and an explicit button — creating something never happens on blur. */
 type MovePlan = Exclude<ReturnType<typeof planMove>, { error: string }>
 
 /** One row of a site's Mục lục; `parent_id` is null on a flat list. */
 type TocItem = { id: string; parent_id: string | null; name: string; dot?: string | null; meta?: string; picked: Picked; movable: boolean }
 
-/** A card under the home card, and the rows it folds over. */
-type GroupSpec = { id: Group; title: string; note: string; rows?: ReactNode }
+type Toc = NonNullable<SiteSpec['toc']>
+
+/** A card under the home card; what it holds is listed on the right. */
+type GroupSpec = { id: Group; title: string; note: string }
 
 /**
  * What a site of the Cấu hình tab is made of — the one shape every site fills
@@ -346,20 +208,17 @@ export function ConfigTree({
     setDropAt(null)
   }
   const [err, setErr] = useState<string | null>(null)
-  // The delete panel of the item open on the right; another pick closes it.
-  const [retiring, setRetiring] = useState(false)
-  useEffect(() => setRetiring(false), [picked])
+  // The delete panel is open for one pick, so another pick closes it and a
+  // row's "Xoá…" can open its item with the panel already showing.
+  const [retiringFor, setRetiringFor] = useState<string | null>(null)
+  const retiring = retiringFor === JSON.stringify(picked)
+  const retire = (p: Picked) => {
+    setPicked(p)
+    setRetiringFor(JSON.stringify(p))
+  }
   const [round, setRound] = useState(0)
   const [portRound, setPortRound] = useState(0)
   const [undo, setUndo] = useState<{ msg: string; saving: boolean; revert: () => Promise<unknown> } | null>(null)
-  const [folded, setFolded] = useState<Set<string>>(new Set())
-  const toggle = (id: string) =>
-    setFolded((f) => {
-      const next = new Set(f)
-      if (!next.delete(id)) next.add(id)
-      return next
-    })
-  const fold = (id: string) => ({ open: !folded.has(id), toggle: () => toggle(id) })
 
   // Both dividers drag, and each width is remembered: the tree for long names, the fields for long forms.
   const treeSplit = useSplit('cfg-tree', 264, 'left', 200, 520)
@@ -462,7 +321,8 @@ export function ConfigTree({
 
   const titleOf = (items: TocItem[], id: string | null) => (id ? (items.find((t) => t.id === id)?.name ?? id) : 'tầng trên cùng')
 
-  const dragOf = (toc: NonNullable<SiteSpec['toc']>, shown: TocItem[], id: string): DragProps => {
+  /** `shown` is the whole Mục lục in drawn order, even where only one level of it is listed. */
+  const dragOf = (toc: Toc, shown: TocItem[], id: string): ItemDrag => {
     const plan = (target: string, where: DropWhere) => (dragging ? planMove(shown, dragging, target, where) : null)
     const drop = (target: string, where: DropWhere) => {
       const moved = dragging
@@ -473,13 +333,6 @@ export function ConfigTree({
       if ('error' in p) return setErr(p.error)
       const msg = `Đã chuyển ${titleOf(shown, moved)} ${WHERE_WORDS[where]} ${titleOf(shown, target)}`
       const m = toc.move(moved, p)
-      // A drop inside a folded node opens it, so the row does not vanish.
-      if (p.parentId)
-        setFolded((f) => {
-          const next = new Set(f)
-          next.delete(`toc:${p.parentId}`)
-          return next
-        })
       setUndo({ msg, saving: true, revert: m.revert })
       run(async () => {
         await m.apply()
@@ -510,7 +363,7 @@ export function ConfigTree({
     }
   }
 
-  // ── the arrow keys walk the rows of the tree ───────────────────────────
+  // ── the arrow keys walk the cards of the tree ──────────────────────────
   const walk = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
     const rows = [...e.currentTarget.querySelectorAll<HTMLElement>(`[${ROW}]`)]
@@ -550,99 +403,62 @@ export function ConfigTree({
   const blog = `/${activeWords().bean}`
 
   const moduleRows = flattenTree(buildTree([...modules].sort(bySiteOrder)))
-  // A module is shown when no ancestor of it is folded.
-  const hidden = (id: string): boolean => {
-    const parent = modules.find((x) => x.id === id)?.parent_id
-    return !!parent && parent !== id && (folded.has(`m:${parent}`) || hidden(parent))
-  }
 
   // ── the sites, each one spec ─────────────────────────────────────────────
+  const topicToc: Toc = {
+    id: 'topics',
+    title: 'Mục lục',
+    note: `${shownTopics.filter((t) => t.parent_id === null).length} subject · cây chủ đề, theo thứ tự của thanh bên và trang Mục lục`,
+    nest: true,
+    move: moveTopic,
+    items: shownTopics.map((t) => ({
+      id: t.id,
+      parent_id: t.parent_id,
+      name: t.title,
+      dot: t.accent ?? ancestorsOf(sorted, t.id).reverse().find((a) => a.accent)?.accent ?? null,
+      meta: tocMeta(t.status, leafMeta('topic', t.id, t.posts)),
+      picked: { kind: 'topic', id: t.id },
+      movable: true,
+    })),
+  }
+
   const blogSite: SiteSpec = {
     id: 'blog',
     path: `${blog}/…`,
     home: { title: 'Trang chủ blog', note: `${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`, picked: { kind: 'system', key: 'landing' } },
-    toc: {
-      id: 'topics',
-      title: 'Mục lục',
-      note: 'Cây chủ đề: thứ tự ở đây là thứ tự của thanh bên và trang Mục lục. Kéo ⋮⋮ để đổi chỗ',
-      nest: true,
-      move: moveTopic,
-      items: shownTopics.map((t) => ({
-        id: t.id,
-        parent_id: t.parent_id,
-        name: t.title,
-        dot: t.accent ?? ancestorsOf(sorted, t.id).reverse().find((a) => a.accent)?.accent ?? null,
-        meta: tocMeta(t.status, leafMeta('topic', t.id, t.posts)),
-        picked: { kind: 'topic', id: t.id },
-        movable: true,
-      })),
-    },
+    toc: topicToc,
     pages: [
-      {
-        id: 'tags',
-        title: 'Tag',
-        note: `${vocab.keywords.length} tag, xếp theo tên · mỗi tag là một trang`,
-        rows: tags.map((k) => <Leaf key={k.id} name={k.label} depth={0} meta={leafMeta('keyword', k.id, k.posts)} on={on({ kind: 'tag', id: k.id })} onClick={pick({ kind: 'tag', id: k.id })} />),
-      },
-      {
-        id: 'curated',
-        title: 'Trang chọn tay',
-        note: 'Trang có quy chế riêng, như Ghi',
-        rows: curated.map((p) => {
-          const page = findPage(pages, p.id)
-          return <Leaf key={p.id} name={p.title || p.id} depth={0} meta={posts(page ? postsOf(page.id).length : 0)} on={on({ kind: 'curated', id: p.id })} onClick={pick({ kind: 'curated', id: p.id })} />
-        }),
-      },
+      { id: 'tags', title: 'Tag', note: `${vocab.keywords.length} tag, xếp theo tên · mỗi tag là một trang` },
+      { id: 'curated', title: 'Trang chọn tay', note: `${curated.length} trang có quy chế riêng, như Ghi` },
     ],
-    shared: {
-      id: 'modules',
-      title: 'Phần chung',
-      note: 'Hình trang: dàn trang, ảnh và chữ mà một trang mượn; xem trước trên trang đang mượn',
-      rows: moduleRows
-        .filter(({ row }) => !hidden(row.id))
-        .map(({ row, depth, children }) => (
-          <Leaf
-            key={row.id}
-            name={row.title}
-            depth={depth}
-            dot={row.accent}
-            meta={wearer(row.id) ? undefined : 'chưa dùng'}
-            on={on({ kind: 'module', id: row.id })}
-            fold={children.length ? fold(`m:${row.id}`) : undefined}
-            onClick={pick({ kind: 'module', id: row.id })}
-          />
-        )),
-    },
+    shared: { id: 'modules', title: 'Phần chung', note: 'Hình trang: dàn trang, ảnh và chữ mà một trang mượn' },
+  }
+
+  const portToc: Toc = {
+    id: 'port-pages',
+    title: 'Mục lục',
+    note: `${livePort.length} trang và About, theo thứ tự của thanh trên`,
+    nest: false,
+    move: movePortLink,
+    items: [
+      // The top bar's links in its order, then the pages it does not show.
+      ...portLinks.flatMap((l): TocItem[] => {
+        if (l.key === 'about') return [{ id: l.key, parent_id: null, name: 'About', dot: null, meta: tocMeta('published', '/about', l.hidden), picked: { kind: 'port-part', part: 'about' }, movable: true }]
+        const pg = port.pages.find((x) => `page:${x.id}` === l.key)
+        return pg ? [{ id: l.key, parent_id: null, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`, l.hidden), picked: { kind: 'port-page', id: pg.id }, movable: true }] : []
+      }),
+      ...[...port.pages.filter((x) => x.status === 'draft'), ...archivedPort].map(
+        (pg): TocItem => ({ id: `page:${pg.id}`, parent_id: null, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: false }),
+      ),
+    ],
   }
 
   const portSite: SiteSpec = {
     id: 'port',
     path: '/',
     home: { title: 'Trang chủ port', note: 'Lời chào và các khối của trang /', picked: { kind: 'port-part', part: 'home' } },
-    toc: {
-      id: 'port-pages',
-      title: 'Mục lục',
-      note: `${livePort.length} trang và About: thứ tự ở đây là thứ tự của thanh trên. Kéo ⋮⋮ để đổi chỗ`,
-      nest: false,
-      move: movePortLink,
-      items: [
-        // The top bar's links in its order, then the pages it does not show.
-        ...portLinks.flatMap((l): TocItem[] => {
-          if (l.key === 'about') return [{ id: l.key, parent_id: null, name: 'About', dot: null, meta: tocMeta('published', '/about', l.hidden), picked: { kind: 'port-part', part: 'about' }, movable: true }]
-          const pg = port.pages.find((x) => `page:${x.id}` === l.key)
-          return pg ? [{ id: l.key, parent_id: null, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`, l.hidden), picked: { kind: 'port-page', id: pg.id }, movable: true }] : []
-        }),
-        ...[...port.pages.filter((x) => x.status === 'draft'), ...archivedPort].map(
-          (pg): TocItem => ({ id: `page:${pg.id}`, parent_id: null, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: false }),
-        ),
-      ],
-    },
-    shared: {
-      id: 'port-parts',
-      title: 'Phần chung',
-      note: 'Signature, thanh trên, chân trang',
-      rows: PORT_PARTS.filter((x) => x.part !== 'about').map((x) => <Leaf key={x.part} name={x.title} depth={0} on={on({ kind: 'port-part', part: x.part })} onClick={pick({ kind: 'port-part', part: x.part })} />),
-    },
+    toc: portToc,
+    shared: { id: 'port-parts', title: 'Phần chung', note: 'Signature, thanh trên, chân trang' },
   }
 
   const practiceSite: SiteSpec = {
@@ -653,40 +469,36 @@ export function ConfigTree({
 
   const spec = { blog: blogSite, port: portSite, practice: practiceSite }[site]
 
-  /** The tree of one site, drawn from its spec: the same cards and rows, the same drag, for every site. */
-  const siteTree = ({ id, path, home, toc, pages: others = [], shared }: SiteSpec) => {
-    const group = (g: GroupSpec) => (
-      <div key={g.id} style={{ display: 'contents' }}>
-        <Card title={g.title} note={g.note} on={on({ kind: 'group', id: g.id })} fold={fold(g.id)} onClick={pick({ kind: 'group', id: g.id })} />
-        {!folded.has(g.id) && g.rows}
-      </div>
-    )
-    const tocRows = () => {
-      if (!toc) return null
-      const nodes = buildTree(toc.items)
-      const shown = flattenTree(nodes).map((n) => n.row)
-      const node = ({ row, children, depth }: (typeof nodes)[number]): ReactNode => (
-        <div key={row.id}>
-          <Leaf
-            name={row.name}
-            depth={depth}
-            dot={row.dot}
-            meta={row.meta}
-            on={on(row.picked)}
-            fold={children.length ? fold(`toc:${row.id}`) : undefined}
-            drag={row.movable ? dragOf(toc, shown, row.id) : undefined}
-            onClick={pick(row.picked)}
-          />
-          {!folded.has(`toc:${row.id}`) && children.map(node)}
-        </div>
-      )
-      return nodes.map(node)
+  /** The card a pick belongs to, lit while anything inside it is open on the right. */
+  const groupOf = (p: Picked): Group | null => {
+    switch (p.kind) {
+      case 'group':
+        return p.id
+      case 'topic':
+        return 'topics'
+      case 'tag':
+        return 'tags'
+      case 'curated':
+        return 'curated'
+      case 'module':
+        return 'modules'
+      case 'port-page':
+        return 'port-pages'
+      case 'port-part':
+        return p.part === 'home' ? null : p.part === 'about' ? 'port-pages' : 'port-parts'
+      default:
+        return null
     }
+  }
+
+  /** The cards of one site, drawn from its spec: the same cards for every site. */
+  const siteTree = ({ id, path, home, toc, pages: others = [], shared }: SiteSpec) => {
+    const group = (g: GroupSpec) => <Card key={g.id} title={g.title} note={g.note} on={groupOf(picked) === g.id} onClick={pick({ kind: 'group', id: g.id })} />
     return (
       <section aria-label={SITE_LABELS[id]} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.muted, padding: '0 2px 2px' }}>{path}</div>
         <Card title={home.title} note={home.note} on={on(home.picked)} onClick={pick(home.picked)} />
-        {toc && group({ ...toc, rows: tocRows() })}
+        {toc && group(toc)}
         {others.map(group)}
         {shared && group(shared)}
       </section>
@@ -700,35 +512,11 @@ export function ConfigTree({
       style={{ display: 'flex', flexDirection: 'column', gap: 8, ...(columns === 1 ? {} : { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto' }), padding: '0 4px 24px 0' }}
     >
       {siteTree(spec)}
-
-      {undo && (
-        <div role="status" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', background: paper.cream, border: `1px solid ${ink.border}`, borderRadius: radius, padding: '8px 10px', fontFamily: sans, fontSize: 12, color: ink.base }}>
-          <span style={{ flex: 1 }}>
-            <span>{undo.msg}</span>
-            {undo.saving && <span style={{ color: ink.muted }}> · đang lưu…</span>}
-          </span>
-          <button
-            type="button"
-            disabled={undo.saving}
-            onClick={() => {
-              const u = undo
-              setUndo(null)
-              run(u.revert)
-            }}
-            style={{ all: 'unset', cursor: undo.saving ? 'default' : 'pointer', color: undo.saving ? ink.faint : ink.green, fontWeight: 500 }}
-          >
-            Hoàn tác
-          </button>
-          <button type="button" aria-label="Đóng" onClick={() => setUndo(null)} style={{ all: 'unset', cursor: 'pointer', color: ink.muted }}>
-            ✕
-          </button>
-        </div>
-      )}
     </nav>
   )
 
   // ── the right side: one template for every item (`Detail.tsx`) and the public page beside it ──
-  let crumbs: string[] = []
+  let crumbs: Crumb[] = []
   let title = ''
   let rename: ((v: string) => void) | undefined
   let address = ''
@@ -742,7 +530,7 @@ export function ConfigTree({
   const undoable = (fn: () => Promise<{ msg: string; revert: () => Promise<unknown> }>, then: () => void) =>
     run(async () => {
       const r = await fn()
-      setRetiring(false)
+      setRetiringFor(null)
       then()
       setUndo({ msg: r.msg, saving: false, revert: r.revert })
     })
@@ -774,7 +562,65 @@ export function ConfigTree({
       renderModule={renderModule}
     />
   )
-  const asItems = (rows: TocItem[]): ListItem[] => rows.map((r) => ({ id: r.id, name: r.name, meta: r.meta, dot: r.dot, onOpen: pick(r.picked) }))
+  const siteCrumb = (id: SiteId): Crumb => ({ label: SITE_LABELS[id], open: pick(homeOf(id)) })
+  const groupCrumb = (id: Group, label: string): Crumb => ({ label, open: pick({ kind: 'group', id }) })
+
+  /**
+   * How an item is deleted — the same from its own ⋮ and from its row's ⋮ in
+   * the list it sits in. Topics and tags first ask where their posts go, so
+   * their row opens the item with that panel showing.
+   */
+  const deleteOf = (p: Picked): DetailAction[] | undefined => {
+    switch (p.kind) {
+      case 'topic':
+        return [{ label: 'Xoá…', danger: true, onPick: () => retire(p) }]
+      case 'tag':
+        return [{ label: 'Xoá hay gộp…', danger: true, onPick: () => retire(p) }]
+      case 'port-page': {
+        const pg = port.pages.find((x) => x.id === p.id)
+        if (!pg) return undefined
+        return [
+          {
+            label: 'Xoá trang…',
+            danger: true,
+            onPick: () => {
+              if (!window.confirm(`Xoá trang “${pg.title}”? Thao tác này không hoàn tác được.`)) return
+              run(async () => {
+                await deleteNode(pg.id)
+                port.setPages((ps) => ps.filter((x) => x.id !== pg.id))
+                setPicked((cur) => (same(cur, p) ? { kind: 'group', id: 'port-pages' } : cur))
+              })
+            },
+          },
+        ]
+      }
+      case 'curated': {
+        const record = describePage(p, layout, pages).record
+        if (!record) return undefined
+        const name = record.title || record.id
+        return [
+          {
+            label: 'Xoá trang…',
+            danger: true,
+            off: pageDeleteBlocker(p, layout, pages),
+            onPick: () =>
+              window.confirm(`Xoá trang “${name}”?`) &&
+              run(async () => {
+                await deletePage(record.id)
+                setPicked((cur) => (same(cur, p) ? { kind: 'group', id: 'curated' } : cur))
+              }),
+          },
+        ]
+      }
+      default:
+        return undefined
+    }
+  }
+
+  /** Rows of a Mục lục as the right-hand list draws them: dragged by their grip, deleted from their ⋮. */
+  const tocList = (toc: Toc, rows: TocItem[]): ListItem[] =>
+    rows.map((r) => ({ id: r.id, name: r.name, meta: r.meta, dot: r.dot, onOpen: pick(r.picked), drag: r.movable ? dragOf(toc, toc.items, r.id) : undefined, actions: deleteOf(r.picked) }))
+  const dragNote = (nest: boolean) => (nest ? 'kéo ⋮⋮ để đổi chỗ hay đưa vào trong' : 'kéo ⋮⋮ để đổi chỗ')
   const addPortPage: AddSpec = {
     label: 'Thêm trang',
     placeholder: 'tên trang mới',
@@ -796,16 +642,7 @@ export function ConfigTree({
   const addTopic = (parent: Node | null): AddSpec => ({
     label: parent ? 'Thêm mục con' : 'Thêm subject',
     placeholder: parent ? `tên mục mới trong ${parent.title}` : 'tên subject',
-    onSave: (name) =>
-      run(async () => {
-        await createNode({ site: 'blog', title: name, parent_id: parent?.id ?? null })
-        if (parent)
-          setFolded((f) => {
-            const next = new Set(f)
-            next.delete(`toc:${parent.id}`)
-            return next
-          })
-      }),
+    onSave: (name) => run(() => createNode({ site: 'blog', title: name, parent_id: parent?.id ?? null })),
   })
 
   /**
@@ -849,7 +686,7 @@ export function ConfigTree({
       const part = PORT_PARTS.find((x) => x.part === picked.part)
       title = picked.part === 'home' ? 'Trang chủ port' : part?.title ?? picked.part
       // About is a page of the top bar, so it sits in Mục lục; the rest every page shares.
-      crumbs = ['Port', ...(picked.part === 'home' ? [] : [picked.part === 'about' ? 'Mục lục' : 'Phần chung'])]
+      crumbs = [siteCrumb('port'), ...(picked.part === 'home' ? [] : [picked.part === 'about' ? groupCrumb('port-pages', 'Mục lục') : groupCrumb('port-parts', 'Phần chung')])]
       preview = toPath({ area: 'public', screen: picked.part === 'about' || picked.part === 'sign' ? 'portfolioAbout' : 'portfolioHome' })
       address = picked.part === 'home' || picked.part === 'about' ? preview : ''
       actions = fixed(picked.part === 'home' || picked.part === 'about' ? 'trang hệ thống, không xoá được' : 'phần chung của mọi trang, không xoá được')
@@ -864,7 +701,7 @@ export function ConfigTree({
     case 'port-page': {
       const p = port.pages.find((x) => x.id === picked.id)
       if (!p) break
-      crumbs = ['Port', 'Mục lục']
+      crumbs = [siteCrumb('port'), groupCrumb('port-pages', 'Mục lục')]
       title = p.title
       rename = (v) => run(async () => {
         const next = await updateNode(p.id, { title: v })
@@ -872,20 +709,7 @@ export function ConfigTree({
       })
       address = p.status === 'published' ? `/${p.slug}` : ''
       facts = [statusLabel(p.status)]
-      actions = [
-        {
-          label: 'Xoá trang…',
-          danger: true,
-          onPick: () => {
-            if (!window.confirm(`Xoá trang “${p.title}”? Thao tác này không hoàn tác được.`)) return
-            run(async () => {
-              await deleteNode(p.id)
-              port.setPages((ps) => ps.filter((x) => x.id !== p.id))
-              setPicked({ kind: 'group', id: 'port-pages' })
-            })
-          },
-        },
-      ]
+      actions = deleteOf(picked) ?? []
       // The builder draws its own live preview of the unsaved page into the preview column.
       body = (
         <>
@@ -909,7 +733,7 @@ export function ConfigTree({
     case 'curated': {
       const d = describePage(picked, layout, pages)
       const blocker = pageDeleteBlocker(picked, layout, pages)
-      crumbs = ['Personal Blog', ...(picked.kind === 'curated' ? ['Trang chọn tay'] : [])]
+      crumbs = [siteCrumb('blog'), ...(picked.kind === 'curated' ? [groupCrumb('curated', 'Trang chọn tay')] : [])]
       title = picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ blog' : d.title
       preview = d.preview
       address = d.preview
@@ -917,19 +741,7 @@ export function ConfigTree({
         const record = d.record
         rename = (v) => run(() => updatePage(record.id, { title: v }))
         facts = [record.visibility === 'public' ? 'công khai' : 'riêng tư']
-        actions = [
-          {
-            label: 'Xoá trang…',
-            danger: true,
-            off: blocker,
-            onPick: () =>
-              window.confirm(`Xoá trang “${title}”?`) &&
-              run(async () => {
-                await deletePage(record.id)
-                setPicked({ kind: 'group', id: 'curated' })
-              }),
-          },
-        ]
+        actions = deleteOf(picked) ?? []
       } else actions = fixed(blocker ?? 'trang hệ thống, không xoá được')
       body = page(picked)
       break
@@ -941,13 +753,13 @@ export function ConfigTree({
       const t = vocab.topics.find((x) => x.id === picked.id)
       if (!t) break
       const kids = sorted.filter((x) => x.parent_id === t.id)
-      crumbs = ['Personal Blog', 'Mục lục', ...ancestorsOf(sorted, t.id).map((x) => x.title)]
+      crumbs = [siteCrumb('blog'), groupCrumb('topics', 'Mục lục'), ...ancestorsOf(sorted, t.id).map((x): Crumb => ({ label: x.title, open: pick({ kind: 'topic', id: x.id }) }))]
       title = t.title
       rename = (v) => run(() => updateNode(t.id, { title: v }))
       address = toPath({ area: 'public', screen: 'module', moduleId: t.id })
       preview = address
       facts = [posts(t.posts), statusLabel(t.status)]
-      actions = [{ label: 'Xoá…', danger: true, onPick: () => setRetiring(true) }]
+      actions = deleteOf(picked) ?? []
       body = (
         <>
           {errorLine}
@@ -957,7 +769,7 @@ export function ConfigTree({
               tree={shownTopics}
               kids={kids.length}
               count={t.posts}
-              onCancel={() => setRetiring(false)}
+              onCancel={() => setRetiringFor(null)}
               onRetire={(to) => undoable(() => retireTopic(t, to, vocab.topics), () => setPicked({ kind: 'group', id: 'topics' }))}
             />
           )}
@@ -972,8 +784,8 @@ export function ConfigTree({
             />
             <NavFlags layout={layout} navRef={`topic:${t.id}`} defaults={{ sidebar: true, home: t.parent_id === null }} run={run} />
           </Section>
-          <Section title="Mục con" note={kids.length ? `${kids.length} · kéo ⋮⋮ ở cây bên trái để đổi chỗ` : undefined}>
-            <ItemList label="Mục con" items={kids.map((k) => ({ id: k.id, name: k.title, meta: posts(k.posts), dot: k.accent, onOpen: pick({ kind: 'topic', id: k.id }) }))} add={addTopic(t)} />
+          <Section title="Mục con" note={kids.length ? `${kids.length} · ${dragNote(true)}` : undefined}>
+            <ItemList label="Mục con" items={tocList(topicToc, topicToc.items.filter((r) => r.parent_id === t.id))} add={addTopic(t)} />
           </Section>
           <Section title="Nội dung trang">{nodePage('topic', t.id)}</Section>
         </>
@@ -983,13 +795,13 @@ export function ConfigTree({
     case 'tag': {
       const k = vocab.keywords.find((x) => x.id === picked.id)
       if (!k) break
-      crumbs = ['Personal Blog', 'Tag']
+      crumbs = [siteCrumb('blog'), groupCrumb('tags', 'Tag')]
       title = k.label
       rename = (v) => run(() => renameKeyword(k.id, v))
       address = toPath({ area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${k.id}` })
       preview = address
       facts = [posts(k.posts)]
-      actions = [{ label: 'Xoá hay gộp…', danger: true, onPick: () => setRetiring(true) }]
+      actions = deleteOf(picked) ?? []
       body = (
         <>
           {errorLine}
@@ -998,7 +810,7 @@ export function ConfigTree({
               tag={k}
               others={tags.filter((x) => x.id !== k.id)}
               count={k.posts}
-              onCancel={() => setRetiring(false)}
+              onCancel={() => setRetiringFor(null)}
               onRetire={(to) => undoable(() => retireKeyword(k, to), () => setPicked({ kind: 'group', id: 'tags' }))}
             />
           )}
@@ -1011,7 +823,7 @@ export function ConfigTree({
       break
     }
     case 'module': {
-      crumbs = ['Personal Blog', 'Phần chung']
+      crumbs = [siteCrumb('blog'), groupCrumb('modules', 'Phần chung')]
       title = modules.find((m) => m.id === picked.id)?.title ?? picked.id
       actions = fixed('hình trang chỉ sửa được; trang nào mượn thì đổi ở trang ấy')
       // A module is not a page of its own since the pages moved onto the topic
@@ -1023,7 +835,7 @@ export function ConfigTree({
       break
     }
     case 'practice':
-      crumbs = ['Practice']
+      crumbs = [siteCrumb('practice')]
       title = 'Ghi 02'
       preview = toPath({ area: 'practice', screen: 'hours' })
       address = preview
@@ -1034,20 +846,20 @@ export function ConfigTree({
       const g = picked.id
       actions = fixed('nhóm của site, không xoá được; xoá từng mục bên trong')
       if (g === 'port-pages') {
-        crumbs = ['Port']
+        crumbs = [siteCrumb('port')]
         title = 'Mục lục'
         preview = '/'
         facts = [`${livePort.length} trang`]
         body = (
           <>
             {errorLine}
-            <Section title="Các trang" note="thứ tự là thứ tự thanh trên · kéo ⋮⋮ ở cây bên trái">
-              <ItemList label="Các trang" items={asItems(portSite.toc?.items ?? [])} add={addPortPage} />
+            <Section title="Các trang" note={`theo thứ tự thanh trên · ${dragNote(false)}`}>
+              <ItemList label="Các trang" items={tocList(portToc, portToc.items)} add={addPortPage} />
             </Section>
           </>
         )
       } else if (g === 'topics') {
-        crumbs = ['Personal Blog']
+        crumbs = [siteCrumb('blog')]
         title = 'Mục lục'
         preview = toPath({ area: 'public', screen: 'home' })
         address = preview
@@ -1056,14 +868,14 @@ export function ConfigTree({
         body = (
           <>
             {errorLine}
-            <Section title="Các subject" note="thứ tự là thứ tự thanh bên · kéo ⋮⋮ ở cây bên trái">
-              <ItemList label="Các subject" items={subjects.map((t) => ({ id: t.id, name: t.title, meta: posts(t.posts), dot: t.accent, onOpen: pick({ kind: 'topic', id: t.id }) }))} add={addTopic(null)} />
+            <Section title="Các subject" note={`theo thứ tự thanh bên · ${dragNote(true)}`}>
+              <ItemList label="Các subject" items={tocList(topicToc, topicToc.items.filter((r) => r.parent_id === null))} add={addTopic(null)} />
             </Section>
             <Section title="Chữ cố định">{renderCopy('index')}</Section>
           </>
         )
       } else if (g === 'tags') {
-        crumbs = ['Personal Blog']
+        crumbs = [siteCrumb('blog')]
         title = 'Tag'
         facts = [`${tags.length} tag`]
         body = (
@@ -1072,14 +884,14 @@ export function ConfigTree({
             <Section title="Các tag" note="xếp theo tên · mỗi tag là một trang">
               <ItemList
                 label="Các tag"
-                items={tags.map((k) => ({ id: k.id, name: k.label, meta: leafMeta('keyword', k.id, k.posts), onOpen: pick({ kind: 'tag', id: k.id }) }))}
+                items={tags.map((k) => ({ id: k.id, name: k.label, meta: leafMeta('keyword', k.id, k.posts), onOpen: pick({ kind: 'tag', id: k.id }), actions: deleteOf({ kind: 'tag', id: k.id }) }))}
                 add={{ label: 'Thêm tag', placeholder: 'tên tag', onSave: (label) => run(() => createKeyword(label)) }}
               />
             </Section>
           </>
         )
       } else if (g === 'curated') {
-        crumbs = ['Personal Blog']
+        crumbs = [siteCrumb('blog')]
         title = 'Trang chọn tay'
         facts = [`${curated.length} trang`]
         body = (
@@ -1088,7 +900,7 @@ export function ConfigTree({
             <Section title="Các trang" note="mỗi trang tự chọn kéo bài nào, xếp ra sao">
               <ItemList
                 label="Các trang"
-                items={curated.map((p) => ({ id: p.id, name: p.title || p.id, meta: `/${p.id}`, onOpen: pick({ kind: 'curated', id: p.id }) }))}
+                items={curated.map((p) => ({ id: p.id, name: p.title || p.id, meta: `/${p.id}`, onOpen: pick({ kind: 'curated', id: p.id }), actions: deleteOf({ kind: 'curated', id: p.id }) }))}
                 add={{
                   label: 'Thêm trang',
                   placeholder: 'tên trang mới',
@@ -1102,7 +914,7 @@ export function ConfigTree({
           </>
         )
       } else if (g === 'port-parts') {
-        crumbs = ['Port']
+        crumbs = [siteCrumb('port')]
         title = 'Phần chung'
         body = (
           <Section title="Các phần" note="mọi trang port dùng chung">
@@ -1110,11 +922,11 @@ export function ConfigTree({
           </Section>
         )
       } else {
-        crumbs = ['Personal Blog']
+        crumbs = [siteCrumb('blog')]
         title = 'Phần chung'
         body = (
           <Section title="Hình trang" note="dàn trang, ảnh và chữ mà một trang mượn">
-            <ItemList label="Hình trang" items={moduleRows.map(({ row }) => ({ id: row.id, name: row.title, dot: row.accent, meta: wearer(row.id) ? undefined : 'chưa dùng', onOpen: pick({ kind: 'module', id: row.id }) }))} />
+            <ItemList label="Hình trang" items={moduleRows.map(({ row, depth }) => ({ id: row.id, name: row.title, depth, dot: row.accent, meta: wearer(row.id) ? undefined : 'chưa dùng', onOpen: pick({ kind: 'module', id: row.id }) }))} />
           </Section>
         )
       }
@@ -1158,12 +970,35 @@ export function ConfigTree({
         padding: columns === 1 ? '16px 16px 90px' : '20px 32px 120px',
       }}
     >
-      <style>{'.cfg-leaf .cfg-grip{opacity:0}.cfg-leaf:hover .cfg-grip,.cfg-leaf:focus-within .cfg-grip{opacity:1}' + DETAIL_CSS}</style>
+      <style>{DETAIL_CSS}</style>
       <div style={columns === 2 ? { gridRow: '1 / span 2' } : undefined}>{tree}</div>
       {columns > 1 && <div style={{ alignSelf: 'stretch', ...(columns === 2 ? { gridRow: '1 / span 2' } : {}) }}>{treeSplit.handle}</div>}
       <div ref={editor} className="cfg-detail" style={{ minWidth: 0, scrollMarginTop: 16, ...(columns === 3 ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
         {header}
         {body}
+        {undo && (
+          <div role="status" style={{ position: 'sticky', bottom: 0, marginTop: 16, display: 'flex', gap: 10, alignItems: 'center', background: paper.cream, border: `1px solid ${ink.border}`, borderRadius: radius, padding: '8px 10px', fontFamily: sans, fontSize: 12, color: ink.base }}>
+            <span style={{ flex: 1 }}>
+              <span>{undo.msg}</span>
+              {undo.saving && <span style={{ color: ink.muted }}> · đang lưu…</span>}
+            </span>
+            <button
+              type="button"
+              disabled={undo.saving}
+              onClick={() => {
+                const u = undo
+                setUndo(null)
+                run(u.revert)
+              }}
+              style={{ all: 'unset', cursor: undo.saving ? 'default' : 'pointer', color: undo.saving ? ink.faint : ink.green, fontWeight: 500 }}
+            >
+              Hoàn tác
+            </button>
+            <button type="button" aria-label="Đóng" onClick={() => setUndo(null)} style={{ all: 'unset', cursor: 'pointer', color: ink.muted }}>
+              ✕
+            </button>
+          </div>
+        )}
       </div>
       {columns === 3 && split.handle}
       <div
