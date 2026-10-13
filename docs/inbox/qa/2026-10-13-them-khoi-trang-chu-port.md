@@ -14,6 +14,10 @@ Chủ site (2026-10-13, ảnh Cấu hình › Port › Trang chủ port): chỉ 
 - Trước: `ContentTab` lọc `home.features` theo trang đã đăng, nên khối của trang nháp biến mất khỏi admin và bị xoá khỏi danh sách ở lần lưu kế tiếp.
 - Sau: lọc theo trang chưa lưu trữ; khối của trang nháp hiện kèm chữ "nháp · hiện khi trang được đăng". Trang công khai không đổi: `homeCards` trong `portfolio/data.ts` vẫn bỏ qua trang chưa đăng.
 
+## [ĐỔI HÀNH VI] Công tắc "Hiện ở trang chủ" của trang nháp ở Mục lục
+- Trước: trang nháp không có công tắc nào (`portFlags` trong `ConfigTree.tsx` chỉ ghi "chỉ trang đã đăng mới lên thanh trên và trang chủ").
+- Sau: trang nháp có công tắc "Hiện ở trang chủ" đọc và ghi cùng `home.features` như ở Trang chủ port, nên khối thêm từ đó hiện là bật ở Mục lục và ngược lại. "Hiện trên menu" của trang nháp vẫn chỉ là dòng chữ ("lên thanh trên khi trang được đăng"). Trang lưu trữ giữ như cũ.
+
 ## Đã rà, không đổi
 - Trang chủ blog không có danh sách khối tương đương (chỉ có công tắc "Hiện ở trang chủ" trên từng mục, `NavFlags`), nên không thêm gì bên blog.
 - Lỗi có sẵn, không sửa ở đây: bấm × hết mọi khối thì `home.features` rỗng và trang chủ quay về hiện mọi trang đã đăng (`homeCards`).
