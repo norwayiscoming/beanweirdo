@@ -26,15 +26,15 @@ import { ContentWorkspace } from '../admin/components/ContentWorkspace'
 import { ConfigTree } from '../admin/components/ConfigTree'
 import { DisplaySettings } from '../admin/components/DisplaySettings'
 import { AuthorsPanel } from '../admin/components/AuthorsPanel'
+import { DETAIL_CSS, desk, frame } from '../admin/components/Detail'
 import { useNav } from '../lib/nav'
 
 const sectionHead: CSSProperties = {
   fontFamily: sans,
-  fontSize: 10.5,
+  fontSize: 13,
   fontWeight: 500,
   letterSpacing: '.2em',
-  textTransform: 'uppercase',
-  color: ink.muted,
+  color: ink.soft,
   borderBottom: `2px solid ${ink.base}`,
   paddingBottom: 9,
   marginBottom: 18,
@@ -42,10 +42,8 @@ const sectionHead: CSSProperties = {
 
 const fieldLabel: CSSProperties = {
   fontFamily: sans,
-  fontSize: 10,
-  letterSpacing: '.16em',
-  textTransform: 'uppercase',
-  color: ink.faint,
+  fontSize: 13,
+  color: ink.soft,
   marginBottom: 6,
 }
 
@@ -65,7 +63,7 @@ const serifInput: CSSProperties = { ...boxed, fontFamily: serif, fontSize: 22 }
 const serifItalicInput: CSSProperties = { ...serifInput, fontStyle: 'italic', color: ink.green }
 const area: CSSProperties = {
   ...boxed,
-  fontWeight: 300,
+  fontWeight: 400,
   fontSize: 13.5,
   lineHeight: 1.5,
   padding: '10px 12px',
@@ -177,7 +175,7 @@ function ImageSlot({
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 13,
               lineHeight: 1,
-              color: ink.faint,
+              color: ink.soft,
               cursor: 'grab',
               userSelect: 'none',
             }}
@@ -218,7 +216,7 @@ function ImageSlot({
             justifyContent: 'center',
           }}
         >
-          <div style={{ fontFamily: sans, fontSize: 11, color: ink.faint }}>chưa có ảnh</div>
+          <div style={{ fontFamily: sans, fontSize: 13, color: ink.soft }}>chưa có ảnh</div>
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 7 }}>
@@ -229,9 +227,7 @@ function ImageSlot({
             minWidth: 0,
             display: 'block',
             fontFamily: sans,
-            fontSize: 10,
-            letterSpacing: '.14em',
-            textTransform: 'uppercase',
+            fontSize: 13,
             color: ink.soft,
             border: '1px dashed #DAD7C7',
             padding: '7px 10px',
@@ -258,9 +254,7 @@ function ImageSlot({
             onClick={() => setPlacing(url)}
             style={{
               fontFamily: sans,
-              fontSize: 10,
-              letterSpacing: '.14em',
-              textTransform: 'uppercase',
+              fontSize: 13,
               color: ink.soft,
               background: 'none',
               border: 'none',
@@ -278,9 +272,7 @@ function ImageSlot({
           onClick={() => setLinking(!linking)}
           style={{
             fontFamily: sans,
-            fontSize: 10,
-            letterSpacing: '.14em',
-            textTransform: 'uppercase',
+            fontSize: 13,
             color: ink.soft,
             background: 'none',
             border: 'none',
@@ -295,7 +287,7 @@ function ImageSlot({
         {url && (
           <Hover
             onClick={onClear}
-            style={{ fontFamily: sans, fontSize: 11, color: ink.faint, cursor: 'pointer', flex: 'none' }}
+            style={{ fontFamily: sans, fontSize: 13, color: ink.soft, cursor: 'pointer', flex: 'none' }}
             hoverStyle={{ color: '#C25C7C' }}
           >
             ✕
@@ -807,7 +799,9 @@ export function Cms() {
   const postCount = posts.length
 
   return (
-    <div style={{ background: paper.cream, color: ink.base, minHeight: '100vh' }}>
+    // Every tab sits on the same desk and takes its fields' frames from DETAIL_CSS (owner chose style C, 2026-10-13).
+    <div className="cfg-detail" style={{ background: desk.ground, color: ink.base, minHeight: '100vh' }}>
+      <style>{DETAIL_CSS}</style>
       <div style={{ background: '#DDEBF0', color: '#0E2C38', padding: '44px 56px 30px' }}>
         <Breadcrumbs style={{ opacity: 0.75 }} />
 
@@ -836,7 +830,7 @@ export function Cms() {
             <div
               style={{
                 fontFamily: sans,
-                fontWeight: 300,
+                fontWeight: 400,
                 fontSize: 13.5,
                 lineHeight: 1.5,
                 marginTop: 10,
@@ -850,9 +844,7 @@ export function Cms() {
           <div
             style={{
               fontFamily: sans,
-              fontSize: 11,
-              letterSpacing: '.14em',
-              textTransform: 'uppercase',
+              fontSize: 13,
               opacity: 0.7,
               paddingBottom: 8,
             }}
@@ -863,23 +855,23 @@ export function Cms() {
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 26 }}>
           {TABS.map((x) => (
-            <div
+            <button
+              type="button"
               key={x.k}
+              aria-pressed={tab === x.k}
               onClick={() => nav.goCms(x.k)}
+              className="cfg-btn"
               style={{
-                fontFamily: sans,
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: '.16em',
-                textTransform: 'uppercase',
-                padding: '10px 18px',
-                cursor: 'pointer',
-                background: tab === x.k ? ink.base : 'transparent',
-                color: tab === x.k ? paper.cream : ink.soft,
+                ...frame,
+                height: 38,
+                padding: '0 18px',
+                fontSize: 14,
+                fontWeight: 600,
+                ...(tab === x.k ? { background: ink.base, borderColor: ink.base, color: paper.cream } : { background: paper.white }),
               }}
             >
               {x.t}
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -954,10 +946,8 @@ export function Cms() {
               display: 'inline-block',
               marginTop: 30,
               fontFamily: sans,
-              fontSize: 10.5,
-              letterSpacing: '.16em',
-              textTransform: 'uppercase',
-              color: ink.faint,
+              fontSize: 13,
+              color: ink.soft,
               borderBottom: `1px solid ${paper.rule}`,
               paddingBottom: 4,
               cursor: 'pointer',

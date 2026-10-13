@@ -22,6 +22,8 @@ import { PostAuthorsDialog } from './PostAuthorsDialog'
 import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
+import { desk, frame } from './Detail'
+import { radius } from '../../design/controls'
 
 /**
  * Nội dung — the posts and the three vocabularies that file them, on one
@@ -80,11 +82,11 @@ const BULK_STATUS: { action: StatusAction; label: string }[] = [
 
 const SEL = '#EEF5F8'
 const WARN = '#B4552E'
-const label: CSSProperties = { fontFamily: sans, fontSize: 10, fontWeight: 500, letterSpacing: '.16em', textTransform: 'uppercase', color: ink.faint }
+const label: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 600, color: ink.strong }
 const box: CSSProperties = { boxSizing: 'border-box', background: paper.white, border: `1px solid ${paper.rule}`, color: ink.base, fontFamily: sans, fontSize: 13, padding: '6px 9px', outline: 'none', width: '100%' }
-const link: CSSProperties = { fontFamily: sans, fontSize: 12, color: ink.green, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }
-const quiet: CSSProperties = { ...link, color: ink.muted }
-const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSize: 11.5, padding: '0 7px', lineHeight: '18px', border: `1px solid ${paper.rule}`, borderRadius: 10, color: ink.soft, whiteSpace: 'nowrap', cursor: 'pointer', background: 'none', margin: '1px 3px 1px 0' }
+const link: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 500, color: ink.green, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }
+const quiet: CSSProperties = { ...link, color: ink.soft }
+const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSize: 13, padding: '0 7px', lineHeight: '18px', border: `1px solid ${paper.rule}`, borderRadius: 10, color: ink.soft, whiteSpace: 'nowrap', cursor: 'pointer', background: 'none', margin: '1px 3px 1px 0' }
 
 const CSS = `
 .cw-r:hover{background:${paper.hover}}
@@ -147,9 +149,9 @@ function RailRow({
       {dot}
       <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: ink.base, ...(big ? { fontFamily: serif, fontSize: 15.5 } : { fontFamily: sans, fontSize: 13 }) }}>
         {name}
-        {flag && <span style={{ fontFamily: sans, fontSize: 10, color: WARN, marginLeft: 6 }}>{flag}</span>}
+        {flag && <span style={{ fontFamily: sans, fontSize: 13, color: WARN, marginLeft: 6 }}>{flag}</span>}
       </span>
-      <span style={{ fontFamily: sans, fontSize: 11.5, color: count ? ink.muted : ink.faint, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
+      <span style={{ fontFamily: sans, fontSize: 13, color: count ? ink.soft : ink.soft, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
     </div>
   )
 }
@@ -305,7 +307,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const unplaced = live.filter((p) => !p.topic_id).length
   const statusCount = (s: PostStatus) => posts.filter((p) => p.status === s).length
   const rail = (
-    <nav aria-label="Phân loại" className="cw-rail" style={{ borderRight: `1px solid ${paper.rule}`, background: paper.white, paddingBottom: 18 }}>
+    <nav aria-label="Phân loại" className="cw-rail" style={{ background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, paddingBottom: 18 }}>
       <SectionHead id="content.topics" title="Chủ đề">
         {shown.map(({ row: t, depth }) => (
             <div key={t.id}>
@@ -356,11 +358,11 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
       {text}
     </button>
   )
-  const th: CSSProperties = { ...label, textAlign: 'left', padding: '9px 10px', borderBottom: `1px solid ${paper.rule}`, fontWeight: 500 }
-  const td: CSSProperties = { padding: '8px 10px', borderBottom: `1px solid ${paper.rule}`, verticalAlign: 'baseline', fontFamily: sans, fontSize: 13 }
+  const th: CSSProperties = { ...label, textAlign: 'left', padding: '10px', borderBottom: `1px solid ${ink.border}`, background: paper.hover }
+  const td: CSSProperties = { padding: '10px', borderBottom: `1px solid ${desk.line}`, verticalAlign: 'baseline', fontFamily: sans, fontSize: 13.5, color: ink.strong }
 
   const list = (
-    <div style={{ minWidth: 0, display: 'grid', alignContent: 'start' }}>
+    <div style={{ minWidth: 0, display: 'grid', alignContent: 'start', background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, overflow: 'hidden' }}>
       {undo && (
         <div role="status" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', background: '#E7EFE3', padding: '8px 16px', fontFamily: sans, fontSize: 13, color: ink.base }}>
           <span>{undo.msg}</span>
@@ -376,7 +378,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           </span>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '10px 14px', borderBottom: `1px solid ${paper.rule}`, fontFamily: sans, fontSize: 12.5, color: ink.muted }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '10px 14px', borderBottom: `1px solid ${paper.rule}`, fontFamily: sans, fontSize: 12.5, color: ink.soft }}>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{visible.length} bài</span>
         {chips.map((v) => (
           <span key={v} style={{ display: 'inline-flex', gap: 6, alignItems: 'center', background: SEL, color: ink.base, padding: '2px 8px', borderRadius: 3 }}>
@@ -390,7 +392,8 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         <button
           type="button"
           onClick={() => nav.newPost()}
-          style={{ fontFamily: sans, fontSize: 11.5, letterSpacing: '.08em', textTransform: 'uppercase', border: 'none', cursor: 'pointer', background: ink.green, color: '#fff', padding: '8px 14px', borderRadius: 4 }}
+          className="cfg-btn"
+          style={{ ...frame, background: ink.moss, borderColor: ink.moss, color: paper.white }}
         >
           + Bài mới
         </button>
@@ -439,15 +442,15 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                     />
                   </td>
                   <td style={{ ...td, maxWidth: 320 }}>
-                    <button type="button" onClick={() => nav.editPost(p.id)} style={{ all: 'unset', cursor: 'pointer', fontFamily: serif, fontSize: 15, color: ink.base }}>
+                    <button type="button" onClick={() => nav.editPost(p.id)} style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 14.5, fontWeight: 500, color: ink.base }}>
                       {p.en}
                     </button>
                     {p.pinned && (
-                      <span aria-label="đã ghim" style={{ marginLeft: 6, fontSize: 11 }}>
+                      <span aria-label="đã ghim" style={{ marginLeft: 6, fontSize: 13 }}>
                         📌
                       </span>
                     )}
-                    <div className="cw-act" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 3, fontSize: 11.5 }}>
+                    <div className="cw-act" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 3, fontSize: 13 }}>
                       <button type="button" onClick={() => nav.editPost(p.id)} style={link}>
                         Sửa
                       </button>
@@ -477,13 +480,13 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                   <td style={td}>
                     <StatusBadge status={p.status} pending={p.has_draft} />
                   </td>
-                  <td style={{ ...td, color: ink.muted, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{p.date_label}</td>
+                  <td style={{ ...td, color: ink.soft, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{p.date_label}</td>
                 </tr>
               )
             })}
           </tbody>
         </table>
-        {visible.length === 0 && <div style={{ color: ink.faint, fontFamily: sans, fontSize: 12.5, padding: '40px 0', textAlign: 'center' }}>Không có bài nào.</div>}
+        {visible.length === 0 && <div style={{ color: ink.soft, fontFamily: sans, fontSize: 12.5, padding: '40px 0', textAlign: 'center' }}>Không có bài nào.</div>}
       </div>
       {selected.length > 0 && (
         <BulkBar
@@ -508,7 +511,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   )
 
   return (
-    <div style={{ borderTop: `1px solid ${paper.rule}` }}>
+    <div style={{ padding: '16px 24px 40px' }}>
       <style>{CSS}</style>
       {err && (
         <div role="alert" style={{ background: '#FBE7E5', color: '#8E1E42', fontFamily: sans, fontSize: 12.5, padding: '8px 16px' }}>
@@ -520,6 +523,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0,240px) minmax(0,1fr)',
+          gap: 14,
           minHeight: 560,
           alignItems: 'start',
         }}
@@ -572,7 +576,7 @@ function BulkBar({
       {keywords.length > 0 && pick('+ Tag', keywords.map((k) => [k.id, k.label]), (v) => onField('kw+', v))}
       {keywords.length > 0 && pick('− Tag', keywords.map((k) => [k.id, k.label]), (v) => onField('kw-', v))}
       {pick('Trạng thái', BULK_STATUS.map((b) => [b.action, b.label]), (v) => onStatus(v as StatusAction))}
-      <button type="button" onClick={onClear} style={{ ...s, border: 'none', marginLeft: 'auto', color: ink.faint }}>
+      <button type="button" onClick={onClear} style={{ ...s, border: 'none', marginLeft: 'auto', color: ink.soft }}>
         Bỏ chọn
       </button>
     </div>
