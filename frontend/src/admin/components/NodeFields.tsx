@@ -18,7 +18,7 @@ function shades(hex: string): { on_color: string; tint: string; tint2: string } 
   return { on_color: mix(0, 0.78), tint: mix(255, 0.82), tint2: mix(255, 0.68) }
 }
 
-const dot = { all: 'unset', cursor: 'pointer', width: 14, height: 14, borderRadius: '50%', boxSizing: 'border-box', outlineOffset: 2 } as const
+const dot = { all: 'unset', cursor: 'pointer', width: 18, height: 18, borderRadius: '50%', boxSizing: 'border-box', outlineOffset: 2 } as const
 
 /** One set for every site's nodes (owner's choice, 2026-10-13), in the words the blog uses for its posts. */
 export const STATUS_CHOICES: { value: NodeStatus; label: string }[] = [
@@ -53,7 +53,7 @@ export function ColorRow({ node, parent, used, save }: { node: Node; parent?: No
         {swatches.map((c) => (
           <button key={c} type="button" aria-label={c} aria-pressed={on(c)} onClick={() => setColor(c)} style={{ ...dot, background: c, outline: on(c) ? `1.5px solid ${ink.base}` : 'none' }} />
         ))}
-        <span style={{ width: 76 }}>
+        <span style={{ width: 92 }}>
           <LineInput label="mã màu" value={node.accent ?? ''} placeholder="#hex" mono onSave={(v) => /^#[0-9a-f]{6}$/i.test(v.trim()) && setColor(v.trim())} />
         </span>
       </span>

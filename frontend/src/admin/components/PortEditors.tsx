@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ScaledPreview } from './ScaledPreview'
-import { Choice, Row, Section } from './Detail'
+import { Choice, Row, Section, desk, frame } from './Detail'
 import { ColorRow, STATUS_CHOICES } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useRowDrag } from '../lib/useRowDrag'
@@ -53,21 +53,18 @@ import {
 
 export const sectionHead: CSSProperties = {
   fontFamily: sans,
-  fontSize: 10.5,
-  fontWeight: 500,
-  letterSpacing: '.2em',
-  textTransform: 'uppercase',
-  color: ink.muted,
+  fontSize: 14,
+  fontWeight: 600,
+  color: ink.base,
   borderBottom: `2px solid ${ink.base}`,
   paddingBottom: 9,
   margin: '28px 0 16px',
 }
 const fieldLabel: CSSProperties = {
   fontFamily: sans,
-  fontSize: 10,
-  letterSpacing: '.16em',
-  textTransform: 'uppercase',
-  color: ink.faint,
+  fontSize: 13,
+  fontWeight: 600,
+  color: ink.strong,
   marginBottom: 6,
 }
 const boxed: CSSProperties = {
@@ -82,17 +79,7 @@ const boxed: CSSProperties = {
   outline: 'none',
 }
 const small: CSSProperties = { ...boxed, padding: '6px 8px', fontSize: 12 }
-const btn: CSSProperties = {
-  fontFamily: sans,
-  fontSize: 11,
-  letterSpacing: '.12em',
-  textTransform: 'uppercase',
-  border: `1px solid ${ink.base}`,
-  background: 'transparent',
-  color: ink.base,
-  padding: '8px 12px',
-  cursor: 'pointer',
-}
+const btn: CSSProperties = { ...frame }
 const quiet: CSSProperties = { ...btn, border: `1px solid ${paper.rule}`, color: ink.soft }
 
 function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
@@ -183,7 +170,7 @@ export function useSplit(key: string, initial: number, side: 'left' | 'right', m
         height: 'calc(100vh - 220px)',
         position: 'sticky',
         top: 0,
-        background: dragging ? ink.faint : paper.rule,
+        background: dragging ? ink.soft : paper.rule,
         borderLeft: `3px solid ${paper.cream}`,
         borderRight: `3px solid ${paper.cream}`,
         touchAction: 'none',
@@ -325,8 +312,7 @@ export function Builder({
         {error && <div style={{ color: ink.danger, fontFamily: sans, fontSize: 12, paddingTop: 6 }}>{error}</div>}
       </Section>
 
-      <Section title="Nội dung trang" note="khối · kéo ⋮⋮ để xếp, bấm để sửa">
-
+      <Section title="Nội dung trang" note={`${draft.blocks.length} khối · kéo ⋮⋮ để xếp, bấm để sửa`}>
         {draft.blocks.map((b, i) => (
           <div
             key={b.id}
@@ -340,23 +326,24 @@ export function Builder({
             onDrop={() => drag.drop(i)}
             onDragEnd={drag.end}
             style={{
-              borderTop: `1px solid ${paper.rule}`,
-              ...(i === draft.blocks.length - 1 ? { borderBottom: `1px solid ${paper.rule}` } : {}),
-              background: drag.over === i && drag.from !== i ? '#EEF5F8' : active === b.id ? paper.hover : 'transparent',
+              borderTop: i ? `1px solid ${desk.line}` : 'none',
+              background: drag.over === i && drag.from !== i ? desk.soft : active === b.id ? paper.hover : 'transparent',
+              boxShadow: drag.over === i && drag.from !== i ? `inset 0 3px 0 ${ink.green}` : 'none',
               opacity: drag.from === i ? 0.5 : 1,
             }}
           >
             <div
               onClick={() => setActive(active === b.id ? null : b.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 4px', cursor: 'pointer', fontFamily: sans, fontSize: 13.5 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px', cursor: 'pointer', fontFamily: sans, fontSize: 14 }}
             >
-              <span style={{ cursor: 'grab', color: ink.faint }} aria-label="Kéo để đổi thứ tự">⋮⋮</span>
-              <span style={{ flex: 1 }}>
-                {BLOCK_NAMES[b.type]}
-                <span style={{ color: ink.faint }}>{summary(b, src.moduleTitles)}</span>
-              </span>
+              <span style={{ cursor: 'grab', color: ink.soft, letterSpacing: -2, width: 18, textAlign: 'center' }} aria-label="Kéo để đổi thứ tự">⋮⋮</span>
+              <span style={{ fontSize: 12.5, color: ink.soft, width: 20, fontVariantNumeric: 'tabular-nums' }}>{String(i + 1).padStart(2, '0')}</span>
+              {/* A chip per block kind, so a page of eight blocks can be read by type at a glance. */}
+              <span style={{ ...BLOCK_CHIP[b.type], fontSize: 12, fontWeight: 600, padding: '3px 9px', borderRadius: 999, whiteSpace: 'nowrap' }}>{BLOCK_NAMES[b.type]}</span>
+              <span style={{ flex: 1, minWidth: 0, color: ink.strong, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{summary(b, src.moduleTitles).replace(/^ · /, '')}</span>
               <button
-                style={{ border: 0, background: 'none', color: ink.faint, cursor: 'pointer', fontSize: 15 }}
+                className="cfg-btn"
+                style={{ ...frame, width: 28, height: 28, padding: 0, fontSize: 16, borderColor: desk.field }}
                 onClick={(e) => {
                   e.stopPropagation()
                   setBlocks(draft.blocks.filter((x) => x.id !== b.id))
@@ -381,7 +368,8 @@ export function Builder({
           </div>
         ))}
         <button
-          style={addLine}
+          className="cfg-btn"
+          style={{ ...frame, marginTop: 12 }}
           onClick={() => {
             const b = newBlock('cards', src.moduleIds[0])
             setBlocks([...draft.blocks, b])
@@ -422,6 +410,17 @@ export function Builder({
         )}
     </div>
   )
+}
+
+/** Each kind's chip: the garden tints the blog already uses, dark ink of the same hue on top. */
+const BLOCK_CHIP: Record<BlockType, { background: string; color: string }> = {
+  head: { background: '#FBE7E5', color: '#8E3A40' },
+  opening: { background: '#F3DCAE', color: '#6B4510' },
+  cards: { background: '#F1EEE6', color: '#4B463A' },
+  slider: { background: '#CFE4EE', color: '#1E5770' },
+  series: { background: '#F9EBD2', color: '#7A5212' },
+  story: { background: '#E4F0DF', color: '#2B4B33' },
+  about: { background: '#EDE7F3', color: '#4E3D68' },
 }
 
 function summary(b: Block, modules: Record<string, string>): string {
@@ -535,7 +534,7 @@ function PickPosts({ ids, posts, onChange }: { ids: string[]; posts: PortPost[];
                 checked={n >= 0}
                 onChange={() => onChange(n >= 0 ? ids.filter((x) => x !== p.id) : [...ids, p.id])}
               />
-              <span style={{ width: 16, color: ink.faint }}>{n >= 0 ? n + 1 : ''}</span>
+              <span style={{ width: 16, color: ink.soft }}>{n >= 0 ? n + 1 : ''}</span>
               <span>{p.en}</span>
             </label>
           )
@@ -686,7 +685,7 @@ function ImageField({ label, value, onChange }: { label: string; value: string; 
       <div style={{ display: 'grid', gridTemplateColumns: '56px minmax(0,1fr) auto', gap: 8, alignItems: 'center' }}>
         <div style={{ width: 56, height: 56, background: value ? `center/cover no-repeat url("${value.split('#')[0]}")` : paper.rule, border: `1px solid ${paper.rule}` }} />
         <input style={small} value={value} placeholder="URL ảnh" onChange={(e) => onChange(e.target.value)} />
-        <button style={{ ...btn, padding: '6px 10px', fontSize: 10 }} disabled={busy} onClick={() => ref.current?.click()}>
+        <button style={{ ...btn, padding: '6px 10px', fontSize: 13 }} disabled={busy} onClick={() => ref.current?.click()}>
           {busy ? 'Đang tải…' : 'Tải ảnh'}
         </button>
         <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => upload(e.target.files?.[0])} />
@@ -699,7 +698,7 @@ function ImageField({ label, value, onChange }: { label: string; value: string; 
 const two: CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '0 22px' }
 const rowBox: CSSProperties = { borderTop: `1px solid ${paper.rule}`, padding: '10px 0 6px' }
 /** "+ Thêm …" as the detail template writes it: a green line of text, not a box. */
-const addLine: CSSProperties = { border: 0, background: 'none', padding: '8px 0', cursor: 'pointer', fontFamily: sans, fontSize: 13, color: ink.green }
+const addLine: CSSProperties = { ...frame, marginTop: 8 }
 
 /**
  * Portfolio › Nội dung trang — the content every port page shares, edited the
@@ -757,7 +756,7 @@ export function ContentTab({
       )}
     </Field>
   )
-  const grip = <span style={{ cursor: 'grab', color: ink.faint }} aria-label="Kéo để đổi thứ tự">⋮⋮</span>
+  const grip = <span style={{ cursor: 'grab', color: ink.soft }} aria-label="Kéo để đổi thứ tự">⋮⋮</span>
   const dragProps = (d: ReturnType<typeof useRowDrag>, i: number) => ({
     draggable: true,
     onDragStart: () => d.setFrom(i),
@@ -824,7 +823,7 @@ export function ContentTab({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, fontFamily: sans, fontSize: 13 }}>
               {grip}
               <span style={{ fontFamily: serif, fontSize: 18, flex: 1 }}>{page?.title}</span>
-              <button style={{ border: 0, background: 'none', color: ink.faint, cursor: 'pointer', fontSize: 15 }} aria-label="Bỏ khỏi trang tổng" onClick={() => saveFeatures(features.filter((_, j) => j !== i))}>
+              <button style={{ border: 0, background: 'none', color: ink.soft, cursor: 'pointer', fontSize: 15 }} aria-label="Bỏ khỏi trang tổng" onClick={() => saveFeatures(features.filter((_, j) => j !== i))}>
                 ×
               </button>
             </div>
@@ -874,7 +873,7 @@ export function ContentTab({
             onChange={(e) => setGroup('about', { ...about, signs: about.signs.map((x, j) => (j === i ? e.target.value : x)) })}
           />
           <button
-            style={{ border: 0, background: 'none', color: ink.faint, cursor: 'pointer', fontSize: 15 }}
+            style={{ border: 0, background: 'none', color: ink.soft, cursor: 'pointer', fontSize: 15 }}
             aria-label="Xoá ký tên"
             onClick={() => {
               const signs = about.signs.filter((_, j) => j !== i)
@@ -907,7 +906,7 @@ export function ContentTab({
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '140px minmax(0,1fr) 24px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
             <input style={small} value={l.label} placeholder="Nhãn" onChange={(e) => set({ label: e.target.value })} />
             <input style={small} value={l.url} placeholder="Link" onChange={(e) => set({ url: e.target.value })} />
-            <button style={{ border: 0, background: 'none', color: ink.faint, cursor: 'pointer', fontSize: 15 }} aria-label="Xoá link" onClick={() => setGroup('about', { ...about, reach: about.reach.filter((_, j) => j !== i) })}>
+            <button style={{ border: 0, background: 'none', color: ink.soft, cursor: 'pointer', fontSize: 15 }} aria-label="Xoá link" onClick={() => setGroup('about', { ...about, reach: about.reach.filter((_, j) => j !== i) })}>
               ×
             </button>
           </div>
@@ -1082,7 +1081,7 @@ export function DesignTab({
     <div style={{ ...sectionHead, display: 'flex', justifyContent: 'space-between' }}>
       <span>{t}</span>
       {group in stored && (
-        <button style={{ border: 0, background: 'none', cursor: 'pointer', fontFamily: sans, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: ink.faint }} onClick={() => reset(group)}>
+        <button style={{ border: 0, background: 'none', cursor: 'pointer', fontFamily: sans, fontSize: 13, color: ink.soft }} onClick={() => reset(group)}>
           Mặc định
         </button>
       )}
@@ -1146,7 +1145,7 @@ export function DesignTab({
 
         {head('Kiểu chữ', 'fonts')}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <button style={{ ...btn, padding: '5px 10px', fontSize: 10 }} disabled={uploading} onClick={() => fileRef.current?.click()}>
+          <button style={{ ...btn, padding: '5px 10px', fontSize: 13 }} disabled={uploading} onClick={() => fileRef.current?.click()}>
             {uploading ? 'Đang tải…' : 'Cập nhật'}
           </button>
           <input ref={fileRef} type="file" accept=".woff2,.woff,.ttf,.otf" style={{ display: 'none' }} onChange={(e) => addFont(e.target.files?.[0])} />
@@ -1158,7 +1157,7 @@ export function DesignTab({
               {f}
               {![design.fonts.display, design.fonts.body, design.fonts.meta].includes(f) && (
                 <button
-                  style={{ border: 0, background: 'none', cursor: 'pointer', color: ink.faint, marginLeft: 6 }}
+                  style={{ border: 0, background: 'none', cursor: 'pointer', color: ink.soft, marginLeft: 6 }}
                   onClick={() => {
                     put('fonts', 'library', design.fonts.library.filter((x) => x !== f))
                     if (f in design.fonts.files) {
