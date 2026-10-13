@@ -11,6 +11,7 @@ import {
   listTopics,
   renameKeyword,
   reorderTopics,
+  updateSite,
   updateTopic,
   type Module,
 } from '../lib/apiClient'
@@ -21,12 +22,14 @@ import { activeWords } from '../../lib/routeWords'
 import { TAG_PAGE, toPath } from '../../lib/routes'
 import { findPage, useModules } from '../../data/useModules'
 import { usePortSources } from '../../portfolio/data'
+import { navLinks, type PortContent } from '../../portfolio/content'
 import type { PresetKey } from '../../portfolio/blocks'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { radius } from '../../design/controls'
 import { FlatSettings, TopicSettings } from './ContentWorkspace'
 import { Builder, ContentTab, createFromPreset, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
+import { SiteTabs, useRememberedTab } from './SiteTabs'
 import {
   describePage,
   NavFlags,
@@ -59,9 +62,19 @@ import {
  * page: Mục lục and the topic tree are one card (Mục lục draws the tree), the
  * Điều hướng screen went (the sidebar follows the tree; its two switches sit
  * on each page), and so did Mẫu and Lưu trữ, which had nothing to see.
+ *
+ * On 2026-10-13 the owner asked for the sites to stop sharing one scroll and
+ * to look and act alike: a tab per site, and every site built from the same
+ * `SiteSpec` — a home card, a Mục lục whose order is the site's navigation
+ * and which drags the same way, other pages, and Phần chung. A new site is a
+ * new spec, not new tree code.
  */
 
 type Group = 'port-pages' | 'port-parts' | 'topics' | 'tags' | 'curated' | 'modules'
+
+const SITES = ['blog', 'port', 'practice'] as const
+type SiteId = (typeof SITES)[number]
+const SITE_LABELS: Record<SiteId, string> = { blog: 'Personal Blog', port: 'Port', practice: 'Practice' }
 
 type Picked =
   | BlogSelected
@@ -155,9 +168,11 @@ type DragProps = {
  * measurement answers "before", never "inside", since inside changes the
  * node's parent and with it every post address under it.
  */
-function whereIn(e: { clientY: number; currentTarget: HTMLElement }): DropWhere {
+function whereIn(e: { clientY: number; currentTarget: HTMLElement }, nest: boolean): DropWhere {
   const box = e.currentTarget.getBoundingClientRect()
   const part = (e.clientY - box.top) / box.height
+  // A flat list has no inside: each half of the row is a side.
+  if (!nest) return Number.isFinite(part) && part >= 0.5 ? 'after' : 'before'
   if (!Number.isFinite(part) || part < 0.25) return 'before'
   if (part > 0.75) return 'after'
   return 'inside'
@@ -297,34 +312,34 @@ function AddField({ label, placeholder, onAdd }: { label: string; placeholder: s
 const sectionHead = { fontFamily: sans, fontSize: 10.5, fontWeight: 500, letterSpacing: '.2em', textTransform: 'uppercase', color: ink.muted, borderBottom: `2px solid ${ink.base}`, paddingBottom: 9, margin: '30px 0 12px' } as const
 const hint = { fontFamily: sans, fontSize: 13, lineHeight: 1.55, color: ink.muted, margin: '6px 0 14px', maxWidth: 520 } as const
 
+type MovePlan = Exclude<ReturnType<typeof planMove>, { error: string }>
+
+/** One row of a site's Mục lục; `parent_id` is null on a flat list. */
+type TocItem = { id: string; parent_id: string | null; name: string; dot?: string | null; meta?: string; picked: Picked; movable: boolean }
+
+/** A card under the home card, and the rows it folds over. */
+type GroupSpec = { id: Group; title: string; note: string; rows?: ReactNode }
+
 /**
- * One of the three sites (Port, Bean blog, Practice) and everything under it.
- * The owner read the tree as one list and asked why the port had a Mục lục:
- * a faint label was not enough of a boundary, so each site is a heading that
- * folds, with its items set in under it.
+ * What a site of the Cấu hình tab is made of — the one shape every site fills
+ * in, so the blog and the port read and act alike (the owner's ask of
+ * 2026-10-13: same names, same cards, same drag). Each part is optional; a
+ * site draws only what it has, never an empty card for symmetry's sake.
  */
-function Site({ name, path, fold, children }: { name: string; path: string; fold: { open: boolean; toggle: () => void }; children: ReactNode }) {
-  return (
-    <section aria-label={name} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-      <button
-        type="button"
-        {...{ [ROW]: '' }}
-        data-fold={fold.open ? 'open' : 'closed'}
-        aria-expanded={fold.open}
-        aria-label={`${fold.open ? 'Gập' : 'Mở'} ${name}`}
-        onClick={fold.toggle}
-        onKeyDown={(e) => foldKey(e, fold)}
-        style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 8, padding: '6px 2px', borderBottom: `2px solid ${ink.base}` }}
-      >
-        <span aria-hidden style={{ width: 12, fontSize: 11, color: ink.muted }}>
-          {fold.open ? '▾' : '▸'}
-        </span>
-        <span style={{ fontFamily: serif, fontSize: 21, letterSpacing: '-.02em', color: ink.base, flex: 1 }}>{name}</span>
-        <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.muted }}>{path}</span>
-      </button>
-      {fold.open && <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 10, borderLeft: `2px solid ${paper.rule}` }}>{children}</div>}
-    </section>
-  )
+type SiteSpec = {
+  id: SiteId
+  path: string
+  home: { title: string; note: string; picked: Picked }
+  /**
+   * Mục lục: the site's pages in the order its navigation shows them. `move`
+   * draws a drop at once and hands back the save and its undo; `nest` says
+   * whether a row can be dropped inside another.
+   */
+  toc?: GroupSpec & { items: TocItem[]; nest: boolean; move: (id: string, plan: MovePlan) => { apply: () => Promise<unknown>; revert: () => Promise<unknown> } }
+  /** Pages outside the navigation order, each kind its own card. */
+  pages?: GroupSpec[]
+  /** Phần chung: what every page of the site shares or borrows. */
+  shared?: GroupSpec
 }
 
 export function ConfigTree({
@@ -346,7 +361,15 @@ export function ConfigTree({
   const src = usePortSources()
   const [layout, setLayout] = useState<Layout | null>(null)
   const [vocab, setVocab] = useState<Vocab>({ topics: [], keywords: [], kinds: [] })
-  const [picked, setPicked] = useState<Picked>({ kind: 'system', key: 'landing' })
+  const [site, setSiteTab] = useRememberedTab('beanweirdo.config.site', SITES)
+  const homeOf = (id: SiteId): Picked => (id === 'blog' ? { kind: 'system', key: 'landing' } : id === 'port' ? { kind: 'port-part', part: 'home' } : { kind: 'practice' })
+  const [picked, setPicked] = useState<Picked>(() => homeOf(site))
+  const openSite = (id: SiteId) => {
+    setSiteTab(id)
+    setPicked(homeOf(id))
+    setDragging(null)
+    setDropAt(null)
+  }
   const [err, setErr] = useState<string | null>(null)
   const [round, setRound] = useState(0)
   const [portRound, setPortRound] = useState(0)
@@ -400,55 +423,15 @@ export function ConfigTree({
         setRound((r) => r + 1)
       })
 
-  // ── the topic tree's drag ──────────────────────────────────────────────
+  // ── the Mục lục drag, the same for every site ──────────────────────
   const [dragging, setDragging] = useState<string | null>(null)
   const [dropAt, setDropAt] = useState<{ id: string; where: DropWhere } | null>(null)
   const sorted = [...vocab.topics].sort((a, b) => a.sort_order - b.sort_order)
   const topicTree = buildTree(sorted)
-  // The order the tree is drawn in, which `planMove` keeps for everything it does not move.
-  const shown = flattenTree(topicTree).map((n) => n.row)
-  const plan = (target: string, where: DropWhere) => (dragging ? planMove(shown, dragging, target, where) : null)
-  const titleOf = (id: string | null) => (id ? (vocab.topics.find((t) => t.id === id)?.title ?? id) : 'tầng trên cùng')
+  // The order the topic tree is drawn in, which `planMove` keeps for everything it does not move.
+  const shownTopics = flattenTree(topicTree).map((n) => n.row)
 
-  function dropTopic(target: string, where: DropWhere) {
-    const id = dragging
-    const p = plan(target, where)
-    setDragging(null)
-    setDropAt(null)
-    if (!id || !p) return
-    if ('error' in p) return setErr(p.error)
-    const from = vocab.topics.find((t) => t.id === id)?.parent_id ?? null
-    const oldOrder = shown.map((t) => t.id)
-    // The tree moves the moment the row is dropped. Saving takes two calls
-    // across the ocean (Vercel in the US, the database in Tokyo) and then a
-    // reload; waiting for all that before redrawing made the owner think the
-    // drop had failed.
-    placeLocally(id, p.parentId, p.order)
-    // A drop inside a folded node opens it, so the row does not vanish.
-    if (p.parentId)
-      setFolded((f) => {
-        const next = new Set(f)
-        next.delete(`t:${p.parentId}`)
-        return next
-      })
-    setUndo({
-      msg: `Đã chuyển ${titleOf(id)} ${WHERE_WORDS[where]} ${titleOf(target)}`,
-      saving: true,
-      revert: async () => {
-        placeLocally(id, from, oldOrder)
-        if (from !== p.parentId) await updateTopic(id, { parent_id: from })
-        await reorderTopics(oldOrder)
-      },
-    })
-    run(async () => {
-      // Parent first: the order only means anything once the node sits where it is going.
-      if (from !== p.parentId) await updateTopic(id, { parent_id: p.parentId })
-      await reorderTopics(p.order)
-      setUndo((u) => u && { ...u, saving: false })
-    })
-  }
-
-  /** Draws a move before the server has it; the reload after the save replaces this with what was stored. */
+  /** Draws a topic move before the server has it; the reload after the save replaces this with what was stored. */
   function placeLocally(id: string, parentId: string | null, order: string[]) {
     setVocab((v) => ({
       ...v,
@@ -459,28 +442,95 @@ export function ConfigTree({
     }))
   }
 
-  const dragOf = (id: string): DragProps => ({
-    onDragStart: (e) => {
-      e.dataTransfer?.setData('text/plain', id)
-      setDragging(id)
-    },
-    onDragOver: (e) => {
-      if (!dragging) return
-      e.preventDefault()
-      const where = whereIn(e)
-      const p = plan(id, where)
-      if (!p || 'error' in p) return dropAt && setDropAt(null)
-      if (dropAt?.id !== id || dropAt.where !== where) setDropAt({ id, where })
-    },
-    onDragLeave: () => dropAt?.id === id && setDropAt(null),
-    onDrop: (e) => {
-      e.preventDefault()
-      dropTopic(id, whereIn(e))
-    },
-    onDragEnd: () => (setDragging(null), setDropAt(null)),
-    dragging: dragging === id,
-    mark: dropAt?.id === id && dragging !== id ? dropAt.where : null,
-  })
+  // The tree moves the moment a row is dropped. Saving takes calls across the
+  // ocean (Vercel in the US, the database in Tokyo) and then a reload; waiting
+  // for all that before redrawing made the owner think the drop had failed.
+  const moveTopic = (id: string, p: MovePlan) => {
+    const from = vocab.topics.find((t) => t.id === id)?.parent_id ?? null
+    const oldOrder = shownTopics.map((t) => t.id)
+    placeLocally(id, p.parentId, p.order)
+    return {
+      // Parent first: the order only means anything once the node sits where it is going.
+      apply: async () => {
+        if (from !== p.parentId) await updateTopic(id, { parent_id: p.parentId })
+        await reorderTopics(p.order)
+      },
+      revert: async () => {
+        placeLocally(id, from, oldOrder)
+        if (from !== p.parentId) await updateTopic(id, { parent_id: from })
+        await reorderTopics(oldOrder)
+      },
+    }
+  }
+
+  // The port's top bar order is its header links (`navLinks`): a drop rewrites
+  // that list, keeping each link's own label and hidden flag, and home where it was.
+  const portLinks = port.loaded ? navLinks(port.content, port.pages) : []
+  const setHeader = (header: PortContent['header']) => port.setContentStored((s) => ({ ...s, header }))
+  const movePortLink = (_id: string, p: MovePlan) => {
+    const before = port.content.header
+    const keys = p.order.filter((k) => k !== 'home' && portLinks.some((l) => l.key === k))
+    keys.splice(Math.max(0, portLinks.findIndex((l) => l.key === 'home')), 0, 'home')
+    const header = { ...before, links: keys.map((key) => before.links.find((o) => o.key === key) ?? { key }) }
+    setHeader(header)
+    return {
+      apply: () => updateSite({ portfolio: { header } } as never),
+      revert: async () => {
+        setHeader(before)
+        await updateSite({ portfolio: { header: before } } as never)
+      },
+    }
+  }
+
+  const titleOf = (items: TocItem[], id: string | null) => (id ? (items.find((t) => t.id === id)?.name ?? id) : 'tầng trên cùng')
+
+  const dragOf = (toc: NonNullable<SiteSpec['toc']>, shown: TocItem[], id: string): DragProps => {
+    const plan = (target: string, where: DropWhere) => (dragging ? planMove(shown, dragging, target, where) : null)
+    const drop = (target: string, where: DropWhere) => {
+      const moved = dragging
+      const p = plan(target, where)
+      setDragging(null)
+      setDropAt(null)
+      if (!moved || !p) return
+      if ('error' in p) return setErr(p.error)
+      const msg = `Đã chuyển ${titleOf(shown, moved)} ${WHERE_WORDS[where]} ${titleOf(shown, target)}`
+      const m = toc.move(moved, p)
+      // A drop inside a folded node opens it, so the row does not vanish.
+      if (p.parentId)
+        setFolded((f) => {
+          const next = new Set(f)
+          next.delete(`toc:${p.parentId}`)
+          return next
+        })
+      setUndo({ msg, saving: true, revert: m.revert })
+      run(async () => {
+        await m.apply()
+        setUndo((u) => u && { ...u, saving: false })
+      })
+    }
+    return {
+      onDragStart: (e) => {
+        e.dataTransfer?.setData('text/plain', id)
+        setDragging(id)
+      },
+      onDragOver: (e) => {
+        if (!dragging) return
+        e.preventDefault()
+        const where = whereIn(e, toc.nest)
+        const p = plan(id, where)
+        if (!p || 'error' in p) return dropAt && setDropAt(null)
+        if (dropAt?.id !== id || dropAt.where !== where) setDropAt({ id, where })
+      },
+      onDragLeave: () => dropAt?.id === id && setDropAt(null),
+      onDrop: (e) => {
+        e.preventDefault()
+        drop(id, whereIn(e, toc.nest))
+      },
+      onDragEnd: () => (setDragging(null), setDropAt(null)),
+      dragging: dragging === id,
+      mark: dropAt?.id === id && dragging !== id ? dropAt.where : null,
+    }
+  }
 
   // ── the arrow keys walk the rows of the tree ───────────────────────────
   const walk = (e: KeyboardEvent<HTMLElement>) => {
@@ -516,29 +566,149 @@ export function ConfigTree({
   const on = (p: Picked) => same(picked, p)
   const blog = `/${activeWords().bean}`
 
-  const topicNode = ({ row: t, children, depth }: (typeof topicTree)[number]): ReactNode => (
-    <div key={t.id}>
-      <Leaf
-        name={t.title}
-        depth={depth}
-        dot={t.accent ?? ancestorsOf(sorted, t.id).reverse().find((a) => a.accent)?.accent ?? null}
-        meta={leafMeta('topic', t.id, t.posts)}
-        on={on({ kind: 'topic', id: t.id })}
-        fold={children.length ? fold(`t:${t.id}`) : undefined}
-        drag={dragOf(t.id)}
-        onClick={pick({ kind: 'topic', id: t.id })}
-      />
-      {!folded.has(`t:${t.id}`) && children.map(topicNode)}
-    </div>
-  )
   const moduleRows = flattenTree(buildTree([...modules].sort(bySiteOrder)))
   // A module is shown when no ancestor of it is folded.
   const hidden = (id: string): boolean => {
     const parent = modules.find((x) => x.id === id)?.parent_id
     return !!parent && parent !== id && (folded.has(`m:${parent}`) || hidden(parent))
   }
-  const groupCard = (id: Group, title: string, note: string) => <Card title={title} note={note} on={on({ kind: 'group', id })} fold={fold(id)} onClick={pick({ kind: 'group', id })} />
-  const openGroup = (id: Group) => !folded.has(id)
+
+  // ── the sites, each one spec ─────────────────────────────────────────────
+  const blogSite: SiteSpec = {
+    id: 'blog',
+    path: `${blog}/…`,
+    home: { title: 'Trang chủ blog', note: `${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`, picked: { kind: 'system', key: 'landing' } },
+    toc: {
+      id: 'topics',
+      title: 'Mục lục',
+      note: 'Cây chủ đề: thứ tự ở đây là thứ tự của thanh bên và trang Mục lục. Kéo ⋮⋮ để đổi chỗ',
+      nest: true,
+      move: moveTopic,
+      items: shownTopics.map((t) => ({
+        id: t.id,
+        parent_id: t.parent_id,
+        name: t.title,
+        dot: t.accent ?? ancestorsOf(sorted, t.id).reverse().find((a) => a.accent)?.accent ?? null,
+        meta: leafMeta('topic', t.id, t.posts),
+        picked: { kind: 'topic', id: t.id },
+        movable: true,
+      })),
+    },
+    pages: [
+      {
+        id: 'tags',
+        title: 'Tag',
+        note: `${vocab.keywords.length} tag, xếp theo tên · mỗi tag là một trang`,
+        rows: tags.map((k) => <Leaf key={k.id} name={k.label} depth={0} meta={leafMeta('keyword', k.id, k.posts)} on={on({ kind: 'tag', id: k.id })} onClick={pick({ kind: 'tag', id: k.id })} />),
+      },
+      {
+        id: 'curated',
+        title: 'Trang chọn tay',
+        note: 'Trang có quy chế riêng, như Ghi',
+        rows: curated.map((p) => {
+          const page = findPage(pages, p.id)
+          return <Leaf key={p.id} name={p.title || p.id} depth={0} meta={posts(page ? postsOf(page.id).length : 0)} on={on({ kind: 'curated', id: p.id })} onClick={pick({ kind: 'curated', id: p.id })} />
+        }),
+      },
+    ],
+    shared: {
+      id: 'modules',
+      title: 'Phần chung',
+      note: 'Hình trang: dàn trang, ảnh và chữ mà một trang mượn; xem trước trên trang đang mượn',
+      rows: moduleRows
+        .filter(({ row }) => !hidden(row.id))
+        .map(({ row, depth, children }) => (
+          <Leaf
+            key={row.id}
+            name={row.title}
+            depth={depth}
+            dot={row.accent}
+            meta={wearer(row.id) ? undefined : 'chưa dùng'}
+            on={on({ kind: 'module', id: row.id })}
+            fold={children.length ? fold(`m:${row.id}`) : undefined}
+            onClick={pick({ kind: 'module', id: row.id })}
+          />
+        )),
+    },
+  }
+
+  const portSite: SiteSpec = {
+    id: 'port',
+    path: '/',
+    home: { title: 'Trang chủ port', note: 'Lời chào và các khối của trang /', picked: { kind: 'port-part', part: 'home' } },
+    toc: {
+      id: 'port-pages',
+      title: 'Mục lục',
+      note: `${livePort.length} trang và About: thứ tự ở đây là thứ tự của thanh trên. Kéo ⋮⋮ để đổi chỗ`,
+      nest: false,
+      move: movePortLink,
+      items: [
+        // The top bar's links in its order, then the pages it does not show.
+        ...portLinks.flatMap((l): TocItem[] => {
+          if (l.key === 'about') return [{ id: l.key, parent_id: null, name: 'About', meta: l.hidden ? 'ẩn' : '/about', picked: { kind: 'port-part', part: 'about' }, movable: true }]
+          const pg = port.pages.find((x) => `page:${x.id}` === l.key)
+          return pg ? [{ id: l.key, parent_id: null, name: pg.title, meta: l.hidden ? 'ẩn' : `/${pg.slug}`, picked: { kind: 'port-page', id: pg.id }, movable: true }] : []
+        }),
+        ...[...port.pages.filter((x) => x.status === 'draft'), ...archivedPort].map(
+          (pg): TocItem => ({ id: `page:${pg.id}`, parent_id: null, name: pg.title, meta: pg.status === 'draft' ? 'nháp' : 'lưu trữ', picked: { kind: 'port-page', id: pg.id }, movable: false }),
+        ),
+      ],
+    },
+    shared: {
+      id: 'port-parts',
+      title: 'Phần chung',
+      note: 'Signature, thanh trên, chân trang',
+      rows: PORT_PARTS.filter((x) => x.part !== 'about').map((x) => <Leaf key={x.part} name={x.title} depth={0} on={on({ kind: 'port-part', part: x.part })} onClick={pick({ kind: 'port-part', part: x.part })} />),
+    },
+  }
+
+  const practiceSite: SiteSpec = {
+    id: 'practice',
+    path: toPath({ area: 'practice', screen: 'hours' }),
+    home: { title: 'Ghi 02', note: 'Nhật ký giờ luyện, sau đăng nhập', picked: { kind: 'practice' } },
+  }
+
+  const spec = { blog: blogSite, port: portSite, practice: practiceSite }[site]
+
+  /** The tree of one site, drawn from its spec: the same cards and rows, the same drag, for every site. */
+  const siteTree = ({ id, path, home, toc, pages: others = [], shared }: SiteSpec) => {
+    const group = (g: GroupSpec) => (
+      <div key={g.id} style={{ display: 'contents' }}>
+        <Card title={g.title} note={g.note} on={on({ kind: 'group', id: g.id })} fold={fold(g.id)} onClick={pick({ kind: 'group', id: g.id })} />
+        {!folded.has(g.id) && g.rows}
+      </div>
+    )
+    const tocRows = () => {
+      if (!toc) return null
+      const nodes = buildTree(toc.items)
+      const shown = flattenTree(nodes).map((n) => n.row)
+      const node = ({ row, children, depth }: (typeof nodes)[number]): ReactNode => (
+        <div key={row.id}>
+          <Leaf
+            name={row.name}
+            depth={depth}
+            dot={row.dot}
+            meta={row.meta}
+            on={on(row.picked)}
+            fold={children.length ? fold(`toc:${row.id}`) : undefined}
+            drag={row.movable ? dragOf(toc, shown, row.id) : undefined}
+            onClick={pick(row.picked)}
+          />
+          {!folded.has(`toc:${row.id}`) && children.map(node)}
+        </div>
+      )
+      return nodes.map(node)
+    }
+    return (
+      <section aria-label={SITE_LABELS[id]} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.muted, padding: '0 2px 2px' }}>{path}</div>
+        <Card title={home.title} note={home.note} on={on(home.picked)} onClick={pick(home.picked)} />
+        {toc && group({ ...toc, rows: tocRows() })}
+        {others.map(group)}
+        {shared && group(shared)}
+      </section>
+    )
+  }
 
   const tree = (
     <nav
@@ -546,58 +716,7 @@ export function ConfigTree({
       onKeyDown={walk}
       style={{ display: 'flex', flexDirection: 'column', gap: 8, ...(columns === 1 ? {} : { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto' }), padding: '0 4px 24px 0' }}
     >
-      <Site name="Port" path="/" fold={fold('site:port')}>
-      <Card title="Trang chủ port" note="Lời chào và các khối của trang /" on={on({ kind: 'port-part', part: 'home' })} onClick={pick({ kind: 'port-part', part: 'home' })} />
-      {groupCard('port-pages', 'Các trang port', `${livePort.length} trang · thêm từ mẫu bibi, bibe hay trang trống`)}
-      {openGroup('port-pages') && (
-        <>
-          {livePort.map((p) => (
-            <Leaf key={p.id} name={p.title} depth={0} meta={p.status === 'draft' ? 'nháp' : `/${p.slug}`} on={on({ kind: 'port-page', id: p.id })} onClick={pick({ kind: 'port-page', id: p.id })} />
-          ))}
-          {archivedPort.map((p) => (
-            <Leaf key={p.id} name={p.title} depth={0} meta="lưu trữ" on={on({ kind: 'port-page', id: p.id })} onClick={pick({ kind: 'port-page', id: p.id })} />
-          ))}
-        </>
-      )}
-      {groupCard('port-parts', 'Phần chung của port', 'About, Signature, thanh trên, chân trang')}
-      {openGroup('port-parts') &&
-        PORT_PARTS.map((x) => <Leaf key={x.part} name={x.title} depth={0} on={on({ kind: 'port-part', part: x.part })} onClick={pick({ kind: 'port-part', part: x.part })} />)}
-      </Site>
-
-      <Site name="Bean blog" path={`${blog}/…`} fold={fold('site:blog')}>
-      <Card title="Trang chủ blog" note={`${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`} on={on({ kind: 'system', key: 'landing' })} onClick={pick({ kind: 'system', key: 'landing' })} />
-      {groupCard('topics', 'Mục lục', 'Cây chủ đề: thứ tự ở đây là thứ tự của thanh bên và trang Mục lục. Kéo ⋮⋮ để đổi chỗ')}
-      {openGroup('topics') && topicTree.map(topicNode)}
-      {groupCard('tags', 'Tag', `${vocab.keywords.length} tag, xếp theo tên · mỗi tag là một trang`)}
-      {openGroup('tags') &&
-        tags.map((k) => <Leaf key={k.id} name={k.label} depth={0} meta={leafMeta('keyword', k.id, k.posts)} on={on({ kind: 'tag', id: k.id })} onClick={pick({ kind: 'tag', id: k.id })} />)}
-      {groupCard('curated', 'Trang chọn tay', 'Trang có quy chế riêng, như Ghi')}
-      {openGroup('curated') &&
-        curated.map((p) => {
-          const page = findPage(pages, p.id)
-          return <Leaf key={p.id} name={p.title || p.id} depth={0} meta={posts(page ? postsOf(page.id).length : 0)} on={on({ kind: 'curated', id: p.id })} onClick={pick({ kind: 'curated', id: p.id })} />
-        })}
-      {groupCard('modules', 'Hình trang', 'Dàn trang, ảnh và chữ mà một trang mượn; xem trước trên trang đang mượn')}
-      {openGroup('modules') &&
-        moduleRows
-          .filter(({ row }) => !hidden(row.id))
-          .map(({ row, depth, children }) => (
-            <Leaf
-              key={row.id}
-              name={row.title}
-              depth={depth}
-              dot={row.accent}
-              meta={wearer(row.id) ? undefined : 'chưa dùng'}
-              on={on({ kind: 'module', id: row.id })}
-              fold={children.length ? fold(`m:${row.id}`) : undefined}
-              onClick={pick({ kind: 'module', id: row.id })}
-            />
-          ))}
-      </Site>
-
-      <Site name="Practice" path={toPath({ area: 'practice', screen: 'hours' })} fold={fold('site:practice')}>
-        <Card title="Ghi 02" note="Nhật ký giờ luyện, sau đăng nhập" on={on({ kind: 'practice' })} onClick={pick({ kind: 'practice' })} />
-      </Site>
+      {siteTree(spec)}
 
       {undo && (
         <div role="status" style={{ position: 'sticky', bottom: 0, display: 'flex', gap: 10, alignItems: 'center', background: paper.cream, border: `1px solid ${ink.border}`, borderRadius: radius, padding: '8px 10px', fontFamily: sans, fontSize: 12, color: ink.base }}>
@@ -666,8 +785,9 @@ export function ConfigTree({
 
   switch (picked.kind) {
     case 'port-part': {
-      const title = picked.part === 'home' ? 'Trang chủ' : PORT_PARTS.find((x) => x.part === picked.part)?.title ?? picked.part
-      crumbs = ['Port', title]
+      const title = picked.part === 'home' ? 'Trang chủ port' : PORT_PARTS.find((x) => x.part === picked.part)?.title ?? picked.part
+      // About is a page of the top bar, so it sits in Mục lục; the rest every page shares.
+      crumbs = ['Port', ...(picked.part === 'home' ? [] : [picked.part === 'about' ? 'Mục lục' : 'Phần chung']), title]
       preview = toPath({ area: 'public', screen: picked.part === 'about' || picked.part === 'sign' ? 'portfolioAbout' : 'portfolioHome' })
       address = preview
       previewKey = portRound
@@ -676,7 +796,7 @@ export function ConfigTree({
     }
     case 'port-page': {
       const p = port.pages.find((x) => x.id === picked.id)
-      crumbs = ['Port', 'Các trang port', p?.title ?? picked.id]
+      crumbs = ['Port', 'Mục lục', p?.title ?? picked.id]
       address = p ? `/${p.slug}` : ''
       // The builder draws its own live preview of the unsaved page into the preview column.
       body = p ? (
@@ -705,7 +825,7 @@ export function ConfigTree({
     case 'curated': {
       const d = describePage(picked, layout, pages)
       const where = picked.kind === 'curated' ? 'Trang chọn tay' : null
-      crumbs = ['Bean blog', ...(where ? [where] : []), picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ blog' : d.title]
+      crumbs = ['Personal Blog', ...(where ? [where] : []), picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ blog' : d.title]
       preview = d.preview
       address = d.preview
       body = page(picked)
@@ -718,7 +838,7 @@ export function ConfigTree({
       const t = vocab.topics.find((x) => x.id === picked.id)
       if (!t) break
       const path = [...ancestorsOf(sorted, t.id), t].map((x) => x.title)
-      crumbs = ['Bean blog', 'Mục lục', ...path]
+      crumbs = ['Personal Blog', 'Mục lục', ...path]
       named = true
       address = toPath({ area: 'public', screen: 'module', moduleId: t.id })
       preview = address
@@ -730,7 +850,7 @@ export function ConfigTree({
               key={t.id}
               topic={t}
               parent={t.parent_id ? vocab.topics.find((x) => x.id === t.parent_id) : undefined}
-              tree={shown}
+              tree={shownTopics}
               count={t.posts}
               used={[...new Set(vocab.topics.map((x) => x.accent).filter((c): c is string => !!c))]}
               save={(patch) => run(() => updateTopic(t.id, patch))}
@@ -761,7 +881,7 @@ export function ConfigTree({
     case 'tag': {
       const k = vocab.keywords.find((x) => x.id === picked.id)
       if (!k) break
-      crumbs = ['Bean blog', 'Tag', k.label]
+      crumbs = ['Personal Blog', 'Tag', k.label]
       named = true
       address = toPath({ area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${k.id}` })
       preview = address
@@ -779,7 +899,7 @@ export function ConfigTree({
       break
     }
     case 'module': {
-      crumbs = ['Bean blog', 'Hình trang', modules.find((m) => m.id === picked.id)?.title ?? picked.id]
+      crumbs = ['Personal Blog', 'Phần chung', modules.find((m) => m.id === picked.id)?.title ?? picked.id]
       // A module is not a page of its own since the pages moved onto the topic
       // tree; it is previewed on the page that wears it.
       const w = wearer(picked.id)
@@ -802,7 +922,7 @@ export function ConfigTree({
     case 'group': {
       const g = picked.id
       if (g === 'port-pages') {
-        crumbs = ['Port', 'Các trang port']
+        crumbs = ['Port', 'Mục lục']
         preview = '/'
         const add = (key: PresetKey) =>
           run(async () => {
@@ -813,7 +933,7 @@ export function ConfigTree({
         body = (
           <>
             {errorLine}
-            <p style={hint}>Chọn một trang ở cây bên trái để sửa, hoặc thêm trang mới.</p>
+            <p style={hint}>Thanh trên của port vẽ đúng thứ tự này. Chọn một trang ở bên trái để sửa; muốn đổi chỗ thì nắm ⋮⋮ ở cuối dòng và kéo lên hay xuống. Trang nháp và trang lưu trữ không lên thanh trên nên đứng cuối, không kéo được.</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {(
                 [
@@ -830,7 +950,7 @@ export function ConfigTree({
           </>
         )
       } else if (g === 'topics') {
-        crumbs = ['Bean blog', 'Mục lục']
+        crumbs = ['Personal Blog', 'Mục lục']
         preview = toPath({ area: 'public', screen: 'home' })
         address = preview
         body = (
@@ -845,7 +965,7 @@ export function ConfigTree({
           </>
         )
       } else if (g === 'tags') {
-        crumbs = ['Bean blog', 'Tag']
+        crumbs = ['Personal Blog', 'Tag']
         body = (
           <>
             {errorLine}
@@ -855,7 +975,7 @@ export function ConfigTree({
           </>
         )
       } else if (g === 'curated') {
-        crumbs = ['Bean blog', 'Trang chọn tay']
+        crumbs = ['Personal Blog', 'Trang chọn tay']
         body = (
           <>
             {errorLine}
@@ -875,7 +995,7 @@ export function ConfigTree({
           </>
         )
       } else {
-        crumbs = g === 'port-parts' ? ['Port', 'Phần chung'] : ['Bean blog', 'Hình trang']
+        crumbs = [g === 'port-parts' ? 'Port' : 'Personal Blog', 'Phần chung']
         body = <p style={hint}>Chọn một mục ở cây bên trái để sửa.</p>
       }
       break
@@ -914,7 +1034,11 @@ export function ConfigTree({
   const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging || treeSplit.dragging ? 'none' : undefined } as const
 
   return (
-    <div
+    <div>
+      <div style={{ padding: columns === 1 ? '24px 16px 0' : '28px 32px 0' }}>
+        <SiteTabs tabs={SITES} labels={SITE_LABELS} value={site} onChange={openSite} />
+      </div>
+      <div
       ref={root}
       style={{
         display: 'grid',
@@ -923,7 +1047,7 @@ export function ConfigTree({
         alignItems: 'start',
         columnGap: 12,
         rowGap: 20,
-        padding: columns === 1 ? '24px 16px 90px' : '28px 32px 120px',
+        padding: columns === 1 ? '16px 16px 90px' : '20px 32px 120px',
       }}
     >
       <style>{'.cfg-leaf .cfg-grip{opacity:0}.cfg-leaf:hover .cfg-grip,.cfg-leaf:focus-within .cfg-grip{opacity:1}'}</style>
@@ -944,6 +1068,7 @@ export function ConfigTree({
         }}
       />
       {previewPane}
+      </div>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { BLOG_COLORS, BLOG_FONTS, blogFontHref, blogVars, type BlogDesign } from
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { DesignTab, sectionHead, usePortAdmin, useSplit } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
+import { SiteTabs, useRememberedTab } from './SiteTabs'
 
 /**
  * Cài đặt hiển thị — one half per site. Personal Blog: its addresses, the
@@ -10,16 +11,8 @@ import { ScaledPreview, useWidth } from './ScaledPreview'
  * are drawn with (it was the third tab of the separate Portfolio screen).
  */
 
-type Site = 'blog' | 'port' | 'routes'
-const KEY = 'beanweirdo.display.site'
-const remembered = (): Site => {
-  try {
-    const v = localStorage.getItem(KEY)
-    return v === 'port' || v === 'routes' ? v : 'blog'
-  } catch {
-    return 'blog'
-  }
-}
+const SITES = ['blog', 'port', 'routes'] as const
+const SITE_LABELS = { blog: 'Personal Blog', port: 'Port', routes: 'Đường dẫn' }
 
 const label: CSSProperties = { fontFamily: sans, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: ink.faint, marginBottom: 6 }
 const box: CSSProperties = { boxSizing: 'border-box', width: '100%', background: paper.white, border: `1px solid ${paper.rule}`, color: ink.base, fontFamily: sans, fontSize: 12.5, padding: '6px 8px', outline: 'none' }
@@ -37,29 +30,11 @@ export function DisplaySettings({
   design: BlogDesign | undefined
   onSaveDesign: (patch: BlogDesign) => Promise<void>
 }) {
-  const [site, setSiteState] = useState<Site>(remembered)
-  const setSite = (s: Site) => {
-    setSiteState(s)
-    try {
-      localStorage.setItem(KEY, s)
-    } catch {
-      /* a remembered half is a convenience */
-    }
-  }
+  const [site, setSite] = useRememberedTab('beanweirdo.display.site', SITES)
   return (
     <div>
-      <div role="tablist" style={{ display: 'inline-flex', border: `1px solid ${paper.rule}`, background: paper.white, margin: '26px 56px 0' }}>
-        {(['blog', 'port', 'routes'] as const).map((s, i) => (
-          <button
-            key={s}
-            role="tab"
-            aria-selected={site === s}
-            onClick={() => setSite(s)}
-            style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 13, padding: '7px 18px', borderLeft: i ? `1px solid ${paper.rule}` : undefined, background: site === s ? ink.base : 'transparent', color: site === s ? paper.cream : ink.soft }}
-          >
-            {{ blog: 'Personal Blog', port: 'Port', routes: 'Đường dẫn' }[s]}
-          </button>
-        ))}
+      <div style={{ margin: '26px 56px 0' }}>
+        <SiteTabs tabs={SITES} labels={SITE_LABELS} value={site} onChange={setSite} />
       </div>
       {site === 'blog' ? (
         <>

@@ -24,6 +24,7 @@ const api = vi.hoisted(() => ({
   deletePage: vi.fn(),
   deletePortPage: vi.fn(),
   updatePage: vi.fn(),
+  updateSite: vi.fn(),
   updateRule: vi.fn(),
   // ContentWorkspace, which lends the two settings panels, imports these at load.
   listModules: vi.fn(),
@@ -35,8 +36,17 @@ vi.mock('../../data/useModules', () => ({
   findPage: () => undefined,
 }))
 vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], moduleTitles: {}, moduleIds: [], loading: false }) }))
+const portPage = (id: string, status: string) => ({ id, title: id, slug: id.toLowerCase(), status })
 vi.mock('./PortEditors', () => ({
-  usePortAdmin: () => ({ pages: [], content: {}, setContentStored: () => {}, setPages: () => {}, loaded: true, design: {} }),
+  usePortAdmin: () => ({
+    pages: [portPage('Alpha', 'published'), portPage('Beta', 'published'), portPage('Draft', 'draft')],
+    // Beta was put first on the top bar and given its own label; home sits second.
+    content: { header: { brand: '', right: '', links: [{ key: 'page:Beta', label: 'Bê' }] }, home: { title: 'port', intro: '', features: [] }, footer: {}, about: {} },
+    setContentStored: () => {},
+    setPages: () => {},
+    loaded: true,
+    design: {},
+  }),
   useSplit: () => ({ size: 520, columns: '520px 7px minmax(0,1fr)', handle: null, dragging: false }),
   ContentTab: ({ only }: { only: string }) => <div>port:{only}</div>,
   Builder: () => null,
@@ -58,6 +68,7 @@ const layout = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   api.getLayout.mockResolvedValue(layout)
   api.listTopics.mockResolvedValue([topic('coffee', null, 1), topic('sensory', 'coffee', 2, 3), topic('tea', null, 3)])
   api.listKeywords.mockResolvedValue([{ id: 'heat', label: 'heat', posts: 2 }])
@@ -67,6 +78,7 @@ beforeEach(() => {
   api.createTopic.mockImplementation(async (title: string, parent: string | null) => topic(title, parent, 9))
   api.createRule.mockResolvedValue({ id: 'r2' })
   api.saveOverride.mockResolvedValue(undefined)
+  api.updateSite.mockResolvedValue({})
 })
 
 const tree = () => screen.getByRole('navigation', { name: 'Cây cấu hình' })
@@ -109,7 +121,7 @@ describe('Cấu hình', () => {
   it('a click on the left only picks; nothing on the left can be typed into', async () => {
     await renderScreen()
     await userEvent.click(rowButton('sensory'))
-    expect(screen.getByLabelText('Đang sửa').textContent).toBe('Bean blog › Mục lục › coffee')
+    expect(screen.getByLabelText('Đang sửa').textContent).toBe('Personal Blog › Mục lục › coffee')
     expect(screen.getByLabelText('Tên')).toHaveProperty('value', 'sensory')
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/module/sensory')
     expect(within(tree()).queryByRole('textbox')).toBeNull()
@@ -177,15 +189,37 @@ describe('Cấu hình', () => {
     await waitFor(() => expect(api.saveOverride).toHaveBeenCalledWith({ node_type: 'topic', node_id: 'sensory', rule_id: 'r2' }))
   })
 
-  it('sets each site apart under its own heading, which folds', async () => {
+  it('shows one site at a time, picked from the tabs, and the port has the blog’s cards', async () => {
     await renderScreen()
-    const port = screen.getByRole('region', { name: 'Port' })
-    // Mục lục is the blog's: it sits under Bean blog, never under Port.
-    expect(within(port).queryByRole('button', { name: /^Mục lục/ })).toBeNull()
-    expect(within(screen.getByRole('region', { name: 'Bean blog' })).getByRole('button', { name: /^Mục lục/ })).toBeTruthy()
+    expect(within(tree()).queryByRole('button', { name: /^Trang chủ port/ })).toBeNull()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Gập Bean blog' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
+    expect(heading()).toBe('Trang chủ port')
     expect(within(tree()).queryByRole('button', { name: /^.?sensory/ })).toBeNull()
+    // Same names as the blog: Mục lục holds the top bar's pages and About, Phần chung the rest.
+    expect(rowButton('Mục lục')).toBeTruthy()
+    expect(rowButton('Phần chung')).toBeTruthy()
+    await userEvent.click(rowButton('About'))
+    expect(screen.getByLabelText('Đang sửa').textContent).toBe('Port › Mục lục')
+  })
+
+  it('drags the port’s Mục lục into the top bar order, keeping labels and home in place', async () => {
+    await renderScreen()
+    await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
+    // A draft is not on the top bar, so it cannot be moved along it.
+    expect(screen.queryByRole('img', { name: 'Kéo Draft' })).toBeNull()
+
+    fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo About' }))
+    const beta = rowButton('Beta').parentElement as HTMLElement
+    // The middle of a row is not "inside" on a flat list.
+    dropOn(beta, 15, ['dragOver'])
+    expect(await screen.findByText('trước Beta')).toBeTruthy()
+    dropOn(beta, 15, ['drop'])
+    await waitFor(() =>
+      expect(api.updateSite).toHaveBeenCalledWith({
+        portfolio: { header: { brand: '', right: '', links: [{ key: 'about' }, { key: 'home' }, { key: 'page:Beta', label: 'Bê' }, { key: 'page:Alpha' }] } },
+      }),
+    )
   })
 
   it('keeps one card per thing: Mục lục is the topic tree, and nothing without a page is left', async () => {
