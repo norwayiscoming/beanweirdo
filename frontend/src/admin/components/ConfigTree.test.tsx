@@ -26,9 +26,10 @@ const api = vi.hoisted(() => ({
   updatePage: vi.fn(),
   updateSite: vi.fn(),
   updateRule: vi.fn(),
-  // ContentWorkspace, which lends the two settings panels, imports these at load.
-  listModules: vi.fn(),
-  listAuthors: vi.fn(),
+  listPosts: vi.fn(),
+  updatePost: vi.fn(),
+  deleteTopic: vi.fn(),
+  deleteKeyword: vi.fn(),
 }))
 vi.mock('../lib/apiClient', () => api)
 vi.mock('../../data/useModules', () => ({
@@ -140,12 +141,17 @@ describe('Cấu hình', () => {
   it('adds a subject from the tree card, and an entry inside the topic being edited', async () => {
     await renderScreen()
     await userEvent.click(rowButton('Mục lục'))
+    // The group lists its subjects; adding one is the last line, and nothing is created before Lưu.
+    expect(within(screen.getByRole('list', { name: 'Các subject' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['01coffee0 bài', '02tea0 bài'])
+    await userEvent.click(screen.getByRole('button', { name: '+ Thêm subject' }))
     await userEvent.type(screen.getByLabelText('Thêm subject'), 'cacao')
-    await userEvent.click(screen.getByRole('button', { name: 'Thêm subject' }))
+    expect(api.createTopic).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
     expect(api.createTopic).toHaveBeenCalledWith('cacao', null)
 
     await userEvent.click(rowButton('coffee'))
-    await userEvent.type(screen.getByLabelText('Thêm mục'), 'aroma{Enter}')
+    await userEvent.click(screen.getByRole('button', { name: '+ Thêm mục con' }))
+    await userEvent.type(screen.getByLabelText('Thêm mục con'), 'aroma{Enter}')
     expect(api.createTopic).toHaveBeenCalledWith('aroma', 'coffee')
   })
 
@@ -230,15 +236,62 @@ describe('Cấu hình', () => {
     for (const gone of ['Điều hướng', 'Mẫu', 'Lưu trữ', 'Cây chủ đề']) expect(within(tree()).queryByRole('button', { name: new RegExp(`^${gone}`) })).toBeNull()
   })
 
-  it('puts the sidebar and blog-home switches on the subject itself', async () => {
+  it('puts the menu and home switches on the subject itself, named as the port names them', async () => {
     api.updatePage.mockResolvedValue(undefined)
     await renderScreen()
     await userEvent.click(rowButton('tea'))
-    const sidebar = screen.getByRole('checkbox', { name: 'hiện ở thanh bên' })
+    const menu = screen.getByRole('group', { name: 'Hiện trên menu' })
     // A subject not yet in the stored list is shown.
-    expect(sidebar).toHaveProperty('checked', true)
-    await userEvent.click(sidebar)
+    expect(within(menu).getByRole('button', { name: 'hiện' }).getAttribute('aria-pressed')).toBe('true')
+    await userEvent.click(within(menu).getByRole('button', { name: 'ẩn' }))
     expect(api.updatePage).toHaveBeenCalledWith('nav', { presentation: { items: [{ ref: 'topic:tea', sidebar: false, home: true }] } })
+  })
+
+  it('deletes from the ⋮ of the item: a topic moves its posts first and can be undone', async () => {
+    api.listPosts.mockResolvedValue([{ id: 'p1', topic_id: 'sensory', keywords: [] }])
+    api.getLayout.mockResolvedValue(layout)
+    api.updatePost.mockResolvedValue({})
+    api.deleteTopic.mockResolvedValue(undefined)
+    await renderScreen()
+    await userEvent.click(rowButton('sensory'))
+    await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá…' }))
+    await userEvent.selectOptions(screen.getByLabelText('Chuyển 3 bài sang'), 'tea')
+    await userEvent.click(screen.getByRole('button', { name: 'Chuyển bài và xoá sensory' }))
+    await waitFor(() => expect(api.deleteTopic).toHaveBeenCalledWith('sensory'))
+    expect(api.updatePost).toHaveBeenCalledWith('p1', { topic_id: 'tea' })
+    expect(await screen.findByText('1 bài → tea · đã xoá sensory')).toBeTruthy()
+  })
+
+  it('refuses to delete a topic that still has children, and says why', async () => {
+    await renderScreen()
+    await userEvent.click(rowButton('coffee'))
+    await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Xoá…' }))
+    expect(screen.getByText(/còn 1 mục con/)).toBeTruthy()
+    expect(api.deleteTopic).not.toHaveBeenCalled()
+  })
+
+  it('keeps Xoá in the same place on a page that cannot be deleted, greyed with the reason', async () => {
+    await renderScreen()
+    await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
+    const del = screen.getByRole('menuitem', { name: /Xoá/ })
+    expect(del).toHaveProperty('disabled', true)
+    expect(del.textContent).toContain('trang hệ thống')
+  })
+
+  it('lists the port’s pages under its Mục lục and adds one, named, from a chosen preset', async () => {
+    const { createFromPreset } = await import('./PortEditors')
+    vi.mocked(createFromPreset).mockResolvedValue({ id: 'n1', title: 'reading room', slug: 'reading-room', status: 'draft' } as never)
+    await renderScreen()
+    await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
+    await userEvent.click(rowButton('Mục lục'))
+    expect(within(screen.getByRole('list', { name: 'Các trang' })).getAllByRole('button').map((b) => b.textContent?.replace(/^\d+/, ''))).toEqual(['Beta/beta', 'Alpha/alpha', 'About/about', 'Draftnháp'])
+    await userEvent.click(screen.getByRole('button', { name: '+ Thêm trang' }))
+    await userEvent.type(screen.getByLabelText('Thêm trang'), 'reading room')
+    await userEvent.click(screen.getByRole('button', { name: 'mẫu bibe' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+    await waitFor(() => expect(createFromPreset).toHaveBeenCalledWith('bibe', 'reading room', expect.anything(), []))
   })
 
   it('walks the tree with the arrow keys and folds with ← →', async () => {

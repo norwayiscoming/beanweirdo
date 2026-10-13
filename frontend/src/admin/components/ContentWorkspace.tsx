@@ -1,28 +1,18 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
-  createKeyword,
   createPost,
-  createTopic,
-  deleteKeyword,
-  deleteTopic,
-  getLayout,
   listKeywords,
   listPosts,
   listTopics,
-  reorderTopics,
-  saveOverride,
   transitionStatus,
   updatePost,
-  updateTopic,
   type Keyword,
-  type LayoutOverride,
   type PostStatus,
   type PostSummary,
   type StatusAction,
   type Topic,
 } from '../lib/apiClient'
 import { ink, paper, sans, serif } from '../../design/tokens'
-import { TAG_PAGE } from '../../lib/routes'
 import { useNav } from '../../lib/nav'
 import { TEMPLATE_KEYS, templateName } from '../../lib/templateNames'
 import { usePostAddresses } from '../../data/usePostAddresses'
@@ -30,7 +20,7 @@ import { StatusBadge } from './StatusBadge'
 import { MovePostDialog } from './MovePostDialog'
 import { PostAuthorsDialog } from './PostAuthorsDialog'
 import { SectionHead } from './SectionHead'
-import { ancestorsOf, buildTree, descendantIds, flattenTree } from '../../lib/contentTree'
+import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 
 /**
  * Nội dung — the posts and the three vocabularies that file them, on one
@@ -38,14 +28,11 @@ import { ancestorsOf, buildTree, descendantIds, flattenTree } from '../../lib/co
  * other: Phân loại knew a dạng bài had ten posts and could not say which).
  *
  * Left: every vocabulary entry with its live count; a click filters the list.
- * Middle: the posts themselves, bulk-editable. Right, only when asked for (⋯):
- * merging or deleting one entry, beside the very posts it would touch, which
- * the middle column is then filtered to.
+ * Right: the posts themselves, bulk-editable.
  *
- * Naming, colouring, adding and arranging topics and tags is Cấu hình's job
- * (owner, 2026-10-08): the tree was in three tabs and a click on the same
- * entry did a different thing in each. Retiring stays here because only this
- * screen shows the posts it moves.
+ * Naming, colouring, adding, arranging and deleting topics and tags is Cấu
+ * hình's job (owner, 2026-10-08 and 2026-10-13): the tree was in three tabs
+ * and a click on the same entry did a different thing in each.
  */
 
 type Vocab = 'topic' | 'tpl' | 'kw'
@@ -90,17 +77,6 @@ const BULK_STATUS: { action: StatusAction; label: string }[] = [
   { action: 'restore-trash', label: 'Lấy khỏi thùng rác' },
 ]
 
-const PALETTE = ['#9D9167', '#F0B45C', '#F2A0A5', '#7FB87E', '#6FA8C0', '#C25C7C', '#8A6420', '#5C5745']
-
-/** A colour's companions: the dark ink on it and the two washes behind lists. */
-function shades(hex: string): { on_color: string; tint: string; tint2: string } {
-  const n = parseInt(hex.slice(1), 16)
-  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-  const mix = (to: number, k: number) =>
-    '#' + rgb.map((c) => Math.round(c + (to - c) * k).toString(16).padStart(2, '0')).join('').toUpperCase()
-  return { on_color: mix(0, 0.78), tint: mix(255, 0.82), tint2: mix(255, 0.68) }
-}
-
 const SEL = '#EEF5F8'
 const WARN = '#B4552E'
 const label: CSSProperties = { fontFamily: sans, fontSize: 10, fontWeight: 500, letterSpacing: '.16em', textTransform: 'uppercase', color: ink.faint }
@@ -110,11 +86,8 @@ const quiet: CSSProperties = { ...link, color: ink.muted }
 const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSize: 11.5, padding: '0 7px', lineHeight: '18px', border: `1px solid ${paper.rule}`, borderRadius: 10, color: ink.soft, whiteSpace: 'nowrap', cursor: 'pointer', background: 'none', margin: '1px 3px 1px 0' }
 
 const CSS = `
-.cw-r .cw-more{opacity:0}
 .cw-r:hover{background:${paper.hover}}
-.cw-r:hover .cw-more,.cw-r.cw-open .cw-more{opacity:1}
 .cw-r:focus-visible,.cw-row:focus-within{outline:2px solid ${ink.green};outline-offset:-2px}
-.cw-more:hover{background:${paper.rule}}
 .cw-row .cw-act{opacity:0}
 .cw-row:hover .cw-act,.cw-row:focus-within .cw-act{opacity:1}
 .cw-row:hover td{background:${paper.hover}}
@@ -131,14 +104,12 @@ function Dot({ own, inherited }: { own: string | null; inherited?: string | null
   )
 }
 
-/** One entry in the left column: a click filters, ⋯ opens merging and deleting. */
+/** One entry in the left column: a click filters the posts to it. */
 function RailRow({
   name,
   count,
   on,
-  open,
   onClick,
-  onMore,
   indent = 14,
   big,
   dot,
@@ -147,9 +118,7 @@ function RailRow({
   name: string
   count: number
   on: boolean
-  open?: boolean
   onClick: () => void
-  onMore?: () => void
   indent?: number
   big?: boolean
   dot?: ReactNode
@@ -160,12 +129,12 @@ function RailRow({
       role="button"
       tabIndex={0}
       aria-pressed={on}
-      className={`cw-r${open ? ' cw-open' : ''}`}
+      className="cw-r"
       onClick={onClick}
       onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onClick())}
       style={{
         display: 'grid',
-        gridTemplateColumns: `${dot ? '9px ' : ''}minmax(0,1fr) auto 18px`,
+        gridTemplateColumns: `${dot ? '9px ' : ''}minmax(0,1fr) auto`,
         gap: 7,
         alignItems: 'center',
         padding: `5px 8px 5px ${indent}px`,
@@ -180,53 +149,6 @@ function RailRow({
         {flag && <span style={{ fontFamily: sans, fontSize: 10, color: WARN, marginLeft: 6 }}>{flag}</span>}
       </span>
       <span style={{ fontFamily: sans, fontSize: 11.5, color: count ? ink.muted : ink.faint, fontVariantNumeric: 'tabular-nums' }}>{count}</span>
-      {onMore ? (
-        <span
-          className="cw-more"
-          role="button"
-          aria-label={`Gộp hay xoá ${name}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            onMore()
-          }}
-          style={{ color: ink.muted, textAlign: 'center', borderRadius: 3, lineHeight: '18px', fontFamily: sans }}
-        >
-          ⋯
-        </span>
-      ) : (
-        <span />
-      )}
-    </div>
-  )
-}
-
-/** Settings column: a field. */
-function Field({ name, children }: { name: string; children: ReactNode }) {
-  return (
-    <div style={{ display: 'grid', gap: 5 }}>
-      <div style={label}>{name}</div>
-      {children}
-    </div>
-  )
-}
-
-/** Two clicks for anything that removes a vocabulary entry. */
-function Confirm({ text, onGo, disabled }: { text: string; onGo: () => void; disabled?: boolean }) {
-  const [ask, setAsk] = useState(false)
-  if (!ask)
-    return (
-      <button type="button" disabled={disabled} onClick={() => setAsk(true)} style={{ ...quiet, color: disabled ? ink.faint : WARN, cursor: disabled ? 'not-allowed' : 'pointer', justifySelf: 'start' }}>
-        {text}
-      </button>
-    )
-  return (
-    <div style={{ display: 'flex', gap: 12 }}>
-      <button type="button" onClick={() => (setAsk(false), onGo())} style={{ ...link, color: '#fff', background: WARN, padding: '6px 12px' }}>
-        {text}
-      </button>
-      <button type="button" onClick={() => setAsk(false)} style={quiet}>
-        thôi
-      </button>
     </div>
   )
 }
@@ -241,7 +163,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const [f, setF] = useState<Filters>({ topic: null, tpl: null, kw: null, status: null })
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
-  const [cfg, setCfg] = useState<{ vocab: Vocab; id: string } | null>(null)
   const [undo, setUndo] = useState<Undo | null>(null)
   const [busy, setBusy] = useState(false)
   const [moving, setMoving] = useState<PostSummary | null>(null)
@@ -281,8 +202,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
 
   // ── derived ──────────────────────────────────────────────────────────────
   const sorted = useMemo(() => [...topics].sort((a, b) => a.sort_order - b.sort_order), [topics])
-  const subjects = sorted.filter((t) => t.parent_id === null)
-  const childrenOf = (id: string) => sorted.filter((t) => t.parent_id === id)
   const topicById = useMemo(() => new Map(topics.map((t) => [t.id, t])), [topics])
   const live = useMemo(() => posts.filter((p) => p.status !== 'deleted'), [posts])
   // A post sits under a node when the node is its topic or any ancestor of it.
@@ -315,15 +234,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           : STATUS_LABEL[id as PostStatus]
 
   const toggle = (vocab: keyof Filters, id: string) => setF((o) => ({ ...o, [vocab]: o[vocab] === id ? null : id }))
-  const open = (vocab: Vocab, id: string) => {
-    setCfg({ vocab, id })
-    setF((o) => ({ ...o, [vocab]: id }))
-  }
-  const close = () => {
-    if (cfg) setF((o) => ({ ...o, [cfg.vocab]: null }))
-    setCfg(null)
-  }
-
   // ── post actions ─────────────────────────────────────────────────────────
   const act = (id: string, action: StatusAction) =>
     run(async () => {
@@ -390,71 +300,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     })
   }
 
-  // ── retiring a vocabulary entry: its posts move first, its address goes with them ──
-
-  /**
-   * The retired node's address (and the ones it already forwarded) become old
-   * addresses of the node its posts went to, so a link to the old page lands
-   * on the new one instead of nothing — the database drops the override of a
-   * deleted node (migration 0028), and with it every alias it held.
-   */
-  async function forward(type: 'topic' | 'keyword', from: string, to: string): Promise<() => Promise<unknown>> {
-    const { overrides } = await getLayout()
-    const mine = overrides.find((o) => o.node_type === type && o.node_id === from)
-    const theirs = overrides.find((o) => o.node_type === type && o.node_id === to)
-    const asAlias = type === 'topic' ? from : `${TAG_PAGE}${from}`
-    const added = [asAlias, ...(mine?.aliases ?? [])].filter((a) => !(theirs?.aliases ?? []).includes(a))
-    if (added.length) await saveOverride({ node_type: type, node_id: to, aliases: [...(theirs?.aliases ?? []), ...added] })
-    return async () => {
-      if (added.length) await saveOverride({ node_type: type, node_id: to, aliases: theirs?.aliases ?? [] })
-      if (mine) await saveOverride(mine as LayoutOverride)
-    }
-  }
-
-  function retireTopic(t: Topic, to: string | null) {
-    const moved = postsOf('topic', t.id, posts).filter((p) => p.topic_id === t.id)
-    const siblings = (t.parent_id ? childrenOf(t.parent_id) : subjects).map((s) => s.id)
-    run(
-      async () => {
-        await Promise.all(moved.map((p) => updatePost(p.id, { topic_id: to })))
-        const unforward = to ? await forward('topic', t.id, to) : null
-        await deleteTopic(t.id)
-        return {
-          msg: to ? `${moved.length} bài → ${nameOf('topic', to)} · đã xoá ${t.title}` : `Đã xoá ${t.title}`,
-          revert: async () => {
-            const back = await createTopic(t.title, t.parent_id)
-            await updateTopic(back.id, { intro: t.intro, visibility: t.visibility, accent: t.accent, on_color: t.on_color, tint: t.tint, tint2: t.tint2, image_url: t.image_url })
-            await reorderTopics(siblings.map((s) => (s === t.id ? back.id : s)))
-            await Promise.all(moved.map((p) => updatePost(p.id, { topic_id: back.id })))
-            await unforward?.()
-          },
-        }
-      },
-      () => setCfg(null),
-    )
-    setF((o) => ({ ...o, topic: null }))
-  }
-
-  function retireKeyword(k: Keyword, to: string | null) {
-    const moved = postsOf('kw', k.id, posts)
-    run(
-      async () => {
-        const unforward = to ? await forward('keyword', k.id, to) : null
-        await deleteKeyword(k.id, to ?? undefined)
-        return {
-          msg: to ? `${moved.length} bài → ${nameOf('kw', to)} · đã xoá ${k.label}` : `Đã gỡ ${k.label} khỏi ${moved.length} bài`,
-          revert: async () => {
-            const back = await createKeyword(k.label)
-            await Promise.all(moved.map((p) => updatePost(p.id, { keywords: kwOf(p).map((x) => (x === k.id ? back.id : x)) })))
-            await unforward?.()
-          },
-        }
-      },
-      () => setCfg(null),
-    )
-    setF((o) => ({ ...o, kw: null }))
-  }
-
   // ── left column ──────────────────────────────────────────────────────────
   const unplaced = live.filter((p) => !p.topic_id).length
   const statusCount = (s: PostStatus) => posts.filter((p) => p.status === s).length
@@ -469,9 +314,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                 indent={14 + depth * 16}
                 count={postsOf('topic', t.id).length}
                 on={f.topic === t.id}
-                open={cfg?.vocab === 'topic' && cfg.id === t.id}
                 onClick={() => toggle('topic', t.id)}
-                onMore={() => open('topic', t.id)}
                 dot={<Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
                 flag={t.visibility === 'private' ? 'riêng tư' : undefined}
               />
@@ -492,9 +335,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
             name={k.label}
             count={postsOf('kw', k.id).length}
             on={f.kw === k.id}
-            open={cfg?.vocab === 'kw' && cfg.id === k.id}
             onClick={() => toggle('kw', k.id)}
-            onMore={() => open('kw', k.id)}
           />
         ))}
       </SectionHead>
@@ -539,7 +380,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         {chips.map((v) => (
           <span key={v} style={{ display: 'inline-flex', gap: 6, alignItems: 'center', background: SEL, color: ink.base, padding: '2px 8px', borderRadius: 3 }}>
             {nameOf(v, f[v] as string)}
-            <button type="button" aria-label={`Bỏ lọc ${nameOf(v, f[v] as string)}`} onClick={() => (setF((o) => ({ ...o, [v]: null })), cfg?.vocab === v && setCfg(null))} style={{ ...quiet, fontSize: 13 }}>
+            <button type="button" aria-label={`Bỏ lọc ${nameOf(v, f[v] as string)}`} onClick={() => (setF((o) => ({ ...o, [v]: null })))} style={{ ...quiet, fontSize: 13 }}>
               ×
             </button>
           </span>
@@ -665,39 +506,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     </div>
   )
 
-  // ── right column ─────────────────────────────────────────────────────────
-  let settings: ReactNode = null
-  if (cfg?.vocab === 'topic') {
-    const t = topicById.get(cfg.id)
-    if (t)
-      settings = (
-        <TopicRetire
-          key={t.id}
-          topic={t}
-          kids={childrenOf(t.id)}
-          tree={shown.map((n) => n.row)}
-          count={postsOf('topic', t.id, posts).filter((p) => p.topic_id === t.id).length}
-          onRetire={(to) => retireTopic(t, to)}
-          onClose={close}
-        />
-      )
-  }
-  if (cfg?.vocab === 'kw') {
-    const k = keywords.find((x) => x.id === cfg.id)
-    if (k)
-      settings = (
-        <FlatRetire
-          key={k.id}
-          kind="Tag"
-          entry={k}
-          count={postsOf('kw', k.id, posts).length}
-          others={keywords.filter((x) => x.id !== k.id)}
-          onRetire={(to) => retireKeyword(k, to)}
-          onClose={close}
-        />
-      )
-  }
-
   return (
     <div style={{ borderTop: `1px solid ${paper.rule}` }}>
       <style>{CSS}</style>
@@ -710,18 +518,13 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         className="cw-ws"
         style={{
           display: 'grid',
-          gridTemplateColumns: settings ? 'minmax(0,240px) minmax(0,1fr) minmax(0,280px)' : 'minmax(0,240px) minmax(0,1fr)',
+          gridTemplateColumns: 'minmax(0,240px) minmax(0,1fr)',
           minHeight: 560,
           alignItems: 'start',
         }}
       >
         {rail}
         {list}
-        {settings && (
-          <aside aria-label="Gộp hay xoá" style={{ borderLeft: `1px solid ${paper.rule}`, background: paper.white, padding: '16px 16px 24px', display: 'grid', gap: 16, alignContent: 'start', position: 'sticky', top: 0 }}>
-            {settings}
-          </aside>
-        )}
       </div>
     </div>
   )
@@ -772,233 +575,5 @@ function BulkBar({
         Bỏ chọn
       </button>
     </div>
-  )
-}
-
-function Head({ kind, count, onClose }: { kind: string; count: number; onClose?: () => void }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-      <span style={label}>
-        {kind} · {count} bài
-      </span>
-      {onClose && (
-        <button type="button" aria-label="Đóng" onClick={onClose} style={quiet}>
-          ✕
-        </button>
-      )}
-    </div>
-  )
-}
-
-function NameInput({ value, onSave, big }: { value: string; onSave: (v: string) => void; big?: boolean }) {
-  return (
-    <input
-      aria-label="Tên"
-      key={value}
-      defaultValue={value}
-      onBlur={(e) => {
-        const v = e.target.value.trim()
-        if (v && v !== value) onSave(v)
-      }}
-      onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-      style={{ fontFamily: serif, fontSize: big ? 24 : 20, lineHeight: 1.15, color: ink.base, border: 'none', borderBottom: `1px solid ${paper.rule}`, background: 'transparent', padding: '2px 0 5px', outline: 'none', width: '100%' }}
-    />
-  )
-}
-
-/** A topic's own fields, edited in Cấu hình: name, who sees it, colour, intro, where it sits. */
-export function TopicSettings({
-  topic,
-  parent,
-  tree,
-  count,
-  used,
-  save,
-}: {
-  topic: Topic
-  parent?: Topic
-  tree: Topic[]
-  /** Posts filed on this node itself, children not counted. */
-  count: number
-  used: string[]
-  save: (patch: Parameters<typeof updateTopic>[1]) => void
-}) {
-  const setColor = (hex: string | null) => save(hex ? { accent: hex, ...shades(hex) } : { accent: null, on_color: null, tint: null, tint2: null })
-  const swatches = [...new Set([...used, ...PALETTE.filter((c) => !used.some((u) => u.toUpperCase() === c))])].slice(0, 9)
-
-  return (
-    <>
-      <Head kind={parent ? `${parent.title} › topic` : 'Subject'} count={count} />
-      <NameInput value={topic.title} onSave={(title) => save({ title })} big />
-      <Field name="Quyền xem">
-        <div style={{ display: 'inline-flex', border: `1px solid ${paper.rule}`, width: 'fit-content' }}>
-          {(['public', 'private'] as const).map((v) => (
-            <button
-              key={v}
-              type="button"
-              aria-pressed={topic.visibility === v}
-              onClick={() => topic.visibility !== v && save({ visibility: v })}
-              style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 12, padding: '4px 11px', background: topic.visibility === v ? ink.base : 'transparent', color: topic.visibility === v ? paper.cream : ink.soft }}
-            >
-              {v === 'public' ? 'công khai' : 'riêng tư'}
-            </button>
-          ))}
-        </div>
-      </Field>
-      <Field name="Màu">
-        <div style={{ display: 'flex', gap: 7, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            aria-label={parent ? `theo ${parent.title}` : 'chưa có màu'}
-            aria-pressed={!topic.accent}
-            onClick={() => topic.accent && setColor(null)}
-            style={{ all: 'unset', cursor: 'pointer', width: 20, height: 20, borderRadius: '50%', boxSizing: 'border-box', border: `2px ${parent?.accent ? 'dashed' : 'solid'} ${parent?.accent ?? paper.rule}`, outline: !topic.accent ? `2px solid ${ink.base}` : 'none', outlineOffset: 2 }}
-          />
-          {swatches.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-label={c}
-              aria-pressed={topic.accent?.toUpperCase() === c.toUpperCase()}
-              onClick={() => setColor(c)}
-              style={{ all: 'unset', cursor: 'pointer', width: 20, height: 20, borderRadius: '50%', background: c, outline: topic.accent?.toUpperCase() === c.toUpperCase() ? `2px solid ${ink.base}` : 'none', outlineOffset: 2 }}
-            />
-          ))}
-          <input
-            aria-label="mã màu"
-            placeholder="#hex"
-            key={topic.accent ?? 'none'}
-            defaultValue={topic.accent ?? ''}
-            onBlur={(e) => {
-              const v = e.target.value.trim()
-              if (/^#[0-9a-f]{6}$/i.test(v) && v !== topic.accent) setColor(v)
-            }}
-            style={{ ...box, width: 84, padding: '3px 7px', fontSize: 12 }}
-          />
-        </div>
-      </Field>
-      <Field name="Lời dẫn">
-        <textarea aria-label="Lời dẫn" key={topic.intro} defaultValue={topic.intro} rows={3} onBlur={(e) => e.target.value !== topic.intro && save({ intro: e.target.value })} style={{ ...box, resize: 'vertical', lineHeight: 1.5 }} />
-      </Field>
-      {/* Any node outside this one's own branch can hold it; none at all makes it a subject. */}
-      <Field name="Nằm trong">
-        <select aria-label="Nằm trong" value={topic.parent_id ?? ''} onChange={(e) => save({ parent_id: e.target.value || null })} style={box}>
-          <option value="">— tầng trên cùng (subject) —</option>
-          {tree
-            .filter((t) => !descendantIds(tree, topic.id).includes(t.id))
-            .map((t) => (
-              <option key={t.id} value={t.id}>
-                {'  '.repeat(ancestorsOf(tree, t.id).length)}
-                {t.title}
-              </option>
-            ))}
-        </select>
-      </Field>
-    </>
-  )
-}
-
-/** A tag's own field, edited in Cấu hình: its name. */
-export function FlatSettings({ kind, entry, count, onRename }: { kind: string; entry: { id: string; label: string }; count: number; onRename: (label: string) => void }) {
-  return (
-    <>
-      <Head kind={kind} count={count} />
-      <NameInput value={entry.label} onSave={onRename} />
-    </>
-  )
-}
-
-const elsewhere = <span style={{ fontFamily: sans, fontSize: 12, color: ink.muted }}>Đổi tên, màu và chỗ trong cây ở tab Cấu hình.</span>
-
-/** Nội dung's side of a topic: retiring it, with its posts moved somewhere first. */
-function TopicRetire({
-  topic,
-  kids,
-  tree,
-  count,
-  onRetire,
-  onClose,
-}: {
-  topic: Topic
-  kids: Topic[]
-  tree: Topic[]
-  count: number
-  onRetire: (to: string | null) => void
-  onClose: () => void
-}) {
-  const targets = tree.filter((t) => t.id !== topic.id && t.parent_id !== topic.id)
-  const [to, setTo] = useState(topic.parent_id ?? targets[0]?.id ?? '')
-  return (
-    <>
-      <Head kind={topic.parent_id ? 'Topic' : 'Subject'} count={count} onClose={onClose} />
-      <div style={{ fontFamily: serif, fontSize: 22, lineHeight: 1.15, color: ink.base }}>{topic.title}</div>
-      {elsewhere}
-      <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
-        {kids.length > 0 ? (
-          <span style={{ fontFamily: sans, fontSize: 12, color: ink.muted }}>còn {kids.length} mục con, chuyển chúng đi trước khi xoá</span>
-        ) : count > 0 ? (
-          <>
-            <Field name={`Chuyển ${count} bài sang`}>
-              <select aria-label={`Chuyển ${count} bài sang`} value={to} onChange={(e) => setTo(e.target.value)} style={box}>
-                {targets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {'  '.repeat(ancestorsOf(tree, t.id).length)}
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Confirm text={`Chuyển và xoá ${topic.title}`} disabled={!to} onGo={() => onRetire(to)} />
-          </>
-        ) : (
-          <Confirm text={`Xoá ${topic.title}`} onGo={() => onRetire(null)} />
-        )}
-      </div>
-    </>
-  )
-}
-
-/** Nội dung's side of a tag: merging it into another, or taking it off its posts. */
-function FlatRetire({
-  kind,
-  entry,
-  count,
-  others,
-  onRetire,
-  onClose,
-}: {
-  kind: string
-  entry: { id: string; label: string }
-  count: number
-  others: { id: string; label: string }[]
-  onRetire: (to: string | null) => void
-  onClose: () => void
-}) {
-  const [to, setTo] = useState('')
-  return (
-    <>
-      <Head kind={kind} count={count} onClose={onClose} />
-      <div style={{ fontFamily: serif, fontSize: 20, lineHeight: 1.15, color: ink.base }}>{entry.label}</div>
-      {elsewhere}
-      <div style={{ display: 'grid', gap: 10, borderTop: `1px solid ${paper.rule}`, paddingTop: 14 }}>
-        {count > 0 ? (
-          <>
-            <Field name={`Chuyển ${count} bài sang`}>
-              <select aria-label={`Chuyển ${count} bài sang`} value={to} onChange={(e) => setTo(e.target.value)} style={box}>
-                <option value="">— bỏ khỏi bài —</option>
-                {others.map((o) => (
-                  <option key={o.id} value={o.id}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Confirm text={to ? `Chuyển và xoá ${entry.label}` : `Gỡ khỏi ${count} bài và xoá`} onGo={() => onRetire(to || null)} />
-          </>
-        ) : (
-          <Confirm text={`Xoá ${entry.label}`} onGo={() => onRetire(null)} />
-        )}
-      </div>
-    </>
   )
 }
