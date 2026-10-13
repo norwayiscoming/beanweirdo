@@ -4,6 +4,8 @@ import { ink, paper, sans, serif } from '../../design/tokens'
 import { DesignTab, sectionHead, usePortAdmin, useSplit } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
 import { SiteTabs, useRememberedTab } from './SiteTabs'
+import { desk } from './Detail'
+import { radius } from '../../design/controls'
 
 /**
  * Cài đặt hiển thị — one half per site. Personal Blog: its addresses, the
@@ -14,7 +16,7 @@ import { SiteTabs, useRememberedTab } from './SiteTabs'
 const SITES = ['blog', 'port', 'routes'] as const
 const SITE_LABELS = { blog: 'Personal Blog', port: 'Port', routes: 'Đường dẫn' }
 
-const label: CSSProperties = { fontFamily: sans, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: ink.faint, marginBottom: 6 }
+const label: CSSProperties = { fontFamily: sans, fontSize: 13, color: ink.soft, marginBottom: 6 }
 const box: CSSProperties = { boxSizing: 'border-box', width: '100%', background: paper.white, border: `1px solid ${paper.rule}`, color: ink.base, fontFamily: sans, fontSize: 12.5, padding: '6px 8px', outline: 'none' }
 const HEX = /^#[0-9a-fA-F]{6}$/
 
@@ -118,13 +120,13 @@ function BlogDesignPanel({ stored, onSave }: { stored: BlogDesign; onSave: (patc
   // Port's layout, half for half: the page on the left, the tokens on the right.
   return (
     <div ref={root} style={{ display: 'grid', gridTemplateColumns: stacked ? 'minmax(0,1fr)' : split.columns, alignItems: 'start', marginTop: 16 }}>
-      <div style={{ background: paper.white, pointerEvents: split.dragging ? 'none' : undefined, ...(stacked ? { height: '55vh', order: 2 } : { height: 'calc(100vh - 220px)', position: 'sticky', top: 0 }) }}>
+      <div style={{ background: paper.white, border: `1px solid ${desk.line}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging ? 'none' : undefined, ...(stacked ? { height: '55vh', order: 2 } : { height: 'calc(100vh - 220px)', position: 'sticky', top: 0 }) }}>
         <ScaledPreview>
           <iframe ref={frame} title="xem trước Personal Blog" src="/" onLoad={dress} style={{ width: '100%', height: '100%', border: 0, display: 'block' }} />
         </ScaledPreview>
       </div>
       {!stacked && split.handle}
-      <div style={stacked ? { padding: '6px 20px 24px' } : { padding: '6px 34px 80px 22px', height: 'calc(100vh - 220px)', overflowY: 'auto', position: 'sticky', top: 0 }}>
+      <div style={{ background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, ...(stacked ? { padding: '6px 20px 24px' } : { padding: '6px 22px 40px', height: 'calc(100vh - 220px)', overflowY: 'auto', position: 'sticky', top: 0 }) }}>
         {group(
           'Font',
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -146,7 +148,7 @@ function BlogDesignPanel({ stored, onSave }: { stored: BlogDesign; onSave: (patc
             ))}
           </div>,
           changed && (
-            <button type="button" onClick={() => save(Object.fromEntries(Object.keys(stored).map((k) => [k, null])))} style={{ all: 'unset', cursor: 'pointer', fontSize: 10, letterSpacing: '.16em', color: ink.faint }}>
+            <button type="button" onClick={() => save(Object.fromEntries(Object.keys(stored).map((k) => [k, null])))} style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: ink.soft }}>
               Trả về mặc định
             </button>
           ),
@@ -169,12 +171,12 @@ function BlogDesignPanel({ stored, onSave }: { stored: BlogDesign; onSave: (patc
                         onChange={(e) => save({ [key]: e.target.value })}
                         style={{ width: 28, height: 28, padding: 0, border: `1px solid ${paper.rule}`, background: 'none' }}
                       />
-                      <span style={{ display: 'grid', fontFamily: sans, fontSize: 12, color: ink.soft, lineHeight: 1.3 }}>
+                      <span style={{ display: 'grid', fontFamily: sans, fontSize: 13, fontWeight: 500, color: ink.strong, lineHeight: 1.35 }}>
                         {g.names[name] ?? name}
-                        <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 10.5, color: own ? ink.base : ink.faint }}>
+                        <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 13, color: own ? ink.base : ink.soft }}>
                           {value.toUpperCase()}
                           {own && (
-                            <button type="button" aria-label={`${g.names[name] ?? name}: về mặc định`} onClick={(e) => (e.preventDefault(), save({ [key]: null }))} style={{ all: 'unset', cursor: 'pointer', marginLeft: 6, color: ink.faint }}>
+                            <button type="button" aria-label={`${g.names[name] ?? name}: về mặc định`} onClick={(e) => (e.preventDefault(), save({ [key]: null }))} style={{ all: 'unset', cursor: 'pointer', marginLeft: 6, color: ink.soft }}>
                               ×
                             </button>
                           )}

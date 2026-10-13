@@ -26,7 +26,7 @@ export type Size = 'lg' | 'md' | 'sm'
 export const radius = 8
 
 export const sizes: Record<Size, { height: number; padding: number; font: number }> = {
-  lg: { height: 40, padding: 20, font: 12.5 },
-  md: { height: 34, padding: 16, font: 12 },
-  sm: { height: 28, padding: 12, font: 11.5 },
+  lg: { height: 40, padding: 20, font: 14.5 },
+  md: { height: 34, padding: 16, font: 13.5 },
+  sm: { height: 28, padding: 12, font: 13 },
 }

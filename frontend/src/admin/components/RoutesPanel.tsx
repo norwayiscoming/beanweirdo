@@ -56,7 +56,7 @@ const OPEN_KEY = 'cms_routes_open'
 
 const label: React.CSSProperties = {
   fontFamily: sans,
-  fontWeight: 300,
+  fontWeight: 400,
   fontSize: 12,
   color: ink.soft,
   minWidth: 168,
@@ -160,13 +160,13 @@ export function RoutesPanel({
           <span
             aria-label={open ? 'Co lại' : 'Mở ra'}
             role="button"
-            style={{ fontFamily: sans, fontSize: 13, color: ink.muted, width: 12 }}
+            style={{ fontFamily: sans, fontSize: 13, color: ink.soft, width: 12 }}
           >
             {open ? '−' : '+'}
           </span>
           Đường dẫn
           {!open && (
-            <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: ink.muted }}>
+            <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: ink.soft }}>
               {toPath({ area: 'admin', screen: 'cms' }, live)} · {`/${live.bean}/${live.post}/…`}
             </code>
           )}
@@ -174,7 +174,7 @@ export function RoutesPanel({
         {open && (
           <div style={{ display: 'flex', alignItems: 'center', gap: space.gap }}>
             {saved && !changed && (
-              <span style={{ fontFamily: sans, fontSize: 11.5, color: ink.muted }}>đã lưu</span>
+              <span style={{ fontFamily: sans, fontSize: 13, color: ink.soft }}>đã lưu</span>
             )}
             <button
               className="admin-btn-ghost"
@@ -203,10 +203,9 @@ export function RoutesPanel({
             <div
               style={{
                 fontFamily: sans,
-                fontSize: 10.5,
+                fontSize: 13,
                 fontWeight: 500,
                 letterSpacing: '.2em',
-                textTransform: 'uppercase',
                 color: ink.soft,
               }}
             >
@@ -232,14 +231,14 @@ export function RoutesPanel({
                   <button
                     className="admin-btn-ghost"
                     onClick={() => set(k, DEFAULT_WORDS[k])}
-                    style={{ fontSize: 11 }}
+                    style={{ fontSize: 13 }}
                   >
                     {DEFAULT_WORDS[k]}
                   </button>
                 )}
               </div>
               {errors[k] && (
-                <div style={{ fontFamily: sans, fontSize: 11.5, color: '#8E1E42', marginTop: 4, marginLeft: 168 + space.gap }}>
+                <div style={{ fontFamily: sans, fontSize: 13, color: '#8E1E42', marginTop: 4, marginLeft: 168 + space.gap }}>
                   {errors[k]}
                 </div>
               )}
@@ -281,17 +280,16 @@ export function RoutesPanel({
           <div
             style={{
               fontFamily: sans,
-              fontSize: 10.5,
+              fontSize: 13,
               fontWeight: 500,
               letterSpacing: '.2em',
-              textTransform: 'uppercase',
               color: ink.soft,
             }}
           >
             Tên module trong địa chỉ
           </div>
           {errors.modules && (
-            <span style={{ fontFamily: sans, fontSize: 11.5, color: '#8E1E42' }}>{errors.modules}</span>
+            <span style={{ fontFamily: sans, fontSize: 13, color: '#8E1E42' }}>{errors.modules}</span>
           )}
         </div>
         {modules.map((m) => (

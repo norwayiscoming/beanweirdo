@@ -11,7 +11,7 @@ const remembered = (id: string): boolean => {
   }
 }
 
-const titleStyle: CSSProperties = { fontFamily: sans, fontSize: 10, fontWeight: 500, letterSpacing: '.16em', textTransform: 'uppercase', color: ink.faint }
+const titleStyle: CSSProperties = { fontFamily: sans, fontSize: 14, fontWeight: 600, color: ink.base }
 
 export function SectionHead({
   id,
@@ -42,7 +42,7 @@ export function SectionHead({
           onClick={() => setFolded(!folded)}
           style={{ all: 'unset', cursor: 'pointer', display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0, flex: 1 }}
         >
-          <span aria-hidden style={{ fontSize: 9, color: ink.faint, width: 8, display: 'inline-block' }}>
+          <span aria-hidden style={{ fontSize: 9, color: ink.soft, width: 8, display: 'inline-block' }}>
             {folded ? '▸' : '▾'}
           </span>
           <span style={titleStyle}>{title}</span>

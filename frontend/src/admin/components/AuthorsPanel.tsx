@@ -107,7 +107,7 @@ export function AuthorsPanel() {
 }
 
 function Quiet({ children }: { children: ReactNode }) {
-  return <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.faint, padding: '10px 2px' }}>{children}</div>
+  return <div style={{ fontFamily: sans, fontSize: 12.5, color: ink.soft, padding: '10px 2px' }}>{children}</div>
 }
 
 export function Avatar({ author, size }: { author: Pick<Author, 'name' | 'avatar_url'>; size: number }) {
@@ -166,7 +166,7 @@ function AuthorCard({
         padding: '12px 16px',
         cursor: 'pointer',
         borderRadius: radius,
-        border: `1px solid ${hover ? ink.faint : paper.rule}`,
+        border: `1px solid ${hover ? ink.soft : paper.rule}`,
         background: hover ? paper.hover : paper.white,
         opacity: a.active ? 1 : 0.62,
       }}
@@ -176,7 +176,7 @@ function AuthorCard({
         <button type="button" className="ab-rowtitle" onClick={onOpen}>
           {a.name}
         </button>
-        <div style={{ fontFamily: sans, fontSize: 11, color: ink.muted, marginTop: 3 }}>
+        <div style={{ fontFamily: sans, fontSize: 13, color: ink.soft, marginTop: 3 }}>
           {a.slug} · {a.post_count ? `${a.post_count} bài` : 'chưa có bài'}
           {!a.active && ' · đã tắt'}
         </div>
@@ -296,7 +296,7 @@ function AuthorDialog({
 
   const note = (field: string) =>
     error?.field === field ? (
-      <div role="alert" style={{ fontFamily: sans, fontSize: 11.5, color: ink.danger, marginTop: 5 }}>
+      <div role="alert" style={{ fontFamily: sans, fontSize: 13, color: ink.danger, marginTop: 5 }}>
         {error.message}
       </div>
     ) : null
@@ -418,7 +418,7 @@ function AuthorDialog({
           </Labeled>
 
           {error && !FORM_FIELDS.includes(error.field ?? '') && (
-            <div role="alert" style={{ fontFamily: sans, fontSize: 11.5, color: ink.danger }}>
+            <div role="alert" style={{ fontFamily: sans, fontSize: 13, color: ink.danger }}>
               {error.message}
             </div>
           )}
@@ -443,10 +443,8 @@ function Labeled({ label, htmlFor, children }: { label: string; htmlFor: string;
         style={{
           display: 'block',
           fontFamily: sans,
-          fontSize: 10,
-          textTransform: 'uppercase',
-          letterSpacing: '.14em',
-          color: ink.faint,
+          fontSize: 13,
+          color: ink.soft,
           marginBottom: 6,
         }}
       >

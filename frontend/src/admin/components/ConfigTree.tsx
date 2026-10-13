@@ -31,7 +31,7 @@ import type { PresetKey } from '../../portfolio/blocks'
 import { ink, paper, sans } from '../../design/tokens'
 import { radius } from '../../design/controls'
 import { retireKeyword, retireTopic } from '../lib/retire'
-import { DETAIL_CSS, Switch, desk, frame, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
+import { Switch, desk, frame, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
 import { RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
 import { Builder, ContentTab, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
@@ -971,7 +971,6 @@ export function ConfigTree({
         padding: columns === 1 ? '16px 16px 90px' : '20px 32px 120px',
       }}
     >
-      <style>{DETAIL_CSS}</style>
       <div style={columns === 2 ? { gridRow: '1 / span 2' } : undefined}>{tree}</div>
       {columns > 1 && <div style={{ alignSelf: 'stretch', ...(columns === 2 ? { gridRow: '1 / span 2' } : {}) }}>{treeSplit.handle}</div>}
       <div ref={editor} className="cfg-detail" style={{ minWidth: 0, scrollMarginTop: 16, ...(columns === 3 ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
