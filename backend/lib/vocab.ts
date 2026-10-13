@@ -213,7 +213,8 @@ export async function handleKeywords(req: VercelRequest, res: VercelResponse, su
 
   if (req.method === 'GET') {
     const [{ data, error }, counts] = await Promise.all([
-      supabase.from('keywords').select('id, label').order('created_at', { ascending: true }),
+      // `*` rather than naming `color`, so the list still loads before migration 0033 adds it.
+      supabase.from('keywords').select('*').order('created_at', { ascending: true }),
       countBy(supabase, 'post_keywords', 'keyword_id'),
     ])
     if (error) return fail(res, error)
@@ -231,7 +232,7 @@ export async function handleKeywords(req: VercelRequest, res: VercelResponse, su
     // Typing a tag that already exists gives that tag back, like `tags` does.
     const { error } = await supabase.from('keywords').upsert({ id: newId, label }, { onConflict: 'id', ignoreDuplicates: true })
     if (error) return fail(res, error)
-    const { data } = await supabase.from('keywords').select('id, label').eq('id', newId).single()
+    const { data } = await supabase.from('keywords').select('id, label, color').eq('id', newId).single()
     res.status(200).json(data)
     return
   }
@@ -242,12 +243,16 @@ export async function handleKeywords(req: VercelRequest, res: VercelResponse, su
   }
 
   if (req.method === 'PATCH') {
-    const label = typeof (req.body ?? {}).label === 'string' ? (req.body as { label: string }).label.trim() : ''
-    if (!label) {
-      res.status(400).json({ error: 'label is required' })
+    // A rename, a colour, or both; a null colour hands the tag back its automatic one.
+    const body = (req.body ?? {}) as { label?: unknown; color?: unknown }
+    const patch: { label?: string; color?: string | null } = {}
+    if (typeof body.label === 'string' && body.label.trim()) patch.label = body.label.trim()
+    if (body.color === null || (typeof body.color === 'string' && /^#[0-9a-f]{6}$/i.test(body.color))) patch.color = body.color as string | null
+    if (!Object.keys(patch).length) {
+      res.status(400).json({ error: 'label or color (#rrggbb | null) is required' })
       return
     }
-    const { data, error } = await supabase.from('keywords').update({ label }).eq('id', id).select('id, label').maybeSingle()
+    const { data, error } = await supabase.from('keywords').update(patch).eq('id', id).select('id, label, color').maybeSingle()
     if (error) return fail(res, error)
     if (!data) {
       res.status(404).json({ error: `Keyword '${id}' not found` })

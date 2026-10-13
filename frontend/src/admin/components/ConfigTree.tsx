@@ -10,6 +10,7 @@ import {
   listKeywords,
   listTags,
   listNodes,
+  colorKeyword,
   renameKeyword,
   reorderNodes,
   updatePage,
@@ -34,9 +35,11 @@ import { Button, IconButton } from '../../design/Button'
 import { IconClose } from '../../design/icons'
 import { retireKeyword, retireTopic } from '../lib/retire'
 import { Switch, desk, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
-import { RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
+import { ColorField, RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
+import { tagColor } from '../../lib/tagColor'
 import { Builder, ContentTab, PRESET_CHOICES, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
+import { TagBadges } from '../../components/TagBadges'
 import { SiteTabs, useRememberedTab } from './SiteTabs'
 import {
   describePage,
@@ -431,14 +434,15 @@ export function ConfigTree({
     ],
   }
 
+  // One list of tags for every site (owner, 2026-10-13): the same card on each, the same badges.
+  const tagCard: GroupSpec = { id: 'tags', title: 'Tag', note: `${vocab.keywords.length} tag, dùng chung cho blog và port · mỗi tag là một badge #tên` }
+
   const blogSite: SiteSpec = {
     id: 'blog',
     path: `${blog}/…`,
     home: { title: 'Trang chủ blog', note: `${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`, picked: { kind: 'system', key: 'landing' } },
     toc: topicToc,
-    pages: [
-      { id: 'tags', title: 'Tag', note: `${vocab.keywords.length} tag, xếp theo tên · mỗi tag là một trang` },
-    ],
+    pages: [tagCard],
     shared: { id: 'modules', title: 'Phần chung', note: 'Hình trang: dàn trang, ảnh và chữ mà một trang mượn' },
   }
 
@@ -466,6 +470,7 @@ export function ConfigTree({
     path: '/',
     home: { title: 'Trang chủ port', note: 'Lời chào và các khối của trang /', picked: { kind: 'port-part', part: 'home' } },
     toc: portToc,
+    pages: [tagCard],
     shared: { id: 'port-parts', title: 'Phần chung', note: 'Signature, thanh trên, chân trang' },
   }
 
@@ -825,7 +830,7 @@ export function ConfigTree({
     case 'tag': {
       const k = vocab.keywords.find((x) => x.id === picked.id)
       if (!k) break
-      crumbs = [siteCrumb('blog'), groupCrumb('tags', 'Tag')]
+      crumbs = [siteCrumb(site), groupCrumb('tags', 'Tag')]
       title = k.label
       rename = (v) => run(() => renameKeyword(k.id, v))
       address = toPath({ area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${k.id}` })
@@ -845,9 +850,20 @@ export function ConfigTree({
             />
           )}
           <Section title="Thông tin">
-            <NavFlags layout={layout} navRef={`tag:${k.id}`} defaults={{ sidebar: false, home: false }} run={run} />
+            <ColorField
+              value={k.color ?? null}
+              fallback={tagColor(k.id)}
+              fallbackLabel="màu tự chọn"
+              used={tags.flatMap((x) => (x.color ? [x.color] : []))}
+              onChange={(hex) => run(() => colorKeyword(k.id, hex))}
+            />
+            <Row label="Hiện trên bài">
+              <TagBadges tags={[{ id: k.id, label: k.label, color: tagColor(k.id, k.color) }]} />
+            </Row>
+            {/* The tag's own page and its menu switches are the blog's; the port only wears the badge. */}
+            {site === 'blog' && <NavFlags layout={layout} navRef={`tag:${k.id}`} defaults={{ sidebar: false, home: false }} run={run} />}
           </Section>
-          <Section title="Nội dung trang">{nodePage('keyword', k.id)}</Section>
+          {site === 'blog' && <Section title="Nội dung trang">{nodePage('keyword', k.id)}</Section>}
         </>
       )
       break
@@ -905,16 +921,16 @@ export function ConfigTree({
           </>
         )
       } else if (g === 'tags') {
-        crumbs = [siteCrumb('blog')]
+        crumbs = [siteCrumb(site)]
         title = 'Tag'
         facts = [`${tags.length} tag`]
         body = (
           <>
             {errorLine}
-            <Section title="Các tag" note="xếp theo tên · mỗi tag là một trang">
+            <Section title="Các tag" note="xếp theo tên · dùng chung cho blog và port">
               <ItemList
                 label="Các tag"
-                items={tags.map((k) => ({ id: k.id, name: k.label, meta: leafMeta('keyword', k.id, k.posts), onOpen: pick({ kind: 'tag', id: k.id }), actions: deleteOf({ kind: 'tag', id: k.id }) }))}
+                items={tags.map((k) => ({ id: k.id, name: `#${k.label}`, dot: tagColor(k.id, k.color), meta: leafMeta('keyword', k.id, k.posts), onOpen: pick({ kind: 'tag', id: k.id }), actions: deleteOf({ kind: 'tag', id: k.id }) }))}
                 add={{ label: 'Thêm tag', placeholder: 'tên tag', onSave: (label) => run(() => createKeyword(label)) }}
               />
             </Section>

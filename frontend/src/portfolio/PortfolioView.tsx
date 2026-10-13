@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { resolvePosts, type Block, type PortPost } from './blocks'
+import { TagBadges } from '../components/TagBadges'
 import { gridArea, imageOf, seriesLayout, storyLayout, type Placed } from './layout'
 import { PF_CSS } from './styles'
 import { cssVars, fontFaceCss, fontHrefs, type Design } from './tokens'
@@ -130,6 +131,7 @@ export function PortfolioView(props: PortfolioViewProps) {
     >
       <Img url={p.hero_image_url} />
       <span className="meta">{metaOf(p, moduleTitles)}</span>
+      <TagBadges tags={p.tags ?? []} style={{ margin: '6px 0 2px' }} />
       <h3 className="title">
         <span className="mk">{p.en}</span>
       </h3>
@@ -573,6 +575,7 @@ function Summary({
         <Img url={post.hero_image_url} />
         <div className="txt">
           <span className="meta">{metaOf(post, moduleTitles)}</span>
+          <TagBadges tags={post.tags ?? []} style={{ margin: '6px 0 2px' }} />
           <h3 className="head">{post.en}</h3>
           <span className="lbl">trước khi đọc</span>
           <p className="read">{post.lead || post.vi}</p>

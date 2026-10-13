@@ -54,7 +54,7 @@ export function usePortSources(): { posts: PortPost[]; moduleTitles: Record<stri
   }, [modules])
   return useMemo(
     () => ({
-      posts: posts.data.map((p) => ({ ...toPortPost(p), pages: pagesOf.get(p.id) ?? [] })),
+      posts: posts.data.map((p) => ({ ...toPortPost(p), pages: pagesOf.get(p.id) ?? [], tags: modules.tagsOf?.(p.id) ?? [] })),
       moduleTitles: Object.fromEntries(modules.data.map((m) => [m.id, m.title])),
       moduleIds: modules.data.map((m) => m.id),
       loading: posts.loading || modules.loading,

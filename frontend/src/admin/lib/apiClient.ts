@@ -566,7 +566,8 @@ export async function updatePortDesign(patch: Record<string, unknown>): Promise<
 
 export type { Node, NodeStatus } from 'api-contract'
 
-export type Keyword = { id: string; label: string; posts: number }
+/** `color`: the badge colour the owner picked, null for the automatic one (`tagColor`); absent before migration 0033. */
+export type Keyword = { id: string; label: string; color?: string | null; posts: number }
 
 /** Without `site`: every site's nodes. */
 export async function listNodes(site?: Site): Promise<Node[]> {
@@ -606,6 +607,11 @@ export async function createKeyword(label: string): Promise<Keyword> {
 
 export async function renameKeyword(id: string, label: string): Promise<void> {
   await request(`/api/tags?vocab=keywords&id=${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ label }) })
+}
+
+/** null hands the tag back its automatic colour. */
+export async function colorKeyword(id: string, color: string | null): Promise<void> {
+  await request(`/api/tags?vocab=keywords&id=${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify({ color }) })
 }
 
 /** `to`: merge into that tag — its posts wear `to` before this one goes. */

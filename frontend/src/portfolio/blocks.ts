@@ -8,6 +8,7 @@
  */
 
 import { newest } from '../lib/listingRule'
+import type { Tag } from '../lib/tagColor'
 
 export type Source =
   | { mode: 'latest'; limit: number }
@@ -66,6 +67,8 @@ export type PortPost = {
    * 0028) — so a block that takes "a module" takes what that page shows.
    */
   pages?: string[]
+  /** Its tags, shown as #badges on its card and its summary. */
+  tags?: Tag[]
 }
 
 // The same "newest" every site page uses: the date on the post, then publish time.
