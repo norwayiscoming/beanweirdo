@@ -252,10 +252,10 @@ describe('Cấu hình', () => {
     api.updatePage.mockResolvedValue(undefined)
     await renderScreen()
     await openTopic('tea')
-    const menu = screen.getByRole('group', { name: 'Hiện trên menu' })
+    const menu = screen.getByRole('switch', { name: 'Hiện trên menu' })
     // A subject not yet in the stored list is shown.
-    expect(within(menu).getByRole('button', { name: 'hiện' }).getAttribute('aria-pressed')).toBe('true')
-    await userEvent.click(within(menu).getByRole('button', { name: 'ẩn' }))
+    expect(menu.getAttribute('aria-checked')).toBe('true')
+    await userEvent.click(menu)
     expect(api.updatePage).toHaveBeenCalledWith('nav', { presentation: { items: [{ ref: 'topic:tea', sidebar: false, home: true }] } })
   })
 

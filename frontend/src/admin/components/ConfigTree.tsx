@@ -28,10 +28,10 @@ import { findPage, useModules } from '../../data/useModules'
 import { usePortSources } from '../../portfolio/data'
 import { navLinks, type PortContent } from '../../portfolio/content'
 import type { PresetKey } from '../../portfolio/blocks'
-import { ink, paper, sans, serif } from '../../design/tokens'
+import { ink, paper, sans } from '../../design/tokens'
 import { radius } from '../../design/controls'
 import { retireKeyword, retireTopic } from '../lib/retire'
-import { Choice, DETAIL_CSS, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
+import { DETAIL_CSS, Switch, desk, frame, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
 import { RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
 import { Builder, ContentTab, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
@@ -42,7 +42,6 @@ import {
   NodePage,
   PageEditor,
   pageDeleteBlocker,
-  SHOWN,
   PORT_PARTS,
   type BlogSelected,
   type Layout,
@@ -111,8 +110,9 @@ function Card({ title, note, on, onClick }: { title: string; note: string; on: b
       style={{
         display: 'flex',
         alignItems: 'flex-start',
-        background: on ? paper.hover : paper.white,
-        border: `1px solid ${on ? ink.border : paper.rule}`,
+        background: on ? desk.soft : desk.panel,
+        border: `1px solid ${on ? ink.moss : desk.line}`,
+        boxShadow: on ? `inset 3px 0 0 ${ink.moss}` : 'none',
         borderRadius: radius,
       }}
     >
@@ -123,8 +123,8 @@ function Card({ title, note, on, onClick }: { title: string; note: string; on: b
         onClick={onClick}
         style={{ all: 'unset', flex: 1, minWidth: 0, padding: '12px 14px 13px', cursor: 'pointer' }}
       >
-        <div style={{ fontFamily: serif, fontSize: 17, lineHeight: 1.15, letterSpacing: '-.02em', color: ink.base }}>{title}</div>
-        <div style={{ fontFamily: sans, fontWeight: 300, fontSize: 11.5, lineHeight: 1.4, color: ink.muted, marginTop: 5 }}>{note}</div>
+        <div style={{ fontFamily: sans, fontWeight: 600, fontSize: 15, lineHeight: 1.25, color: ink.base }}>{title}</div>
+        <div style={{ fontFamily: sans, fontSize: 13, lineHeight: 1.45, color: ink.soft, marginTop: 4 }}>{note}</div>
       </button>
     </div>
   )
@@ -377,7 +377,7 @@ export function ConfigTree({
   if (!layout) return <div style={{ padding: '34px 56px', fontFamily: sans, fontSize: 13, color: ink.muted }}>{err ?? 'Đang tải…'}</div>
 
   const errorLine = err && (
-    <div role="alert" style={{ fontFamily: sans, fontSize: 12, color: '#8E1E42', margin: '10px 0' }}>
+    <div role="alert" style={{ fontFamily: sans, fontSize: 14, fontWeight: 500, color: ink.danger, background: desk.panel, border: `1px solid ${ink.dangerLine}`, borderRadius: radius, padding: '10px 14px', margin: '14px 0 0' }}>
       {err}
     </div>
   )
@@ -654,7 +654,7 @@ export function ConfigTree({
     if (p.status !== 'published')
       return (
         <Row label="Hiện trên menu">
-          <span style={{ color: ink.muted }}>chỉ trang đã đăng mới lên thanh trên và trang chủ</span>
+          <span style={{ color: ink.soft }}>chỉ trang đã đăng mới lên thanh trên và trang chủ</span>
         </Row>
       )
     const { header, home } = port.content
@@ -672,10 +672,10 @@ export function ConfigTree({
     return (
       <>
         <Row label="Hiện trên menu">
-          <Choice label="Hiện trên menu" options={SHOWN} value={link && !link.hidden ? 'on' : 'off'} onChange={(v) => setMenu(v === 'on')} />
+          <Switch label="Hiện trên menu" value={!!link && !link.hidden} onChange={setMenu} />
         </Row>
         <Row label="Hiện ở trang chủ">
-          <Choice label="Hiện ở trang chủ" options={SHOWN} value={features.some((f) => f.pageId === p.id) ? 'on' : 'off'} onChange={(v) => setHome(v === 'on')} />
+          <Switch label="Hiện ở trang chủ" value={features.some((f) => f.pageId === p.id)} onChange={setHome} />
         </Row>
       </>
     )
@@ -954,7 +954,8 @@ export function ConfigTree({
   const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging || treeSplit.dragging ? 'none' : undefined } as const
 
   return (
-    <div>
+    // The desk: every panel of the detail and every card of the tree sits on it.
+    <div style={{ background: desk.ground }}>
       <div style={{ padding: columns === 1 ? '24px 16px 0' : '28px 32px 0' }}>
         <SiteTabs tabs={SITES} labels={SITE_LABELS} value={site} onChange={openSite} />
       </div>
@@ -977,10 +978,10 @@ export function ConfigTree({
         {header}
         {body}
         {undo && (
-          <div role="status" style={{ position: 'sticky', bottom: 0, marginTop: 16, display: 'flex', gap: 10, alignItems: 'center', background: paper.cream, border: `1px solid ${ink.border}`, borderRadius: radius, padding: '8px 10px', fontFamily: sans, fontSize: 12, color: ink.base }}>
+          <div role="status" style={{ position: 'sticky', bottom: 0, marginTop: 14, display: 'flex', gap: 10, alignItems: 'center', background: desk.panel, border: `1px solid ${ink.border}`, borderRadius: radius, boxShadow: '0 -6px 18px rgba(35,33,26,.08)', padding: '10px 14px', fontFamily: sans, fontSize: 14, color: ink.base }}>
             <span style={{ flex: 1 }}>
               <span>{undo.msg}</span>
-              {undo.saving && <span style={{ color: ink.muted }}> · đang lưu…</span>}
+              {undo.saving && <span style={{ color: ink.soft }}> · đang lưu…</span>}
             </span>
             <button
               type="button"
@@ -990,11 +991,12 @@ export function ConfigTree({
                 setUndo(null)
                 run(u.revert)
               }}
-              style={{ all: 'unset', cursor: undo.saving ? 'default' : 'pointer', color: undo.saving ? ink.faint : ink.green, fontWeight: 500 }}
+              className="cfg-btn"
+              style={{ ...frame, height: 32, ...(undo.saving ? { color: ink.muted, borderColor: desk.field, cursor: 'not-allowed' } : {}) }}
             >
               Hoàn tác
             </button>
-            <button type="button" aria-label="Đóng" onClick={() => setUndo(null)} style={{ all: 'unset', cursor: 'pointer', color: ink.muted }}>
+            <button type="button" aria-label="Đóng" onClick={() => setUndo(null)} className="cfg-btn" style={{ ...frame, height: 32, width: 32, padding: 0, borderColor: 'transparent', color: ink.strong }}>
               ✕
             </button>
           </div>

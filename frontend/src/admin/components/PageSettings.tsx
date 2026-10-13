@@ -19,7 +19,8 @@ import { ancestorsOf } from '../../lib/contentTree'
 import { treeOrder, type ListingRule, type RuleGroup, type RuleSort, type RuleTier } from '../../lib/listingRule'
 import { toPath } from '../../lib/routes'
 import type { PortPart } from './PortEditors'
-import { Choice, Row, Section } from './Detail'
+import { Choice, Row, Section, Switch } from './Detail'
+import { radius } from '../../design/controls'
 import { VISIBILITY } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 
@@ -68,7 +69,7 @@ const TIER_NAMES: Record<RuleTier, string> = {
 const SORT_NAMES: Record<RuleSort, string> = { newest: 'mới nhất trước', oldest: 'cũ nhất trước', manual: 'xếp tay', tree: 'theo cây chủ đề' }
 const GROUP_NAMES: Record<RuleGroup, string> = { none: 'không nhóm', subject: 'subject', topic: 'topic', keyword: 'tag', kind: 'dạng bài', year: 'năm' }
 
-const label: CSSProperties = { fontFamily: sans, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: ink.faint, marginBottom: 6 }
+const label: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 600, color: ink.strong, marginBottom: 6 }
 const box: CSSProperties = {
   boxSizing: 'border-box',
   background: paper.white,
@@ -80,15 +81,17 @@ const box: CSSProperties = {
   outline: 'none',
 }
 const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: `1px solid ${paper.rule}`, fontFamily: sans, fontSize: 13 }
-const link: CSSProperties = { fontFamily: sans, fontSize: 11, color: ink.green, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }
-const quiet: CSSProperties = { ...link, color: ink.muted }
+const link: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 500, color: ink.green, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textUnderlineOffset: 3 }
+const quiet: CSSProperties = { ...link, color: ink.soft }
 const chip = (on: boolean): CSSProperties => ({
   fontFamily: sans,
-  fontSize: 11.5,
-  padding: '3px 9px',
-  border: `1px solid ${on ? ink.base : paper.rule}`,
-  background: on ? ink.base : paper.white,
-  color: on ? paper.cream : ink.soft,
+  fontSize: 13,
+  fontWeight: 500,
+  padding: '5px 11px',
+  borderRadius: radius,
+  border: `1px solid ${on ? ink.moss : ink.border}`,
+  background: on ? ink.moss : paper.white,
+  color: on ? paper.white : ink.strong,
   cursor: 'pointer',
 })
 
@@ -247,12 +250,12 @@ function HandOrder({ rule, posts, onChange }: { rule: StoredRule; posts: { id: s
     <div>
       {posts.map((p, i) => (
         <div key={p.id} {...dragRow(drag, i)}>
-          <span style={{ cursor: 'grab', color: ink.faint }} aria-hidden>
+          <span style={{ cursor: 'grab', color: ink.soft }} aria-hidden>
             ⋮⋮
           </span>
-          <span style={{ color: ink.faint, width: 22 }}>{String(i + 1).padStart(2, '0')}</span>
+          <span style={{ color: ink.soft, width: 22 }}>{String(i + 1).padStart(2, '0')}</span>
           <span style={{ flex: 1, fontFamily: serif, fontSize: 15 }}>{p.en}</span>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: ink.muted }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 13, color: ink.soft }}>
             <input
               type="checkbox"
               aria-label={`ghim ${p.en}`}
@@ -277,11 +280,6 @@ export const PORT_PARTS: { part: PortPart; title: string }[] = [
 const ruleIn = (layout: Layout) => (id: string | null | undefined) => layout.rules.find((r) => r.id === id)
 
 type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
-
-export const SHOWN = [
-  { value: 'on' as const, label: 'hiện' },
-  { value: 'off' as const, label: 'ẩn' },
-]
 
 /**
  * Whether one page is listed in the blog's menu (its sidebar) and on the blog
@@ -319,7 +317,7 @@ export function NavFlags({
     <>
       {(['sidebar', 'home'] as const).map((flag) => (
         <Row key={flag} label={flag === 'sidebar' ? 'Hiện trên menu' : 'Hiện ở trang chủ'}>
-          <Choice label={flag === 'sidebar' ? 'Hiện trên menu' : 'Hiện ở trang chủ'} options={SHOWN} value={shown(flag) ? 'on' : 'off'} onChange={(v) => set(flag, v === 'on')} />
+          <Switch label={flag === 'sidebar' ? 'Hiện trên menu' : 'Hiện ở trang chủ'} value={shown(flag)} onChange={(v) => set(flag, v)} />
         </Row>
       ))}
     </>
@@ -376,7 +374,7 @@ export function NodePage({
   return (
     <div>
       {error}
-      <div style={{ fontFamily: sans, fontSize: 13, color: ink.muted, margin: '8px 0 10px' }}>
+      <div style={{ fontFamily: sans, fontSize: 13, color: ink.soft, margin: '8px 0 10px' }}>
         Theo {TEMPLATE_WORDS[tplKind]}: {listed.length ? `trang đang liệt kê ${listed.length} bài` : 'trang chưa có bài nào'}.
       </div>
       {listed.length > 0 && (
@@ -384,7 +382,7 @@ export function NodePage({
           {listed.slice(0, 8).map((p) => (
             <li key={p.id}>{p.en}</li>
           ))}
-          {listed.length > 8 && <li style={{ listStyle: 'none', fontFamily: sans, fontSize: 12, color: ink.muted }}>… và {listed.length - 8} bài nữa</li>}
+          {listed.length > 8 && <li style={{ listStyle: 'none', fontFamily: sans, fontSize: 12, color: ink.soft }}>… và {listed.length - 8} bài nữa</li>}
         </ol>
       )}
       <button

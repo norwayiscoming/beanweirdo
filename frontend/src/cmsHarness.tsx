@@ -19,6 +19,7 @@ import { createRoot } from 'react-dom/client'
 // định của trình duyệt, và trang thử bày một màn khác màn thật.
 import './global.css'
 import './admin/admin.css'
+import { newBlock } from './portfolio/blocks'
 
 type Row = Record<string, unknown>
 
@@ -80,7 +81,8 @@ let TOPICS: Row[] = [
   topic('sensory', 'sensory', 5, 'bean', null, 3),
   topic('maillard', 'phản ứng Maillard', 6, 'roasting', null, 2),
   topic('ghi', 'ghi', 6, null, '#F0B45C', 12),
-  topic('p1', 'business', 1, null, null, 0, 'port', { slug: 'business', look: 'biz' }),
+  // The blocks of the real strat & ops page, so the block list can be looked at.
+  topic('p1', 'strat & ops', 1, null, null, 0, 'port', { slug: 'biz-hkd', look: 'biz', blocks: (['head', 'slider', 'series', 'slider', 'story', 'slider', 'about', 'cards'] as const).map((t) => newBlock(t, 'bean')) }),
   topic('p2', 'bean', 2, null, null, 0, 'port', { slug: 'bean', look: 'baen', status: 'draft' }),
 ]
 const KEYWORDS: Row[] = [
