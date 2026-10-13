@@ -17,6 +17,7 @@ import {
   updateNode,
   type Module,
   type Node,
+  type NodeStatus,
 } from '../lib/apiClient'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { planMove, type DropWhere } from '../../lib/treeMove'
@@ -535,6 +536,11 @@ export function ConfigTree({
   const overrideOf = (type: 'topic' | 'keyword', id: string) => layout.overrides.find((o) => o.node_type === type && o.node_id === id)
   // One count per node, the one its settings show too: the posts filed under it.
   const leafMeta = (type: 'topic' | 'keyword', id: string, n: number) => `${overrideOf(type, id) ? 'riêng · ' : ''}${posts(n)}`
+  // Every site's rows say the same things the same way: a state other than live first, then where it is.
+  const tocMeta = (status: NodeStatus, rest: string, hidden = false) =>
+    [status !== 'published' ? statusLabel(status) : hidden ? 'ẩn' : '', rest].filter(Boolean).join(' · ')
+  // A port page's dot: its own colour, else the colour of the look it wears.
+  const portDot = (pg: Node) => pg.accent ?? port.design.palettes[pg.look ?? 'biz']?.c500 ?? null
   // Tags have no order of their own; by name, so a long list can be scanned.
   const tags = [...vocab.keywords].sort((a, b) => a.label.localeCompare(b.label, 'vi'))
   // The page that wears a module's looks, if any: the one to preview it on.
@@ -566,7 +572,7 @@ export function ConfigTree({
         parent_id: t.parent_id,
         name: t.title,
         dot: t.accent ?? ancestorsOf(sorted, t.id).reverse().find((a) => a.accent)?.accent ?? null,
-        meta: leafMeta('topic', t.id, t.posts),
+        meta: tocMeta(t.status, leafMeta('topic', t.id, t.posts)),
         picked: { kind: 'topic', id: t.id },
         movable: true,
       })),
@@ -622,12 +628,12 @@ export function ConfigTree({
       items: [
         // The top bar's links in its order, then the pages it does not show.
         ...portLinks.flatMap((l): TocItem[] => {
-          if (l.key === 'about') return [{ id: l.key, parent_id: null, name: 'About', meta: l.hidden ? 'ẩn' : '/about', picked: { kind: 'port-part', part: 'about' }, movable: true }]
+          if (l.key === 'about') return [{ id: l.key, parent_id: null, name: 'About', dot: null, meta: tocMeta('published', '/about', l.hidden), picked: { kind: 'port-part', part: 'about' }, movable: true }]
           const pg = port.pages.find((x) => `page:${x.id}` === l.key)
-          return pg ? [{ id: l.key, parent_id: null, name: pg.title, meta: l.hidden ? 'ẩn' : `/${pg.slug}`, picked: { kind: 'port-page', id: pg.id }, movable: true }] : []
+          return pg ? [{ id: l.key, parent_id: null, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`, l.hidden), picked: { kind: 'port-page', id: pg.id }, movable: true }] : []
         }),
         ...[...port.pages.filter((x) => x.status === 'draft'), ...archivedPort].map(
-          (pg): TocItem => ({ id: `page:${pg.id}`, parent_id: null, name: pg.title, meta: pg.status === 'draft' ? 'nháp' : 'lưu trữ', picked: { kind: 'port-page', id: pg.id }, movable: false }),
+          (pg): TocItem => ({ id: `page:${pg.id}`, parent_id: null, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: false }),
         ),
       ],
     },
@@ -860,6 +866,10 @@ export function ConfigTree({
       if (!p) break
       crumbs = ['Port', 'Mục lục']
       title = p.title
+      rename = (v) => run(async () => {
+        const next = await updateNode(p.id, { title: v })
+        port.setPages((ps) => ps.map((x) => (x.id === next.id ? next : x)))
+      })
       address = p.status === 'published' ? `/${p.slug}` : ''
       facts = [statusLabel(p.status)]
       actions = [

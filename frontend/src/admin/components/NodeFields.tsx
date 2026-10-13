@@ -35,6 +35,32 @@ export const VISIBILITY = [
   { value: 'private' as const, label: 'riêng tư' },
 ]
 
+/** A node's colour — its dot in the tree and its accent on the site — on every site alike. */
+export function ColorRow({ node, parent, used, save }: { node: Node; parent?: Node; used: string[]; save: (patch: Parameters<typeof updateNode>[1]) => void }) {
+  const setColor = (hex: string | null) => save(hex ? { accent: hex, ...shades(hex) } : { accent: null, on_color: null, tint: null, tint2: null })
+  const swatches = [...new Set([...used, ...PALETTE.filter((c) => !used.some((u) => u.toUpperCase() === c))])].slice(0, 9)
+  const on = (c: string | null) => (c ? node.accent?.toUpperCase() === c.toUpperCase() : !node.accent)
+  return (
+    <Row label="Màu">
+      <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          aria-label={parent ? `theo ${parent.title}` : 'chưa có màu'}
+          aria-pressed={on(null)}
+          onClick={() => node.accent && setColor(null)}
+          style={{ ...dot, border: `1.5px ${parent?.accent ? 'dashed' : 'solid'} ${parent?.accent ?? ink.faint}`, outline: on(null) ? `1.5px solid ${ink.base}` : 'none' }}
+        />
+        {swatches.map((c) => (
+          <button key={c} type="button" aria-label={c} aria-pressed={on(c)} onClick={() => setColor(c)} style={{ ...dot, background: c, outline: on(c) ? `1.5px solid ${ink.base}` : 'none' }} />
+        ))}
+        <span style={{ width: 76 }}>
+          <LineInput label="mã màu" value={node.accent ?? ''} placeholder="#hex" mono onSave={(v) => /^#[0-9a-f]{6}$/i.test(v.trim()) && setColor(v.trim())} />
+        </span>
+      </span>
+    </Row>
+  )
+}
+
 /** Màu, Lời dẫn, Nằm trong, Trạng thái — the name is typed in the title above. */
 export function TopicFields({
   topic,
@@ -49,28 +75,9 @@ export function TopicFields({
   used: string[]
   save: (patch: Parameters<typeof updateNode>[1]) => void
 }) {
-  const setColor = (hex: string | null) => save(hex ? { accent: hex, ...shades(hex) } : { accent: null, on_color: null, tint: null, tint2: null })
-  const swatches = [...new Set([...used, ...PALETTE.filter((c) => !used.some((u) => u.toUpperCase() === c))])].slice(0, 9)
-  const on = (c: string | null) => (c ? topic.accent?.toUpperCase() === c.toUpperCase() : !topic.accent)
   return (
     <>
-      <Row label="Màu">
-        <span style={{ display: 'inline-flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            aria-label={parent ? `theo ${parent.title}` : 'chưa có màu'}
-            aria-pressed={on(null)}
-            onClick={() => topic.accent && setColor(null)}
-            style={{ ...dot, border: `1.5px ${parent?.accent ? 'dashed' : 'solid'} ${parent?.accent ?? ink.faint}`, outline: on(null) ? `1.5px solid ${ink.base}` : 'none' }}
-          />
-          {swatches.map((c) => (
-            <button key={c} type="button" aria-label={c} aria-pressed={on(c)} onClick={() => setColor(c)} style={{ ...dot, background: c, outline: on(c) ? `1.5px solid ${ink.base}` : 'none' }} />
-          ))}
-          <span style={{ width: 76 }}>
-            <LineInput label="mã màu" value={topic.accent ?? ''} placeholder="#hex" mono onSave={(v) => /^#[0-9a-f]{6}$/i.test(v.trim()) && setColor(v.trim())} />
-          </span>
-        </span>
-      </Row>
+      <ColorRow node={topic} parent={parent} used={used} save={save} />
       <Row label="Lời dẫn">
         <LineInput label="Lời dẫn" value={topic.intro} multiline placeholder="bấm để viết lời dẫn…" onSave={(intro) => save({ intro })} />
       </Row>

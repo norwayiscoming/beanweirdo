@@ -45,7 +45,7 @@ vi.mock('./PortEditors', () => ({
     setContentStored: () => {},
     setPages: () => {},
     loaded: true,
-    design: {},
+    design: { palettes: { biz: { name: "biz", c500: "#123456" } } },
   }),
   useSplit: () => ({ size: 520, columns: '520px 7px minmax(0,1fr)', handle: null, dragging: false }),
   ContentTab: ({ only }: { only: string }) => <div>port:{only}</div>,
@@ -285,7 +285,7 @@ describe('Cấu hình', () => {
     await renderScreen()
     await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
     await userEvent.click(rowButton('Mục lục'))
-    expect(within(screen.getByRole('list', { name: 'Các trang' })).getAllByRole('button').map((b) => b.textContent?.replace(/^\d+/, ''))).toEqual(['Beta/beta', 'Alpha/alpha', 'About/about', 'Draftnháp'])
+    expect(within(screen.getByRole('list', { name: 'Các trang' })).getAllByRole('button').map((b) => b.textContent?.replace(/^\d+/, ''))).toEqual(['Beta/beta', 'Alpha/alpha', 'About/about', 'Draftnháp · /draft'])
     await userEvent.click(screen.getByRole('button', { name: '+ Thêm trang' }))
     await userEvent.type(screen.getByLabelText('Thêm trang'), 'reading room')
     await userEvent.click(screen.getByRole('button', { name: 'mẫu bibe' }))
