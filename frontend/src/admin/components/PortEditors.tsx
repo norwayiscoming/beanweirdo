@@ -794,12 +794,6 @@ export function ContentTab({
   const links = navLinks(content, pages)
   const saveLinks = (list: typeof links) =>
     setGroup('header', { ...header, links: list.map((l): NavOverride => ({ key: l.key, label: l.label, hidden: l.hidden })) })
-  const linkDrag = useRowDrag((from, to) => {
-    const next = [...links]
-    const [m] = next.splice(from, 1)
-    next.splice(to, 0, m)
-    saveLinks(next)
-  })
 
   // Featured pages: what the owner chose, or every published page before any choice.
   const features: Feature[] = home.features.length
@@ -857,10 +851,10 @@ export function ContentTab({
         {text('Chữ thương hiệu', header.brand, (v) => setGroup('header', { ...header, brand: v }))}
         {text('Chữ bên phải', header.right, (v) => setGroup('header', { ...header, right: v }))}
       </div>
-      <div style={fieldLabel}>Link trên thanh</div>
-      {links.map((l, i) => (
-        <div key={l.key} {...dragProps(linkDrag, i)} style={{ ...rowBox, display: 'grid', gridTemplateColumns: '20px minmax(0,1fr) 200px 80px', gap: 10, alignItems: 'center', opacity: linkDrag.from === i ? 0.5 : 1 }}>
-          {grip}
+      {/* The order is set by dragging in Mục lục, as the blog's sidebar is; here only the words and whether each shows. */}
+      <div style={fieldLabel}>Link trên thanh · thứ tự kéo ở Mục lục</div>
+      {links.map((l) => (
+        <div key={l.key} style={{ ...rowBox, display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 200px 80px', gap: 10, alignItems: 'center' }}>
           <input
             style={small}
             value={l.label}
