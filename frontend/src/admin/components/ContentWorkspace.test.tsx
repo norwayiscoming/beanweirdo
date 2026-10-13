@@ -76,7 +76,11 @@ beforeEach(() => {
   ]
 })
 
-const row = (title: string) => screen.getByRole('button', { name: title }).closest('tr') as HTMLElement
+// Everything but Sửa sits behind the row's ⋮.
+const pick = async (title: string, action: string) => {
+  await userEvent.click(screen.getByRole('button', { name: `Thao tác ${title}` }))
+  await userEvent.click(screen.getByRole('menuitem', { name: action }))
+}
 
 describe('ContentWorkspace', () => {
   it('lists the live posts and publishes a draft from its row', async () => {
@@ -84,7 +88,7 @@ describe('ContentWorkspace', () => {
     expect(await screen.findByRole('button', { name: 'Senses of Flavors' })).toBeInTheDocument()
     // The trash stays out of the list until it is asked for.
     expect(screen.queryByRole('button', { name: 'Chlorogenic Acids' })).not.toBeInTheDocument()
-    await userEvent.click(within(row('Senses of Flavors')).getByRole('button', { name: 'Đăng' }))
+    await pick('Senses of Flavors', 'Đăng')
     expect(api.transitionStatus).toHaveBeenCalledWith('Senses of Flavors', 'publish')
   })
 
@@ -92,11 +96,10 @@ describe('ContentWorkspace', () => {
     render(<ContentWorkspace />)
     await screen.findByRole('button', { name: 'Senses of Flavors' })
     await userEvent.click(screen.getByRole('button', { name: /^Thùng rác/ }))
-    const trashed = row('Chlorogenic Acids')
     expect(screen.queryByRole('button', { name: 'Senses of Flavors' })).not.toBeInTheDocument()
-    await userEvent.click(within(trashed).getByRole('button', { name: 'Khôi phục' }))
+    await pick('Chlorogenic Acids', 'Khôi phục')
     expect(api.transitionStatus).toHaveBeenCalledWith('Chlorogenic Acids', 'restore-trash')
-    await userEvent.click(within(trashed).getByRole('button', { name: 'Xoá vĩnh viễn' }))
+    await pick('Chlorogenic Acids', 'Xoá vĩnh viễn')
     expect(api.transitionStatus).toHaveBeenCalledWith('Chlorogenic Acids', 'permanently-delete')
   })
 
@@ -128,7 +131,7 @@ describe('ContentWorkspace', () => {
   it('pins a post from its row, whichever page lists it', async () => {
     render(<ContentWorkspace />)
     await screen.findByRole('button', { name: 'Senses of Flavors' })
-    await userEvent.click(within(row('Detachment')).getByRole('button', { name: 'Ghim' }))
+    await pick('Detachment', 'Ghim')
     expect(api.updatePost).toHaveBeenCalledWith('Detachment', { pinned: true })
   })
 })

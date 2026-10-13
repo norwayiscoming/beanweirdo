@@ -69,22 +69,6 @@ export const IconUpload = ({ size = 16, style }: IconProps) =>
     </>,
   )
 
-/*
- * Three dots, solid for the same reason the pin is: a 1.5px ring at 16px is a
- * smudge, a filled dot is a dot.
- */
-export const IconMore = ({ size = 16, style }: IconProps) =>
-  svg(
-    size,
-    style,
-    <>
-      <circle cx="12" cy="5" r="1.8" />
-      <circle cx="12" cy="12" r="1.8" />
-      <circle cx="12" cy="19" r="1.8" />
-    </>,
-    true,
-  )
-
 /**
  * A chain link, for "đặt link" — pasting an address instead of a file.
  *
