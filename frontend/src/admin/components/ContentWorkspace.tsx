@@ -22,7 +22,9 @@ import { PostAuthorsDialog } from './PostAuthorsDialog'
 import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
-import { desk, frame, Menu } from './Detail'
+import { desk, Menu } from './Detail'
+import { Button, IconButton } from '../../design/Button'
+import { IconClose, IconEdit, IconPlus } from '../../design/icons'
 import { radius } from '../../design/controls'
 
 /**
@@ -84,8 +86,6 @@ const SEL = '#EEF5F8'
 const WARN = '#B4552E'
 const label: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 600, color: ink.strong }
 const box: CSSProperties = { boxSizing: 'border-box', background: paper.white, border: `1px solid ${paper.rule}`, color: ink.base, fontFamily: sans, fontSize: 13, padding: '6px 9px', outline: 'none', width: '100%' }
-const link: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 500, color: ink.green, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }
-const quiet: CSSProperties = { ...link, color: ink.soft }
 const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSize: 13, padding: '0 7px', lineHeight: '18px', border: `1px solid ${paper.rule}`, borderRadius: 10, color: ink.soft, whiteSpace: 'nowrap', cursor: 'pointer', background: 'none', margin: '1px 3px 1px 0' }
 
 const CSS = `
@@ -93,6 +93,9 @@ const CSS = `
 .cw-r:focus-visible,.cw-row:focus-within{outline:2px solid ${ink.green};outline-offset:-2px}
 .cw-row:hover td{background:${paper.hover}}
 .cw-pill:hover{border-color:${ink.green}!important;color:${ink.green}!important}
+.cw-unchip{all:unset;cursor:pointer;display:inline-flex;padding:2px;border-radius:4px;color:${ink.soft}}
+.cw-unchip:hover{background:rgba(0,0,0,.08);color:${ink.base}}
+.cw-unchip:focus-visible{outline:2px solid #2563eb}
 @media (max-width:900px){.cw-ws{grid-template-columns:1fr!important}.cw-rail{border-right:none!important;border-bottom:1px solid ${paper.rule};max-height:280px;overflow-y:auto}}
 `
 
@@ -364,15 +367,15 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
       {undo && (
         <div role="status" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', background: '#E7EFE3', padding: '8px 16px', fontFamily: sans, fontSize: 13, color: ink.base }}>
           <span>{undo.msg}</span>
-          <span style={{ display: 'flex', gap: 14 }}>
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
             {undo.revert && (
-              <button type="button" disabled={busy} onClick={() => run(async () => (await undo.revert?.(), { msg: 'Đã hoàn tác' }))} style={{ ...link, fontWeight: 500 }}>
+              <Button size="sm" disabled={busy} onClick={() => run(async () => (await undo.revert?.(), { msg: 'Đã hoàn tác' }))}>
                 Hoàn tác
-              </button>
+              </Button>
             )}
-            <button type="button" aria-label="Đóng" onClick={() => setUndo(null)} style={quiet}>
-              ✕
-            </button>
+            <IconButton size="sm" label="Đóng" onClick={() => setUndo(null)}>
+              <IconClose />
+            </IconButton>
           </span>
         </div>
       )}
@@ -381,20 +384,15 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         {chips.map((v) => (
           <span key={v} style={{ display: 'inline-flex', gap: 6, alignItems: 'center', background: SEL, color: ink.base, padding: '2px 8px', borderRadius: 3 }}>
             {nameOf(v, f[v] as string)}
-            <button type="button" aria-label={`Bỏ lọc ${nameOf(v, f[v] as string)}`} onClick={() => (setF((o) => ({ ...o, [v]: null })))} style={{ ...quiet, fontSize: 13 }}>
-              ×
+            <button type="button" aria-label={`Bỏ lọc ${nameOf(v, f[v] as string)}`} onClick={() => (setF((o) => ({ ...o, [v]: null })))} className="cw-unchip">
+              <IconClose size={12} />
             </button>
           </span>
         ))}
         <input type="search" aria-label="Tìm bài" placeholder="Tìm bài" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...box, width: 200, marginLeft: 'auto' }} />
-        <button
-          type="button"
-          onClick={() => nav.newPost()}
-          className="cfg-btn"
-          style={{ ...frame, background: ink.moss, borderColor: ink.moss, color: paper.white }}
-        >
-          + Bài mới
-        </button>
+        <Button level="primary" icon={<IconPlus />} onClick={() => nav.newPost()}>
+          Bài mới
+        </Button>
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 680 }}>
@@ -459,9 +457,9 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                   <td style={{ ...td, color: ink.soft, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{p.date_label}</td>
                   <td style={td}>
                     <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <button type="button" aria-label={`Sửa ${p.en}`} onClick={() => nav.editPost(p.id)} className="cfg-btn" style={{ ...frame, height: 28, padding: '0 12px', fontSize: 13 }}>
+                      <Button size="sm" icon={<IconEdit size={14} />} aria-label={`Sửa ${p.en}`} onClick={() => nav.editPost(p.id)}>
                         Sửa
-                      </button>
+                      </Button>
                       <Menu
                         small
                         label={`Thao tác ${p.en}`}
@@ -575,9 +573,11 @@ function BulkBar({
       {keywords.length > 0 && pick('+ Tag', keywords.map((k) => [k.id, k.label]), (v) => onField('kw+', v))}
       {keywords.length > 0 && pick('− Tag', keywords.map((k) => [k.id, k.label]), (v) => onField('kw-', v))}
       {pick('Trạng thái', BULK_STATUS.map((b) => [b.action, b.label]), (v) => onStatus(v as StatusAction))}
-      <button type="button" onClick={onClear} style={{ ...s, border: 'none', marginLeft: 'auto', color: ink.soft }}>
-        Bỏ chọn
-      </button>
+      <span style={{ marginLeft: 'auto' }}>
+        <Button size="sm" onClick={onClear}>
+          Bỏ chọn
+        </Button>
+      </span>
     </div>
   )
 }

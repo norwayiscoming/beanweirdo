@@ -26,7 +26,7 @@ import { ContentWorkspace } from '../admin/components/ContentWorkspace'
 import { ConfigTree } from '../admin/components/ConfigTree'
 import { DisplaySettings } from '../admin/components/DisplaySettings'
 import { AuthorsPanel } from '../admin/components/AuthorsPanel'
-import { DETAIL_CSS, desk, frame } from '../admin/components/Detail'
+import { DETAIL_CSS, desk } from '../admin/components/Detail'
 import { useNav } from '../lib/nav'
 
 const sectionHead: CSSProperties = {
@@ -853,23 +853,9 @@ export function Cms() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 26 }}>
+        <div role="tablist" aria-label="Khu quản trị" className="ab-tabs" style={{ marginTop: 26 }}>
           {TABS.map((x) => (
-            <button
-              type="button"
-              key={x.k}
-              aria-pressed={tab === x.k}
-              onClick={() => nav.goCms(x.k)}
-              className="cfg-btn"
-              style={{
-                ...frame,
-                height: 38,
-                padding: '0 18px',
-                fontSize: 14,
-                fontWeight: 600,
-                ...(tab === x.k ? { background: ink.base, borderColor: ink.base, color: paper.cream } : { background: paper.white }),
-              }}
-            >
+            <button type="button" role="tab" key={x.k} aria-selected={tab === x.k} onClick={() => nav.goCms(x.k)} className="ab-tab">
               {x.t}
             </button>
           ))}

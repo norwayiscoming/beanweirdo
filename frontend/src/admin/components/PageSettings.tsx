@@ -20,7 +20,8 @@ import { treeOrder, type ListingRule, type RuleGroup, type RuleSort, type RuleTi
 import { toPath } from '../../lib/routes'
 import type { PortPart } from './PortEditors'
 import { Choice, Row, Section, Switch } from './Detail'
-import { radius } from '../../design/controls'
+import { Button } from '../../design/Button'
+import { IconGrip } from '../../design/icons'
 import { VISIBILITY } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 
@@ -81,19 +82,6 @@ const box: CSSProperties = {
   outline: 'none',
 }
 const row: CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: `1px solid ${paper.rule}`, fontFamily: sans, fontSize: 13 }
-const link: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 500, color: ink.green, background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline', textUnderlineOffset: 3 }
-const quiet: CSSProperties = { ...link, color: ink.soft }
-const chip = (on: boolean): CSSProperties => ({
-  fontFamily: sans,
-  fontSize: 13,
-  fontWeight: 500,
-  padding: '5px 11px',
-  borderRadius: radius,
-  border: `1px solid ${on ? ink.moss : ink.border}`,
-  background: on ? ink.moss : paper.white,
-  color: on ? paper.white : ink.strong,
-  cursor: 'pointer',
-})
 
 function dragRow(d: ReturnType<typeof useRowDrag>, i: number) {
   return {
@@ -118,14 +106,17 @@ const moved = <T,>(list: readonly T[], from: number, to: number): T[] => {
 
 export type Vocab = { topics: Node[]; keywords: Keyword[]; kinds: Tag[] }
 
-/** A set of options to switch on and off. */
+/**
+ * A set of options to switch on and off. Several can be on at once, so these are
+ * loose pressed toggles rather than the joined one-of-a-few `Choice`.
+ */
 function Chips({ options, value, onChange }: { options: { id: string; label: string }[]; value: string[]; onChange: (v: string[]) => void }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <div className="ab-tabs" style={{ gap: 4 }}>
       {options.map((o) => {
         const on = value.includes(o.id)
         return (
-          <button key={o.id} type="button" onClick={() => onChange(on ? value.filter((x) => x !== o.id) : [...value, o.id])} style={chip(on)}>
+          <button key={o.id} type="button" className="ab-tab" aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== o.id) : [...value, o.id])}>
             {o.label}
           </button>
         )
@@ -250,8 +241,8 @@ function HandOrder({ rule, posts, onChange }: { rule: StoredRule; posts: { id: s
     <div>
       {posts.map((p, i) => (
         <div key={p.id} {...dragRow(drag, i)}>
-          <span style={{ cursor: 'grab', color: ink.soft }} aria-hidden>
-            ⋮⋮
+          <span className="ab-grip" aria-hidden>
+            <IconGrip size={14} />
           </span>
           <span style={{ color: ink.soft, width: 22 }}>{String(i + 1).padStart(2, '0')}</span>
           <span style={{ flex: 1, fontFamily: serif, fontSize: 15 }}>{p.en}</span>
@@ -385,9 +376,9 @@ export function NodePage({
           {listed.length > 8 && <li style={{ listStyle: 'none', fontFamily: sans, fontSize: 12, color: ink.soft }}>… và {listed.length - 8} bài nữa</li>}
         </ol>
       )}
-      <button
-        type="button"
-        style={{ ...link, fontSize: 12.5 }}
+      {/* The "+" stays in the words: tests and the owner's notes name the button by them. */}
+      <Button
+        level="add"
         onClick={() =>
           run(async () => {
             // The node starts from its template's rule, with the node written in.
@@ -398,7 +389,7 @@ export function NodePage({
         }
       >
         + cài đặt riêng
-      </button>
+      </Button>
     </div>
   )
 }
@@ -506,9 +497,11 @@ export function PageEditor({
       {copyKey && <Section title="Chữ cố định">{renderCopy(copyKey)}</Section>}
 
       {selected.kind === 'override' && (
-        <button type="button" style={{ ...quiet, marginTop: 30 }} onClick={() => run(() => deleteOverride(selected.type, selected.node))}>
-          bỏ cài đặt riêng, dùng quy chế chung
-        </button>
+        <div style={{ marginTop: 30 }}>
+          <Button onClick={() => run(() => deleteOverride(selected.type, selected.node))}>
+            bỏ cài đặt riêng, dùng quy chế chung
+          </Button>
+        </div>
       )}
     </div>
   )

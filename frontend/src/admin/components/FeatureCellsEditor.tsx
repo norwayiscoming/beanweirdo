@@ -1,7 +1,7 @@
 import { useState, type CSSProperties } from 'react'
 import { cellRatio, featureCells, patchOverride, withOverrides, type FeatureOverride } from '../../content/notes'
 import { ink, paper, sans, serif } from '../../design/tokens'
-import { Hover } from '../../lib/Hover'
+import { Button } from '../../design/Button'
 import { useSlotSwap } from '../lib/useSlotSwap'
 import { coverStyle } from '../../lib/imageFocus'
 import { FocusPicker } from './FocusPicker'
@@ -37,13 +37,6 @@ const textInput: CSSProperties = {
   fontSize: 12.5,
   padding: '6px 9px',
   outline: 'none',
-}
-
-const action: CSSProperties = {
-  fontFamily: sans,
-  fontSize: 10.5,
-  color: ink.green,
-  cursor: 'pointer',
 }
 
 const cellName: CSSProperties = {
@@ -190,8 +183,9 @@ export function FeatureCellsEditor({
                   placeholder="chú thích"
                   style={textInput}
                 />
-                <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-                  <Hover as="label" style={action} hoverStyle={{ color: ink.base }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                  {/* A label, not a `Button`: only a label opens the hidden file input, so it wears the button's classes. */}
+                  <label className="ab ab-secondary ab-sm">
                     {f.img ? 'đổi ảnh' : 'tải ảnh lên'}
                     <input
                       type="file"
@@ -212,10 +206,9 @@ export function FeatureCellsEditor({
                       }}
                       style={{ display: 'none' }}
                     />
-                  </Hover>
+                  </label>
                   {f.img && (
-                    <Hover
-                      as="button"
+                    <Button
                       onClick={() =>
                         setPlacing({
                           n: f.n,
@@ -224,29 +217,25 @@ export function FeatureCellsEditor({
                           name: `Ảnh feature · F${f.n}`,
                         })
                       }
-                      style={{ ...action, background: 'none', border: 'none', padding: 0 }}
-                      hoverStyle={{ color: ink.base }}
+                      size="sm"
                     >
                       đặt vào khung
-                    </Hover>
+                    </Button>
                   )}
-                  <Hover
-                    as="button"
+                  <Button
                     onClick={() => setLinking(linking === f.n ? null : f.n)}
-                    style={{ ...action, background: 'none', border: 'none', padding: 0 }}
-                    hoverStyle={{ color: ink.base }}
+                    size="sm"
                   >
                     dán link
-                  </Hover>
+                  </Button>
                   {f.img && (
-                    <Hover
-                      as="button"
+                    <Button
                       onClick={() => set(f.n, { img: null })}
-                      style={{ ...action, background: 'none', border: 'none', padding: 0 }}
-                      hoverStyle={{ color: '#C25C7C' }}
+                      size="sm"
+                      level="danger"
                     >
                       xoá
-                    </Hover>
+                    </Button>
                   )}
                 </div>
 

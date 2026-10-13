@@ -28,6 +28,7 @@ import {
 import { garden, ink, paper, sans } from './tokens'
 import { radius } from './controls'
 import { IconAlert, IconCheck, IconInfo } from './icons'
+import { Button } from './Button'
 
 type Tone = 'ok' | 'error' | 'info' | 'busy'
 type Toast = { id: number; tone: Tone; text: string }
@@ -212,9 +213,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               {current.text}
             </span>
             {current.tone === 'error' && (
-              <button type="button" className="admin-btn-ghost" onClick={() => dismiss()} style={{ marginTop: 4 }}>
+              <Button level="quiet" onClick={() => dismiss()} style={{ marginTop: 4 }}>
                 Đóng
-              </button>
+              </Button>
             )}
           </div>
         )}

@@ -11,6 +11,8 @@ import {
   type Node,
 } from '../lib/apiClient'
 import { ink, paper, sans } from '../../design/tokens'
+import { IconButton } from '../../design/Button'
+import { IconClose } from '../../design/icons'
 
 /**
  * Where a post sits in the content layer (migration 0027), editable after the
@@ -40,6 +42,8 @@ const select: CSSProperties = {
 }
 
 const label: CSSProperties = { display: 'flex', alignItems: 'center', gap: 6 }
+/** The × inside a tag chip, shrunk to the chip's line so a chip is no taller than its words. */
+const chipX: CSSProperties = { width: 18, height: 18 }
 
 /**
  * Subjects in order, each followed by every topic under it at any depth — the
@@ -131,16 +135,16 @@ export function PostPlacement({
       <span style={label}>
         Tag
         {wearing.map((id) => (
-          <span key={id} style={{ background: paper.hover, color: ink.strong, padding: '2px 4px 2px 8px', display: 'inline-flex', gap: 4 }}>
+          <span key={id} style={{ background: paper.hover, color: ink.strong, padding: '2px 2px 2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
             {labelOf(id)}
-            <button
-              type="button"
-              aria-label={`bỏ tag ${labelOf(id)}`}
+            <IconButton
+              size="sm"
+              label={`bỏ tag ${labelOf(id)}`}
               onClick={() => onPatch({ keywords: wearing.filter((k) => k !== id) })}
-              style={{ border: 'none', background: 'none', cursor: 'pointer', color: ink.muted, padding: '0 2px' }}
+              style={chipX}
             >
-              ×
-            </button>
+              <IconClose size={12} />
+            </IconButton>
           </span>
         ))}
         <input
@@ -214,17 +218,12 @@ export function PostPlacement({
         <span style={label}>
           Địa chỉ cũ
           {(post.old_slugs ?? []).map((s) => (
-            <span key={s} style={{ background: paper.hover, color: ink.strong, padding: '2px 4px 2px 8px', display: 'inline-flex', gap: 4 }}>
+            <span key={s} style={{ background: paper.hover, color: ink.strong, padding: '2px 2px 2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 }}>
               {s}
               {onForget && (
-                <button
-                  type="button"
-                  aria-label={`bỏ địa chỉ cũ ${s}`}
-                  onClick={() => onForget(s)}
-                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: ink.muted, padding: '0 2px' }}
-                >
-                  ×
-                </button>
+                <IconButton size="sm" label={`bỏ địa chỉ cũ ${s}`} onClick={() => onForget(s)} style={chipX}>
+                  <IconClose size={12} />
+                </IconButton>
               )}
             </span>
           ))}

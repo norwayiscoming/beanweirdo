@@ -126,7 +126,7 @@ export function MovePostDialog({
           <h2 style={{ fontFamily: serif, fontSize: 18, fontWeight: 400, margin: 0, color: ink.base }}>
             Chuyển sang module khác
           </h2>
-          <IconButton level="ghost" label="Đóng" onClick={onClose}>
+          <IconButton label="Đóng" onClick={onClose}>
             <IconClose size={16} />
           </IconButton>
         </div>
@@ -208,7 +208,7 @@ export function MovePostDialog({
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
-            <Button level="ghost" onClick={onClose}>
+            <Button level="quiet" onClick={onClose}>
               Huỷ
             </Button>
             <Button

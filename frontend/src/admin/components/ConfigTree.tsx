@@ -30,8 +30,10 @@ import { navLinks, type PortContent } from '../../portfolio/content'
 import type { PresetKey } from '../../portfolio/blocks'
 import { ink, paper, sans } from '../../design/tokens'
 import { radius } from '../../design/controls'
+import { Button, IconButton } from '../../design/Button'
+import { IconClose } from '../../design/icons'
 import { retireKeyword, retireTopic } from '../lib/retire'
-import { Switch, desk, frame, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
+import { Switch, desk, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
 import { RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
 import { Builder, ContentTab, PRESET_CHOICES, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
@@ -626,7 +628,7 @@ export function ConfigTree({
   /** Rows of a Mục lục as the right-hand list draws them: dragged by their grip, deleted from their ⋮. */
   const tocList = (toc: Toc, rows: TocItem[]): ListItem[] =>
     rows.map((r) => ({ id: r.id, name: r.name, meta: r.meta, dot: r.dot, onOpen: pick(r.picked), drag: r.movable ? dragOf(toc, toc.items.filter((x) => x.movable), r.id) : undefined, actions: deleteOf(r.picked) }))
-  const dragNote = (nest: boolean) => (nest ? 'kéo ⋮⋮ để đổi chỗ hay đưa vào trong' : 'kéo ⋮⋮ để đổi chỗ')
+  const dragNote = (nest: boolean) => (nest ? 'kéo ⠿ để đổi chỗ hay đưa vào trong' : 'kéo ⠿ để đổi chỗ')
   const newPortPage = async (name: string, key: PresetKey) => {
     const p = await createFromPreset(key, name, port.pages, src.moduleIds)
     port.setPages((ps) => [...ps, p])
@@ -987,22 +989,19 @@ export function ConfigTree({
               <span>{undo.msg}</span>
               {undo.saving && <span style={{ color: ink.soft }}> · đang lưu…</span>}
             </span>
-            <button
-              type="button"
+            <Button
               disabled={undo.saving}
               onClick={() => {
                 const u = undo
                 setUndo(null)
                 run(u.revert)
               }}
-              className="cfg-btn"
-              style={{ ...frame, height: 32, ...(undo.saving ? { color: ink.muted, borderColor: desk.field, cursor: 'not-allowed' } : {}) }}
             >
               Hoàn tác
-            </button>
-            <button type="button" aria-label="Đóng" onClick={() => setUndo(null)} className="cfg-btn" style={{ ...frame, height: 32, width: 32, padding: 0, borderColor: 'transparent', color: ink.strong }}>
-              ✕
-            </button>
+            </Button>
+            <IconButton label="Đóng" onClick={() => setUndo(null)}>
+              <IconClose />
+            </IconButton>
           </div>
         )}
       </div>

@@ -48,7 +48,8 @@ import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { radius } from '../../design/controls'
 import { ink, paper, sans, serif } from '../../design/tokens'
-import { IconLink } from '../../design/icons'
+import { IconExternal, IconLink, IconPlus } from '../../design/icons'
+import { Button, ButtonLink } from '../../design/Button'
 import { useToast } from '../../design/Toaster'
 import { ThemePicker } from '../components/ThemePicker'
 import { AuthorPicker } from '../components/AuthorPicker'
@@ -559,12 +560,17 @@ function EditorContent({ postId }: { postId: string }) {
           {/* A real link because it opens a second tab, where a nav() call
               cannot reach. Every screen has an address of its own now, so this
               is the address of the preview screen and nothing special. */}
-          <a href={toPath({ area: 'admin', screen: 'postPreview', slug: addresses.slugOf(postId) })} target="_blank" rel="noreferrer" className="admin-btn-ghost" style={{ textDecoration: 'none', display: 'inline-block' }}>
-            Xem trước ↗
-          </a>
-          <button onClick={() => nav.goCms()} className="admin-btn-ghost" style={{ marginLeft: 8 }}>
+          <ButtonLink
+            href={toPath({ area: 'admin', screen: 'postPreview', slug: addresses.slugOf(postId) })}
+            target="_blank"
+            rel="noreferrer"
+            icon={<IconExternal />}
+          >
+            Xem trước
+          </ButtonLink>
+          <Button onClick={() => nav.goCms()} style={{ marginLeft: 8 }}>
             Lưu nháp
-          </button>
+          </Button>
           {/*
             * Publish là việc duy nhất đưa chữ lên trang (migration 0028).
             *
@@ -573,7 +579,8 @@ function EditorContent({ postId }: { postId: string }) {
             * xem `save` — rồi mới đăng, và luôn nói ra kết quả: một lần bấm
             * không có hồi âm từng là lý do chủ site không biết bài đã lên chưa.
             */}
-          <button
+          <Button
+            level="primary"
             onClick={async () => {
               if (published && !pending) {
                 toast.info('Không có thay đổi nào chưa đăng')
@@ -593,11 +600,10 @@ function EditorContent({ postId }: { postId: string }) {
               }
             }}
             disabled={publishing}
-            className="admin-btn"
             style={{ marginLeft: 8 }}
           >
             {publishing ? 'Đang đăng…' : published ? (pending ? 'Đăng thay đổi' : 'Đã đăng') : 'Publish'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -687,8 +693,6 @@ function EditorStyles() {
       .awc-editable{ transition: border-color .12s, background-color .12s; }
       .awc-editable:hover, .awc-editable:focus{ border-color: rgba(0,0,0,.3); background: rgba(255,255,255,.4); outline: none; }
       .awc-hero-drop:hover{ border-color: rgba(0,0,0,.45); }
-      .awc-plus-btn{ font-family: 'Be Vietnam Pro', system-ui, sans-serif; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: #8C8674; background: transparent; border: 1px dashed #EBE5D3; border-radius: 4px; padding: 5px 10px; cursor: pointer; margin: 8px 0; }
-      .awc-plus-btn:hover{ border-color: #8C8674; color: #3B3729; }
       .awc-insert-menu{ display: flex; flex-direction: column; gap: 10px; }
       .awc-insert-group{ display: flex; flex-direction: column; gap: 1px; }
       .awc-insert-glyph{ flex: 0 0 26px; height: 26px; display: flex; align-items: center; justify-content: center; border: 1px solid #EBE5D3; border-radius: 6px; color: #5C5647; background: #FDFBF2; }
@@ -776,7 +780,6 @@ function EditorStyles() {
       .awc-bar i{ display: block; height: 100%; width: 100%; transform-origin: left; animation: awc-run 2s linear forwards; }
       @keyframes awc-run{ from{ transform: scaleX(1) } to{ transform: scaleX(0) } }
       @media (prefers-reduced-motion: reduce){ .awc-bar i{ animation: none; transform: scaleX(.45) } }
-      .awc-undo{ font-family: 'Be Vietnam Pro', system-ui, sans-serif; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; border: 1px solid currentColor; background: transparent; padding: 6px 12px; cursor: pointer; }
       .awc-block-controls{ display: contents; }
       .awc-block-controls button{ width: 20px; height: 20px; font-size: 11px; border: none; background: transparent; cursor: pointer; border-radius: 3px; color: #8C8674; line-height: 1; }
       .awc-block-controls button:hover{ background: #EFEADA; color: #23211A; }
@@ -2801,23 +2804,9 @@ function GroupPicker({
           }}
         />
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          style={{
-            fontFamily: sans,
-            fontSize: 9.5,
-            letterSpacing: '.06em',
-            padding: '3px 8px',
-            borderRadius: 999,
-            cursor: 'pointer',
-            border: `1px dashed ${paper.rule}`,
-            background: 'transparent',
-            color: ink.muted,
-          }}
-        >
-          + nhóm mới
-        </button>
+        <Button level="add" size="sm" icon={<IconPlus />} onClick={() => setAdding(true)}>
+          nhóm mới
+        </Button>
       )}
     </div>
   )
@@ -3413,9 +3402,9 @@ function KeepNotesDialog({
         <div className="awc-bar">
           <i style={{ background: accent }} />
         </div>
-        <button type="button" className="awc-undo" style={{ color: accent, borderColor: accent }} onClick={() => setChoice(null)}>
+        <Button level="quiet" size="sm" onClick={() => setChoice(null)}>
           ← quay lại
-        </button>
+        </Button>
       </div>
     )
   }

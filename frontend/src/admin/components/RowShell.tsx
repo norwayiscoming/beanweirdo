@@ -13,6 +13,8 @@
  */
 import { useEffect, useRef, type DragEvent, type ReactNode } from 'react'
 import { FLOW_EXIT, exitThing, fieldOf, focusField, removeThing, thingKeyDown } from '../lib/flowFocus'
+import { Button } from '../../design/Button'
+import { IconPlus } from '../../design/icons'
 
 const GRIP_LABEL = 'Kéo thả để đổi thứ tự · Delete để xoá'
 
@@ -204,9 +206,9 @@ export function AddRow({ label, onAdd }: { label: string; onAdd: () => void }) {
   return (
     // `alignSelf` because some canvases lay their children out in a stretching
     // column, where a bare button spans the whole width and stops reading as one.
-    <button type="button" className="awc-plus-btn" style={{ alignSelf: 'flex-start' }} onClick={onAdd}>
-      + {label}
-    </button>
+    <Button level="add" icon={<IconPlus size={14} />} style={{ alignSelf: 'flex-start', margin: '8px 0' }} onClick={onAdd}>
+      {label}
+    </Button>
   )
 }
 

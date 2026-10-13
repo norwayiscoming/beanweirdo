@@ -268,7 +268,7 @@ export function CropPicker({
         <div style={sub}>{name}</div>
         <div style={{ fontFamily: serif, fontSize: 22, color: ink.base, marginBottom: 10 }}>Cắt ảnh</div>
 
-        <div role="radiogroup" aria-label="hình dạng khung" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        <div role="radiogroup" aria-label="hình dạng khung" className="ab-seg">
           {shapes.map((s) => {
             const on = s.label === shape
             return (
@@ -278,16 +278,6 @@ export function CropPicker({
                 role="radio"
                 aria-checked={on}
                 onClick={() => choose(s.label)}
-                style={{
-                  fontFamily: sans,
-                  fontSize: 12,
-                  padding: '4px 10px',
-                  borderRadius: radius,
-                  cursor: 'pointer',
-                  border: `1px solid ${on ? ink.base : ink.border}`,
-                  background: on ? paper.hover : 'transparent',
-                  color: on ? ink.base : ink.soft,
-                }}
               >
                 {s.label}
               </button>
@@ -352,7 +342,7 @@ export function CropPicker({
             {pxW && pxH ? `giữ ${pxW}×${pxH}` : 'đang tải ảnh…'}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Button level="ghost" size="sm" onClick={onCancel}>
+            <Button level="quiet" size="sm" onClick={onCancel}>
               Huỷ
             </Button>
             <Button

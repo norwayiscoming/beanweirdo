@@ -10,6 +10,7 @@ import {
 import { topicOptions } from '../components/PostPlacement'
 import { ink, paper } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
+import { Button } from '../../design/Button'
 
 /**
  * Everything a post needs before it exists.
@@ -162,9 +163,9 @@ export function MetadataStep({ onContinue }: { onContinue: (m: Metadata) => void
       <input id="vi" aria-label="Mô tả" value={vi} onChange={(e) => setVi(e.target.value)} className="admin-field" />
 
       <div style={{ marginTop: 20 }}>
-        <button disabled={!canContinue} onClick={() => void submit()} className="admin-btn">
+        <Button level="primary" disabled={!canContinue} onClick={() => void submit()}>
           Soạn bài →
-        </button>
+        </Button>
       </div>
     </div>
   )

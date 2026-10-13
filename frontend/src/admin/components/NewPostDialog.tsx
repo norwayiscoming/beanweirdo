@@ -115,7 +115,7 @@ export function NewPostDialog({
           }}
         >
           <h2 style={{ fontFamily: serif, fontSize: 18, fontWeight: 400, margin: 0, color: ink.base }}>Bài mới</h2>
-          <IconButton level="ghost" label="Đóng" onClick={onClose}>
+          <IconButton label="Đóng" onClick={onClose}>
             <IconClose size={16} />
           </IconButton>
         </div>

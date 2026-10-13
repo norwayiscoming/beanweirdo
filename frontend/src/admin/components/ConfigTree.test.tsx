@@ -154,14 +154,14 @@ describe('Cấu hình', () => {
     await userEvent.click(card('Mục lục'))
     // The group lists its subjects; adding one is the last line, and nothing is created before Lưu.
     expect(rowsOf('Các mục')).toEqual(['coffee0 bài', 'tea0 bài'])
-    await userEvent.click(screen.getByRole('button', { name: '+ Thêm' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm' }))
     await userEvent.type(screen.getByLabelText('Thêm'), 'cacao')
     expect(api.createNode).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
     expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'cacao', parent_id: null })
 
     await userEvent.click(listRow('Các mục', 'coffee'))
-    await userEvent.click(screen.getByRole('button', { name: '+ Thêm mục con' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm mục con' }))
     await userEvent.type(screen.getByLabelText('Thêm mục con'), 'aroma{Enter}')
     expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'aroma', parent_id: 'coffee' })
   })
@@ -305,7 +305,7 @@ describe('Cấu hình', () => {
     // A page is deleted from its row; About is a system page and has no ⋮.
     expect(screen.getByRole('button', { name: 'Thao tác Beta' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Thao tác About' })).toBeNull()
-    await userEvent.click(screen.getByRole('button', { name: '+ Thêm trang' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm trang' }))
     await userEvent.type(screen.getByLabelText('Thêm trang'), 'reading room')
     await userEvent.click(screen.getByRole('button', { name: 'mẫu bibe' }))
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))

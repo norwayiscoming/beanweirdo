@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { type Keyword, type Node, type NodeStatus, type updateNode } from '../lib/apiClient'
 import { ancestorsOf, descendantIds } from '../../lib/contentTree'
 import { ink, paper, sans } from '../../design/tokens'
-import { radius } from '../../design/controls'
+import { Button } from '../../design/Button'
 import { Choice, LineInput, Row } from './Detail'
 
 /** A topic's and a tag's own fields in the shared detail template, and their delete. */
@@ -102,9 +102,6 @@ export function TopicFields({
   )
 }
 
-const confirm = { all: 'unset', cursor: 'pointer', background: ink.danger, color: paper.cream, borderRadius: radius, padding: '5px 14px', fontFamily: sans, fontSize: 13 } as const
-const cancel = { all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 13, color: ink.muted } as const
-
 function Panel({ children }: { children: ReactNode }) {
   return (
     <div role="group" aria-label="Xoá" style={{ margin: '14px 0 0', padding: '12px 0', borderTop: `1px solid ${ink.danger}`, borderBottom: `1px solid ${paper.rule}`, fontFamily: sans, fontSize: 13, color: ink.base, display: 'grid', gap: 10 }}>
@@ -123,9 +120,11 @@ export function RetireTopic({ topic, tree, kids, count, onRetire, onCancel }: { 
         <span>
           {topic.title} còn {kids} mục con. Chuyển hay xoá chúng trước rồi mới xoá được mục này.
         </span>
-        <button type="button" onClick={onCancel} style={{ ...cancel, justifySelf: 'start' }}>
-          Đóng
-        </button>
+        <span style={{ justifySelf: 'start' }}>
+          <Button level="quiet" size="sm" onClick={onCancel}>
+            Đóng
+          </Button>
+        </span>
       </Panel>
     )
   return (
@@ -142,13 +141,13 @@ export function RetireTopic({ topic, tree, kids, count, onRetire, onCancel }: { 
           </select>
         </Row>
       )}
-      <span style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
-        <button type="button" disabled={count > 0 && !to} onClick={() => onRetire(count > 0 ? tree.find((t) => t.id === to) ?? null : null)} style={confirm}>
+      <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <Button level="danger" size="sm" disabled={count > 0 && !to} onClick={() => onRetire(count > 0 ? tree.find((t) => t.id === to) ?? null : null)}>
           {count > 0 ? `Chuyển bài và xoá ${topic.title}` : `Xoá ${topic.title}`}
-        </button>
-        <button type="button" onClick={onCancel} style={cancel}>
+        </Button>
+        <Button level="quiet" size="sm" onClick={onCancel}>
           Huỷ
-        </button>
+        </Button>
       </span>
     </Panel>
   )
@@ -171,13 +170,13 @@ export function RetireTag({ tag, others, count, onRetire, onCancel }: { tag: Key
           </select>
         </Row>
       )}
-      <span style={{ display: 'flex', gap: 18, alignItems: 'center' }}>
-        <button type="button" onClick={() => onRetire(others.find((o) => o.id === to) ?? null)} style={confirm}>
+      <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <Button level="danger" size="sm" onClick={() => onRetire(others.find((o) => o.id === to) ?? null)}>
           {to ? `Gộp vào ${others.find((o) => o.id === to)?.label} và xoá` : count > 0 ? `Gỡ khỏi ${count} bài và xoá` : `Xoá ${tag.label}`}
-        </button>
-        <button type="button" onClick={onCancel} style={cancel}>
+        </Button>
+        <Button level="quiet" size="sm" onClick={onCancel}>
           Huỷ
-        </button>
+        </Button>
       </span>
     </Panel>
   )
