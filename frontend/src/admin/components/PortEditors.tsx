@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { createPortal } from 'react-dom'
 import { ScaledPreview } from './ScaledPreview'
 import { Choice, Row, Section } from './Detail'
-import { STATUS_CHOICES } from './NodeFields'
+import { ColorRow, STATUS_CHOICES } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useRowDrag } from '../lib/useRowDrag'
 import { useTags } from '../../data/useTags'
@@ -299,8 +299,9 @@ export function Builder({
   const fields = (
     <>
       <Section title="Thông tin">
-        <Row label="Tiêu đề">
-          <input aria-label="Tiêu đề" style={{ ...boxed, fontFamily: serif, fontSize: 18 }} value={draft.title} onChange={(e) => set({ title: e.target.value })} />
+        <ColorRow node={draft} used={[...new Set(pages.map((p) => p.accent).filter((c): c is string => !!c))]} save={(patch) => set(patch as Partial<typeof draft>)} />
+        <Row label="Lời dẫn">
+          <textarea aria-label="Lời dẫn" style={{ ...boxed, minHeight: 44, resize: 'vertical' }} value={draft.intro} placeholder="bấm để viết lời dẫn…" onChange={(e) => set({ intro: e.target.value })} />
         </Row>
         <Row label="Đường dẫn">
           <input
@@ -309,9 +310,6 @@ export function Builder({
             value={draft.slug}
             onChange={(e) => set({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
           />
-        </Row>
-        <Row label="Intro">
-          <textarea aria-label="Intro" style={{ ...boxed, minHeight: 44, resize: 'vertical' }} value={draft.intro} placeholder="bấm để viết…" onChange={(e) => set({ intro: e.target.value })} />
         </Row>
         <Row label="Giao diện">
           <select aria-label="Giao diện" style={boxed} value={draft.look ?? 'biz'} onChange={(e) => set({ look: e.target.value })}>
@@ -397,7 +395,7 @@ export function Builder({
   )
   const view = (
         <PortfolioView
-          title={draft.title}
+          title={page.title}
           intro={draft.intro}
           palette={draft.look ?? 'biz'}
           blocks={draft.blocks}
@@ -408,7 +406,7 @@ export function Builder({
           onward={onwardOf(draft.slug)}
           activeId={active}
           onPick={setActive}
-          chrome={buildChrome(content, pages.map((p) => (p.id === draft.id ? { ...p, title: draft.title, slug: draft.slug, status: draft.status } : p)), `page:${draft.id}`)}
+          chrome={buildChrome(content, pages.map((p) => (p.id === draft.id ? { ...p, title: page.title, slug: draft.slug, status: draft.status } : p)), `page:${draft.id}`)}
         />
   )
 
