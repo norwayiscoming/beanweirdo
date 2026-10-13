@@ -648,7 +648,7 @@ export function ConfigTree({
    * Only a published page is on either.
    */
   const portFlags = (p: Node): ReactNode => {
-    if (p.status !== 'published')
+    if (p.status === 'archived')
       return (
         <Row label="Hiện trên menu">
           <span style={{ color: ink.soft }}>chỉ trang đã đăng mới lên thanh trên và trang chủ</span>
@@ -666,11 +666,19 @@ export function ConfigTree({
       save({ header: { ...header, links: portLinks.map((l) => ({ key: l.key, label: l.label, hidden: l.key === `page:${p.id}` ? !on : l.hidden })) } })
     const setHome = (on: boolean) =>
       save({ home: { ...home, features: on ? [...features, { pageId: p.id, label: '', intro: '', image: '' }] : features.filter((f) => f.pageId !== p.id) } })
+    // A draft can already hold its home block (added from Trang chủ port's "+ Thêm khối"),
+    // so its switch shows the same list; the public home waits for it to be published.
     return (
       <>
-        <Row label="Hiện trên menu">
-          <Switch label="Hiện trên menu" value={!!link && !link.hidden} onChange={setMenu} />
-        </Row>
+        {p.status === 'published' ? (
+          <Row label="Hiện trên menu">
+            <Switch label="Hiện trên menu" value={!!link && !link.hidden} onChange={setMenu} />
+          </Row>
+        ) : (
+          <Row label="Hiện trên menu">
+            <span style={{ color: ink.soft }}>lên thanh trên khi trang được đăng</span>
+          </Row>
+        )}
         <Row label="Hiện ở trang chủ">
           <Switch label="Hiện ở trang chủ" value={features.some((f) => f.pageId === p.id)} onChange={setHome} />
         </Row>
