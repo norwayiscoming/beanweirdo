@@ -7,7 +7,7 @@ import { IconClose, IconPlus, IconUpload } from '../../design/icons'
 import { radius } from '../../design/controls'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useToast } from '../../design/Toaster'
-import { RowMenu } from './RowMenu'
+import { Menu, type DetailAction } from './Detail'
 
 /**
  * Tab Tác giả: ai được đứng tên bài trên trang.
@@ -133,8 +133,6 @@ export function Avatar({ author, size }: { author: Pick<Author, 'name' | 'avatar
   )
 }
 
-type Item = { label: string; danger?: true; kind: 'edit' | 'toggle' | 'delete' }
-
 function AuthorCard({
   author: a,
   onOpen,
@@ -147,11 +145,11 @@ function AuthorCard({
   onDelete: () => void
 }) {
   const [hover, setHover] = useState(false)
-  const items: Item[] = [
-    { kind: 'edit', label: 'Sửa' },
-    { kind: 'toggle', label: a.active ? 'Tắt' : 'Bật lại' },
+  const actions: DetailAction[] = [
+    { label: 'Sửa', onPick: onOpen },
+    { label: a.active ? 'Tắt' : 'Bật lại', onPick: onToggle },
     // Xoá chỉ dành cho hồ sơ tạo nhầm; người đã viết thì tắt.
-    ...(a.post_count === 0 ? [{ kind: 'delete' as const, label: 'Xoá', danger: true as const }] : []),
+    ...(a.post_count === 0 ? [{ label: 'Xoá', onPick: onDelete, danger: true as const }] : []),
   ]
   return (
     <div
@@ -168,11 +166,13 @@ function AuthorCard({
         borderRadius: radius,
         border: `1px solid ${hover ? ink.soft : paper.rule}`,
         background: hover ? paper.hover : paper.white,
-        opacity: a.active ? 1 : 0.62,
       }}
     >
-      <Avatar author={a} size={40} />
-      <div style={{ minWidth: 0 }}>
+      {/* Only the person fades when switched off; the ⋮ list opens from here and must stay legible. */}
+      <div style={{ opacity: a.active ? 1 : 0.62 }}>
+        <Avatar author={a} size={40} />
+      </div>
+      <div style={{ minWidth: 0, opacity: a.active ? 1 : 0.62 }}>
         <button type="button" className="ab-rowtitle" onClick={onOpen}>
           {a.name}
         </button>
@@ -199,14 +199,7 @@ function AuthorCard({
         )}
       </div>
       <div onClick={(e) => e.stopPropagation()}>
-        <RowMenu
-          items={items}
-          onPick={(it) => {
-            if (it.kind === 'edit') onOpen()
-            else if (it.kind === 'toggle') onToggle()
-            else onDelete()
-          }}
-        />
+        <Menu actions={actions} label={`Thao tác ${a.name}`} />
       </div>
     </div>
   )

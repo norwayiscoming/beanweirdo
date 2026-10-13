@@ -22,7 +22,7 @@ import { PostAuthorsDialog } from './PostAuthorsDialog'
 import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
-import { desk, frame } from './Detail'
+import { desk, frame, Menu } from './Detail'
 import { radius } from '../../design/controls'
 
 /**
@@ -91,8 +91,6 @@ const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSiz
 const CSS = `
 .cw-r:hover{background:${paper.hover}}
 .cw-r:focus-visible,.cw-row:focus-within{outline:2px solid ${ink.green};outline-offset:-2px}
-.cw-row .cw-act{opacity:0}
-.cw-row:hover .cw-act,.cw-row:focus-within .cw-act{opacity:1}
 .cw-row:hover td{background:${paper.hover}}
 .cw-pill:hover{border-color:${ink.green}!important;color:${ink.green}!important}
 @media (max-width:900px){.cw-ws{grid-template-columns:1fr!important}.cw-rail{border-right:none!important;border-bottom:1px solid ${paper.rule};max-height:280px;overflow-y:auto}}
@@ -420,6 +418,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
               <th style={th}>Tag</th>
               <th style={th}>Trạng thái</th>
               <th style={th}>Ngày</th>
+              <th style={th} aria-label="Thao tác" />
             </tr>
           </thead>
           <tbody>
@@ -450,29 +449,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                         📌
                       </span>
                     )}
-                    <div className="cw-act" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 3, fontSize: 13 }}>
-                      <button type="button" onClick={() => nav.editPost(p.id)} style={link}>
-                        Sửa
-                      </button>
-                      <button type="button" onClick={() => copy(p.id)} style={link}>
-                        Nhân bản
-                      </button>
-                      {/* A pinned post leads every page that lists it (listingRule sortPosts). */}
-                      <button type="button" aria-pressed={p.pinned} onClick={() => run(() => updatePost(p.id, { pinned: !p.pinned }))} style={link}>
-                        {p.pinned ? 'Bỏ ghim' : 'Ghim'}
-                      </button>
-                      <button type="button" onClick={() => setMoving(p)} style={link}>
-                        Chuyển module
-                      </button>
-                      <button type="button" onClick={() => setNaming(p)} style={link}>
-                        Tác giả
-                      </button>
-                      {ACTIONS_BY_STATUS[p.status].map((a) => (
-                        <button key={a.action} type="button" onClick={() => act(p.id, a.action)} style={a.action === 'delete' || a.action === 'permanently-delete' ? quiet : link}>
-                          {a.label}
-                        </button>
-                      ))}
-                    </div>
                   </td>
                   <td style={td}>{t ? pillBtn('topic', t.id, t.title) : pillBtn('topic', UNPLACED, 'chưa xếp')}</td>
                   <td style={td}>{pillBtn('tpl', p.template ?? '', templateName(p.template))}</td>
@@ -481,6 +457,29 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                     <StatusBadge status={p.status} pending={p.has_draft} />
                   </td>
                   <td style={{ ...td, color: ink.soft, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{p.date_label}</td>
+                  <td style={td}>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                      <button type="button" aria-label={`Sửa ${p.en}`} onClick={() => nav.editPost(p.id)} className="cfg-btn" style={{ ...frame, height: 28, padding: '0 12px', fontSize: 13 }}>
+                        Sửa
+                      </button>
+                      <Menu
+                        small
+                        label={`Thao tác ${p.en}`}
+                        actions={[
+                          { label: 'Nhân bản', onPick: () => copy(p.id) },
+                          // A pinned post leads every page that lists it (listingRule sortPosts).
+                          { label: p.pinned ? 'Bỏ ghim' : 'Ghim', onPick: () => run(() => updatePost(p.id, { pinned: !p.pinned })) },
+                          { label: 'Chuyển module', onPick: () => setMoving(p) },
+                          { label: 'Tác giả', onPick: () => setNaming(p) },
+                          ...ACTIONS_BY_STATUS[p.status].map((a) => ({
+                            label: a.label,
+                            onPick: () => act(p.id, a.action),
+                            ...(a.action === 'delete' || a.action === 'permanently-delete' ? { danger: true as const } : {}),
+                          })),
+                        ]}
+                      />
+                    </div>
+                  </td>
                 </tr>
               )
             })}

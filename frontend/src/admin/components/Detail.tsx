@@ -70,21 +70,44 @@ export const frame = {
   whiteSpace: 'nowrap',
 } as const
 
-function Menu({ actions, label = 'Thao tác', small }: { actions: DetailAction[]; label?: string; small?: boolean }) {
-  const [open, setOpen] = useState(false)
+/**
+ * The ⋮ that holds a row's or a page's actions — the one shape for "more
+ * actions" across the admin, so no screen lists its actions as a line of links.
+ *
+ * The list is placed against the window, not the button's box: rows sit inside
+ * scrolling tables and panels, and a list hung inside them is clipped at their
+ * edge or grows a scrollbar there. It opens upwards when the window has no room
+ * below, and closes on scroll since it would no longer sit by its button.
+ */
+export function Menu({ actions, label = 'Thao tác', small }: { actions: DetailAction[]; label?: string; small?: boolean }) {
+  const [at, setAt] = useState<{ top?: number; bottom?: number; right: number } | null>(null)
   const box = useRef<HTMLDivElement>(null)
+  const open = at !== null
   useEffect(() => {
     if (!open) return
     // `mousedown`: a click that closes the menu must not also land on what is under it.
-    const outside = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
-    const escape = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    const outside = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setAt(null)
+    const escape = (e: KeyboardEvent) => e.key === 'Escape' && setAt(null)
+    const away = () => setAt(null)
     document.addEventListener('mousedown', outside)
     document.addEventListener('keydown', escape)
+    window.addEventListener('scroll', away, true)
+    window.addEventListener('resize', away)
     return () => {
       document.removeEventListener('mousedown', outside)
       document.removeEventListener('keydown', escape)
+      window.removeEventListener('scroll', away, true)
+      window.removeEventListener('resize', away)
     }
   }, [open])
+  const toggle = () => {
+    if (open || !box.current) return setAt(null)
+    const r = box.current.getBoundingClientRect()
+    const right = window.innerWidth - r.right
+    // Room for every line plus the list's padding; a greyed line carries its reason under it.
+    const need = actions.reduce((h, a) => h + (a.off ? 56 : 38), 12)
+    setAt(window.innerHeight - r.bottom < need && r.top > need ? { bottom: window.innerHeight - r.top + 4, right } : { top: r.bottom + 4, right })
+  }
   const size = small ? 28 : 34
   return (
     <div ref={box} style={{ position: 'relative', flex: 'none' }}>
@@ -93,14 +116,14 @@ function Menu({ actions, label = 'Thao tác', small }: { actions: DetailAction[]
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         className="cfg-btn"
         style={{ ...frame, width: size, height: size, padding: 0, fontSize: 17, borderColor: small ? desk.field : ink.border, background: open ? paper.hover : desk.panel }}
       >
         ⋮
       </button>
-      {open && (
-        <div role="menu" style={{ position: 'absolute', right: 0, top: size + 4, zIndex: 5, width: 230, background: desk.panel, border: `1px solid ${ink.border}`, borderRadius: radius, boxShadow: '0 10px 24px rgba(35,33,26,.14)', padding: '4px 0' }}>
+      {at && (
+        <div role="menu" style={{ position: 'fixed', ...at, zIndex: 50, width: 230, background: desk.panel, border: `1px solid ${ink.border}`, borderRadius: radius, boxShadow: '0 10px 24px rgba(35,33,26,.14)', padding: '4px 0', textAlign: 'left' }}>
           {actions.map((a) => (
             <button
               key={a.label}
@@ -108,7 +131,7 @@ function Menu({ actions, label = 'Thao tác', small }: { actions: DetailAction[]
               role="menuitem"
               disabled={!!a.off}
               onClick={() => {
-                setOpen(false)
+                setAt(null)
                 a.onPick?.()
               }}
               className="cfg-menuitem"
