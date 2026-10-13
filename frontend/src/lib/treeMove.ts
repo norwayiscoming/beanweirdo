@@ -31,7 +31,7 @@ type MovePlan = {
   /**
    * Toàn bộ id theo thứ tự hiển thị mới, cha đứng trước con của nó.
    *
-   * `PUT /api/tags?vocab=topics` ghi `sort_order` 1..N đè lên đúng mảng này. Viết cả cây
+   * `PUT /api/tags?vocab=nodes` ghi `sort_order` 1..N đè lên đúng mảng này. Viết cả cây
    * đã duỗi thẳng — chứ không chỉ mấy anh em vừa đổi chỗ — vì `sort_order` là
    * một dãy số chung cho cả bảng, nên số của một nhánh mà không xét nhánh khác
    * thì hai nhánh giẫm lên nhau.
