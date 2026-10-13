@@ -95,7 +95,7 @@ const CSS = `
 .cw-pill:hover{border-color:${ink.green}!important;color:${ink.green}!important}
 .cw-unchip{all:unset;cursor:pointer;display:inline-flex;padding:2px;border-radius:4px;color:${ink.soft}}
 .cw-unchip:hover{background:rgba(0,0,0,.08);color:${ink.base}}
-.cw-unchip:focus-visible{outline:2px solid #2563eb}
+.cw-unchip:focus-visible{outline:2px solid ${ink.green}}
 @media (max-width:900px){.cw-ws{grid-template-columns:1fr!important}.cw-rail{border-right:none!important;border-bottom:1px solid ${paper.rule};max-height:280px;overflow-y:auto}}
 `
 

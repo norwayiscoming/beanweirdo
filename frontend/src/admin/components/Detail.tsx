@@ -422,15 +422,15 @@ export const DETAIL_CSS = `
 }
 .cfg-detail input::placeholder, .cfg-detail textarea::placeholder { color: ${ink.muted}; }
 .cfg-detail input:hover, .cfg-detail textarea:hover, .cfg-detail select:hover { border-color: ${ink.soft} !important; }
-.cfg-detail input:focus, .cfg-detail textarea:focus, .cfg-detail select:focus { border-color: ${ctl.blue} !important; box-shadow: 0 0 0 3px ${ctl.blueSoft} !important; }
+.cfg-detail input:focus, .cfg-detail textarea:focus, .cfg-detail select:focus { border-color: ${ctl.accent} !important; box-shadow: 0 0 0 3px ${ctl.accentSoft} !important; }
 .cfg-detail .cfg-line { border: 1px solid transparent; border-radius: ${radius}px; background: transparent; outline: none; padding: 2px 6px; margin-left: -7px; }
 .cfg-detail .cfg-line:hover { border-color: ${desk.field}; }
-.cfg-detail .cfg-line:focus { border-color: ${ctl.blue}; background: ${desk.panel}; box-shadow: 0 0 0 3px ${ctl.blueSoft}; }
+.cfg-detail .cfg-line:focus { border-color: ${ctl.accent}; background: ${desk.panel}; box-shadow: 0 0 0 3px ${ctl.accentSoft}; }
 .cfg-detail .cfg-field + .cfg-field { border-top: 1px solid ${desk.line}; }
-.cfg-detail .cfg-item:focus-visible, .cfg-detail .cfg-crumb:focus-visible { outline: 2px solid ${ctl.blue}; outline-offset: 2px; }
+.cfg-detail .cfg-item:focus-visible, .cfg-detail .cfg-crumb:focus-visible { outline: 2px solid ${ctl.accent}; outline-offset: 2px; }
 .cfg-detail .cfg-item:hover { background: ${ctl.hover}; }
 .cfg-detail .cfg-crumb { all: unset; cursor: pointer; color: ${ink.strong}; text-decoration: underline; text-decoration-color: ${ink.faint}; text-underline-offset: 3px; }
-.cfg-detail .cfg-crumb:hover { color: ${ctl.blueDeep}; text-decoration-color: currentColor; }
+.cfg-detail .cfg-crumb:hover { color: ${ctl.accentDeep}; text-decoration-color: currentColor; }
 .cfg-detail label, .cfg-detail .cfg-sec { font-family: ${sans}; }
 @media (max-width: 640px) { .cfg-detail .cfg-field { grid-template-columns: minmax(0, 1fr) !important; gap: 8px !important; } }
 `

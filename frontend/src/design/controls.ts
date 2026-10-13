@@ -1,7 +1,7 @@
 /**
  * Shape and size of every control in the back office.
  *
- * Style "Bàn phím" (owner, 2026-10-13): a compact tool, 32px controls, one blue
+ * Style "Bàn phím" (owner, 2026-10-13): a compact tool, 32px controls, one moss green
  * for the action that saves or creates, white framed buttons for the rest and
  * bare icons that only take a ground when pointed at. The owner rejected the
  * brown-bordered set before it outright ("vẫn xấu, đổi design mới hẳn"), so
@@ -17,7 +17,7 @@
  * - `secondary`: a framed white button for everything else.
  * - `quiet`: no frame until pointed at — icon buttons (⋮, ×) and Huỷ.
  * - `danger`: deletes; red text, and a red frame once pointed at.
- * - `add`: "+ Thêm …" under a list, blue text with no frame.
+ * - `add`: "+ Thêm …" under a list, green text with no frame.
  */
 export type Level = 'primary' | 'secondary' | 'quiet' | 'danger' | 'add'
 
@@ -28,9 +28,9 @@ export const radius = 6
 
 /** The control palette. Only the back office uses it; the public site keeps the blog's ink. */
 export const ctl = {
-  blue: '#2563EB',
-  blueDeep: '#1D4ED8',
-  blueSoft: '#EFF4FF',
+  accent: '#3E7A4E',
+  accentDeep: '#2B4B33',
+  accentSoft: '#E4F0DF',
   ink: '#111827',
   text: '#374151',
   sub: '#6B7280',
