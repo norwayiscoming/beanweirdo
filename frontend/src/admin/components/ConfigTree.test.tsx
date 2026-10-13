@@ -108,7 +108,7 @@ const renderScreen = async () => {
 /** Opens a topic the way the owner does: the Mục lục card, then down the lists. */
 const openTopic = async (...path: string[]) => {
   await userEvent.click(card('Mục lục'))
-  for (const [i, name] of path.entries()) await userEvent.click(listRow(i === 0 ? 'Các subject' : 'Mục con', name))
+  for (const [i, name] of path.entries()) await userEvent.click(listRow(i === 0 ? 'Các mục' : 'Mục con', name))
 }
 
 /** jsdom has no DragEvent: build the drop by hand, at a height inside the row. */
@@ -153,14 +153,14 @@ describe('Cấu hình', () => {
     await renderScreen()
     await userEvent.click(card('Mục lục'))
     // The group lists its subjects; adding one is the last line, and nothing is created before Lưu.
-    expect(rowsOf('Các subject')).toEqual(['coffee0 bài', 'tea0 bài'])
-    await userEvent.click(screen.getByRole('button', { name: '+ Thêm subject' }))
-    await userEvent.type(screen.getByLabelText('Thêm subject'), 'cacao')
+    expect(rowsOf('Các mục')).toEqual(['coffee0 bài', 'tea0 bài'])
+    await userEvent.click(screen.getByRole('button', { name: '+ Thêm' }))
+    await userEvent.type(screen.getByLabelText('Thêm'), 'cacao')
     expect(api.createNode).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
     expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'cacao', parent_id: null })
 
-    await userEvent.click(listRow('Các subject', 'coffee'))
+    await userEvent.click(listRow('Các mục', 'coffee'))
     await userEvent.click(screen.getByRole('button', { name: '+ Thêm mục con' }))
     await userEvent.type(screen.getByLabelText('Thêm mục con'), 'aroma{Enter}')
     expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'aroma', parent_id: 'coffee' })
@@ -170,10 +170,10 @@ describe('Cấu hình', () => {
     await renderScreen()
     await userEvent.click(card('Mục lục'))
     // The row itself never starts a drag, so a slipping click cannot move a node.
-    expect(listRow('Các subject', 'tea').closest('[draggable="true"]')).toBeNull()
+    expect(listRow('Các mục', 'tea').closest('[draggable="true"]')).toBeNull()
 
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo tea' }))
-    const coffee = li(listRow('Các subject', 'coffee'))
+    const coffee = li(listRow('Các mục', 'coffee'))
     dropOn(coffee, 20, ['dragOver'])
     expect(await screen.findByText('vào trong coffee')).toBeTruthy()
     dropOn(coffee, 20, ['drop'])
@@ -194,8 +194,8 @@ describe('Cấu hình', () => {
     await userEvent.click(card('Mục lục'))
     api.updateNode.mockReturnValue(new Promise(() => {}))
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo tea' }))
-    dropOn(li(listRow('Các subject', 'coffee')), 20)
-    await waitFor(() => expect(rowsOf('Các subject')).toEqual(['coffee0 bài']))
+    dropOn(li(listRow('Các mục', 'coffee')), 20)
+    await waitFor(() => expect(rowsOf('Các mục')).toEqual(['coffee0 bài']))
     expect(screen.getByText(/đang lưu/)).toBeTruthy()
   })
 

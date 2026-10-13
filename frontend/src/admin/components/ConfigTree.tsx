@@ -81,7 +81,7 @@ import {
  * detail on the right, where an item's own children are listed in turn.
  */
 
-type Group = 'port-pages' | 'port-parts' | 'topics' | 'tags' | 'curated' | 'modules'
+type Group = 'port-pages' | 'port-parts' | 'topics' | 'tags' | 'modules'
 
 const SITES = ['blog', 'port', 'practice'] as const
 type SiteId = (typeof SITES)[number]
@@ -408,10 +408,11 @@ export function ConfigTree({
   const topicToc: Toc = {
     id: 'topics',
     title: 'Mục lục',
-    note: `${shownTopics.filter((t) => t.parent_id === null).length} subject · cây chủ đề, theo thứ tự của thanh bên và trang Mục lục`,
+    note: `${shownTopics.filter((t) => t.parent_id === null).length} subject${curated.length ? ` · ${curated.length} trang chọn tay` : ''} · theo thứ tự của thanh bên và trang Mục lục`,
     nest: true,
     move: moveTopic,
-    items: shownTopics.map((t) => ({
+    items: [
+      ...shownTopics.map((t): TocItem => ({
       id: t.id,
       parent_id: t.parent_id,
       name: t.title,
@@ -420,6 +421,12 @@ export function ConfigTree({
       picked: { kind: 'topic', id: t.id },
       movable: true,
     })),
+      // A curated page (Ghi, tư duy tư duy) is a blog page like a subject, only it picks its own posts;
+      // the sidebar already lists it after the tree, so the Mục lục does too.
+      ...curated.map(
+        (pg): TocItem => ({ id: pg.id, parent_id: null, name: pg.title || pg.id, dot: null, meta: tocMeta(pg.visibility === 'public' ? 'published' : 'draft', `chọn tay · /${pg.id}`), picked: { kind: 'curated', id: pg.id }, movable: false }),
+      ),
+    ],
   }
 
   const blogSite: SiteSpec = {
@@ -429,7 +436,6 @@ export function ConfigTree({
     toc: topicToc,
     pages: [
       { id: 'tags', title: 'Tag', note: `${vocab.keywords.length} tag, xếp theo tên · mỗi tag là một trang` },
-      { id: 'curated', title: 'Trang chọn tay', note: `${curated.length} trang có quy chế riêng, như Ghi` },
     ],
     shared: { id: 'modules', title: 'Phần chung', note: 'Hình trang: dàn trang, ảnh và chữ mà một trang mượn' },
   }
@@ -479,7 +485,7 @@ export function ConfigTree({
       case 'tag':
         return 'tags'
       case 'curated':
-        return 'curated'
+        return 'topics'
       case 'module':
         return 'modules'
       case 'port-page':
@@ -607,7 +613,7 @@ export function ConfigTree({
               window.confirm(`Xoá trang “${name}”?`) &&
               run(async () => {
                 await deletePage(record.id)
-                setPicked((cur) => (same(cur, p) ? { kind: 'group', id: 'curated' } : cur))
+                setPicked((cur) => (same(cur, p) ? { kind: 'group', id: 'topics' } : cur))
               }),
           },
         ]
@@ -619,7 +625,7 @@ export function ConfigTree({
 
   /** Rows of a Mục lục as the right-hand list draws them: dragged by their grip, deleted from their ⋮. */
   const tocList = (toc: Toc, rows: TocItem[]): ListItem[] =>
-    rows.map((r) => ({ id: r.id, name: r.name, meta: r.meta, dot: r.dot, onOpen: pick(r.picked), drag: r.movable ? dragOf(toc, toc.items, r.id) : undefined, actions: deleteOf(r.picked) }))
+    rows.map((r) => ({ id: r.id, name: r.name, meta: r.meta, dot: r.dot, onOpen: pick(r.picked), drag: r.movable ? dragOf(toc, toc.items.filter((x) => x.movable), r.id) : undefined, actions: deleteOf(r.picked) }))
   const dragNote = (nest: boolean) => (nest ? 'kéo ⋮⋮ để đổi chỗ hay đưa vào trong' : 'kéo ⋮⋮ để đổi chỗ')
   const newPortPage = async (name: string, key: PresetKey) => {
     const p = await createFromPreset(key, name, port.pages, src.moduleIds)
@@ -635,6 +641,23 @@ export function ConfigTree({
         const p = await newPortPage(name, (key ?? 'blank') as PresetKey)
         setPicked({ kind: 'port-page', id: p.id })
       }),
+  }
+  // The blog's Mục lục holds subjects and curated pages alike, so one "+ Thêm" makes either.
+  const addToBlog: AddSpec = {
+    label: 'Thêm',
+    placeholder: 'tên mới',
+    choose: {
+      label: 'là',
+      options: [
+        { value: 'subject', label: 'subject' },
+        { value: 'curated', label: 'trang chọn tay' },
+      ],
+    },
+    onSave: (name, kind) => {
+      if (kind !== 'curated') return addTopic(null).onSave(name)
+      const id = toSlug(name)
+      if (id) run(async () => (await createPage(id, name), setPicked({ kind: 'curated', id })))
+    },
   }
   const addTopic = (parent: Node | null): AddSpec => ({
     label: parent ? 'Thêm mục con' : 'Thêm subject',
@@ -738,7 +761,7 @@ export function ConfigTree({
     case 'curated': {
       const d = describePage(picked, layout, pages)
       const blocker = pageDeleteBlocker(picked, layout, pages)
-      crumbs = [siteCrumb('blog'), ...(picked.kind === 'curated' ? [groupCrumb('curated', 'Trang chọn tay')] : [])]
+      crumbs = [siteCrumb('blog'), ...(picked.kind === 'curated' ? [groupCrumb('topics', 'Mục lục')] : [])]
       title = picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ blog' : d.title
       preview = d.preview
       address = d.preview
@@ -873,8 +896,8 @@ export function ConfigTree({
         body = (
           <>
             {errorLine}
-            <Section title="Các subject" note={`theo thứ tự thanh bên · ${dragNote(true)}`}>
-              <ItemList label="Các subject" items={tocList(topicToc, topicToc.items.filter((r) => r.parent_id === null))} add={addTopic(null)} />
+            <Section title="Các mục" note={`theo thứ tự thanh bên · ${dragNote(true)}`}>
+              <ItemList label="Các mục" items={tocList(topicToc, topicToc.items.filter((r) => r.parent_id === null))} add={addToBlog} />
             </Section>
             <Section title="Chữ cố định">{renderCopy('index')}</Section>
           </>
@@ -891,29 +914,6 @@ export function ConfigTree({
                 label="Các tag"
                 items={tags.map((k) => ({ id: k.id, name: k.label, meta: leafMeta('keyword', k.id, k.posts), onOpen: pick({ kind: 'tag', id: k.id }), actions: deleteOf({ kind: 'tag', id: k.id }) }))}
                 add={{ label: 'Thêm tag', placeholder: 'tên tag', onSave: (label) => run(() => createKeyword(label)) }}
-              />
-            </Section>
-          </>
-        )
-      } else if (g === 'curated') {
-        crumbs = [siteCrumb('blog')]
-        title = 'Trang chọn tay'
-        facts = [`${curated.length} trang`]
-        body = (
-          <>
-            {errorLine}
-            <Section title="Các trang" note="mỗi trang tự chọn kéo bài nào, xếp ra sao">
-              <ItemList
-                label="Các trang"
-                items={curated.map((p) => ({ id: p.id, name: p.title || p.id, meta: `/${p.id}`, onOpen: pick({ kind: 'curated', id: p.id }), actions: deleteOf({ kind: 'curated', id: p.id }) }))}
-                add={{
-                  label: 'Thêm trang',
-                  placeholder: 'tên trang mới',
-                  onSave: (name) => {
-                    const id = toSlug(name)
-                    if (id) run(async () => (await createPage(id, name), setPicked({ kind: 'curated', id })))
-                  },
-                }}
               />
             </Section>
           </>
