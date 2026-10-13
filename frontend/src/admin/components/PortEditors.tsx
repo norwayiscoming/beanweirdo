@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ScaledPreview } from './ScaledPreview'
-import { garden, ink, paper, sans, serif } from '../../design/tokens'
+import { Choice, Row, Section } from './Detail'
+import { ink, paper, sans, serif } from '../../design/tokens'
 import { useRowDrag } from '../lib/useRowDrag'
 import { useTags } from '../../data/useTags'
 import {
@@ -18,7 +19,6 @@ import {
 import { PortfolioView } from '../../portfolio/PortfolioView'
 import docHtml from '../../portfolio/design-doc.html?raw'
 import { buildChrome, onwardOf, usePortSources, usePostHref } from '../../portfolio/data'
-import { toPath } from '../../lib/routes'
 import { navLinks, resolveContent, type Feature, type LinkItem, type NavOverride, type PortContent } from '../../portfolio/content'
 import {
   BLOCK_NAMES,
@@ -227,49 +227,23 @@ function uniqueSlug(base: string, pages: PortPageRecord[]) {
   for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`
 }
 
-/** A new port page from a preset; it starts as a draft at the end of the list. */
-export async function createFromPreset(key: PresetKey, pages: PortPageRecord[], moduleIds: string[]): Promise<PortPageRecord> {
-  const base = key === 'blank' ? 'trang' : key
-  const slug = uniqueSlug(base, pages)
-  return createPortPage({ slug, title: slug, blocks: preset(key, moduleIds), palette: key === 'bibe' ? 'baen' : 'biz', sortOrder: pages.length })
+/** An address word from a name: accents off, đ as d, anything else a hyphen. */
+export function toSlug(name: string): string {
+  return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 
-// Same labels and colours as the post status pills (StatusBadge), so a status reads the same everywhere in admin.
-const STATUS_NAMES: Record<PortStatus, string> = {
-  draft: 'Nháp',
-  published: 'Đã đăng',
-  archived: 'Lưu trữ',
-}
-const STATUS_PILL: Record<PortStatus, { background: string; color: string }> = {
-  draft: { background: paper.rule, color: ink.soft },
-  published: { background: garden.leafTint, color: garden.moss },
-  archived: { background: garden.honeyTint, color: garden.cinnamon },
+/** A new port page from a preset, named by the owner; it starts as a draft at the end of the list. */
+export async function createFromPreset(key: PresetKey, title: string, pages: PortPageRecord[], moduleIds: string[]): Promise<PortPageRecord> {
+  const slug = uniqueSlug(toSlug(title) || (key === 'blank' ? 'trang' : key), pages)
+  return createPortPage({ slug, title, blocks: preset(key, moduleIds), palette: key === 'bibe' ? 'baen' : 'biz', sortOrder: pages.length })
 }
 
-function StatusSelect({ value, onChange, pill }: { value: PortStatus; onChange: (s: PortStatus) => void; pill?: boolean }) {
-  const style: CSSProperties = pill
-    ? {
-        fontFamily: sans,
-        fontSize: 9.5,
-        fontWeight: 500,
-        padding: '4px 10px',
-        borderRadius: 999,
-        border: 'none',
-        cursor: 'pointer',
-        appearance: 'none',
-        textAlign: 'center',
-        width: 'fit-content',
-        ...STATUS_PILL[value],
-      }
-    : boxed
-  return (
-    <select style={style} value={value} onChange={(e) => onChange(e.target.value as PortStatus)}>
-      {(Object.keys(STATUS_NAMES) as PortStatus[]).map((k) => (
-        <option key={k} value={k}>{STATUS_NAMES[k]}</option>
-      ))}
-    </select>
-  )
-}
+/** The port page's status, in the words the blog uses for its posts. */
+export const STATUS_CHOICES: { value: PortStatus; label: string }[] = [
+  { value: 'published', label: 'đã đăng' },
+  { value: 'draft', label: 'nháp' },
+  { value: 'archived', label: 'lưu trữ' },
+]
 
 type Sources = ReturnType<typeof usePortSources>
 
@@ -279,30 +253,23 @@ export function Builder({
   src,
   content,
   pages,
-  onBack,
   onSaved,
-  onDelete,
   previewSlot,
+  flags,
 }: {
   page: PortPageRecord
   design: Design
   src: Sources
   content: PortContent
   pages: PortPageRecord[]
-  onBack?: () => void
   onSaved: (p: PortPageRecord) => void
-  /** Shown as a link under the status when the page is opened from the CMS page tree. */
-  onDelete?: () => void
-  /**
-   * Inline in the CMS page tree: only the fields are drawn here, and the live
-   * page goes to this element (the tree's right half). `undefined` keeps the
-   * builder's own split screen.
-   */
-  previewSlot?: HTMLElement | null
+  /** The fields are drawn here and the live page goes to this element, Cấu hình's preview column. */
+  previewSlot: HTMLElement | null
+  /** Hiện trên menu / Hiện ở trang chủ, which live in the port's shared copy, not on the page. */
+  flags?: ReactNode
 }) {
   const [draft, setDraft] = useState({ ...page, blocks: parseBlocks(page.blocks) })
   const [active, setActive] = useState<string | null>(null)
-  const split = useSplit('builder', 420, 'left')
   const { tags } = useTags()
   const postHref = usePostHref()
 
@@ -337,47 +304,37 @@ export function Builder({
 
   const fields = (
     <>
-        {onBack && <button style={{ ...quiet, border: 0, padding: 0, marginBottom: 14 }} onClick={onBack}>← tất cả trang</button>}
-        <Field label="Tiêu đề">
-          <input style={{ ...boxed, fontFamily: serif, fontSize: 22 }} value={draft.title} onChange={(e) => set({ title: e.target.value })} />
-        </Field>
-        <Field label="Đường dẫn · /">
+      <Section title="Thông tin">
+        <Row label="Tiêu đề">
+          <input aria-label="Tiêu đề" style={{ ...boxed, fontFamily: serif, fontSize: 18 }} value={draft.title} onChange={(e) => set({ title: e.target.value })} />
+        </Row>
+        <Row label="Đường dẫn">
           <input
-            style={boxed}
+            aria-label="Đường dẫn"
+            style={{ ...boxed, fontFamily: 'ui-monospace, Menlo, monospace' }}
             value={draft.slug}
             onChange={(e) => set({ slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })}
           />
-        </Field>
-        <Field label="Intro">
-          <textarea style={{ ...boxed, minHeight: 64, resize: 'vertical' }} value={draft.intro} onChange={(e) => set({ intro: e.target.value })} />
-        </Field>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="Bảng màu">
-            <select style={boxed} value={draft.palette} onChange={(e) => set({ palette: e.target.value })}>
-              {Object.entries(design.palettes).map(([k, p]) => (
-                <option key={k} value={k}>{p.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Trạng thái">
-            <StatusSelect value={draft.status} onChange={(status) => set({ status })} />
-          </Field>
-        </div>
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center', fontFamily: sans, fontSize: 12 }}>
-          {draft.status === 'published' && (
-            <a href={toPath({ area: 'public', screen: 'portfolioPage', slug: draft.slug })} target="_blank" rel="noopener noreferrer" style={{ color: ink.green }}>
-              mở trang ↗
-            </a>
-          )}
-          {onDelete && (
-            <button style={{ border: 0, background: 'none', padding: 0, cursor: 'pointer', color: ink.muted, fontFamily: sans, fontSize: 12 }} onClick={onDelete}>
-              xoá trang
-            </button>
-          )}
-          {error && <span style={{ color: '#B33' }}>{error}</span>}
-        </div>
+        </Row>
+        <Row label="Intro">
+          <textarea aria-label="Intro" style={{ ...boxed, minHeight: 44, resize: 'vertical' }} value={draft.intro} placeholder="bấm để viết…" onChange={(e) => set({ intro: e.target.value })} />
+        </Row>
+        <Row label="Giao diện">
+          <select aria-label="Giao diện" style={boxed} value={draft.palette} onChange={(e) => set({ palette: e.target.value })}>
+            {Object.entries(design.palettes).map(([k, p]) => (
+              <option key={k} value={k}>{p.name}</option>
+            ))}
+          </select>
+        </Row>
+        <Row label="Trạng thái">
+          <Choice label="Trạng thái" options={STATUS_CHOICES} value={draft.status} onChange={(status) => set({ status })} />
+        </Row>
+        {flags}
+        {error && <div style={{ color: ink.danger, fontFamily: sans, fontSize: 12, paddingTop: 6 }}>{error}</div>}
+      </Section>
 
-        <div style={sectionHead}>Khối</div>
+      <Section title="Nội dung trang" note="khối · kéo ⋮⋮ để xếp, bấm để sửa">
+
         {draft.blocks.map((b, i) => (
           <div
             key={b.id}
@@ -391,15 +348,15 @@ export function Builder({
             onDrop={() => drag.drop(i)}
             onDragEnd={drag.end}
             style={{
-              border: `1px solid ${active === b.id ? ink.base : paper.rule}`,
-              background: drag.over === i && drag.from !== i ? '#EEF5F8' : paper.white,
+              borderTop: `1px solid ${paper.rule}`,
+              ...(i === draft.blocks.length - 1 ? { borderBottom: `1px solid ${paper.rule}` } : {}),
+              background: drag.over === i && drag.from !== i ? '#EEF5F8' : active === b.id ? paper.hover : 'transparent',
               opacity: drag.from === i ? 0.5 : 1,
-              marginBottom: 6,
             }}
           >
             <div
               onClick={() => setActive(active === b.id ? null : b.id)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', cursor: 'pointer', fontFamily: sans, fontSize: 12.5 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 4px', cursor: 'pointer', fontFamily: sans, fontSize: 13.5 }}
             >
               <span style={{ cursor: 'grab', color: ink.faint }} aria-label="Kéo để đổi thứ tự">⋮⋮</span>
               <span style={{ flex: 1 }}>
@@ -418,7 +375,7 @@ export function Builder({
               </button>
             </div>
             {active === b.id && (
-              <div style={{ padding: '4px 12px 10px', borderTop: `1px solid ${paper.rule}` }}>
+              <div style={{ padding: '4px 4px 10px 26px' }}>
                 <Field label="Component">
                   <select style={small} value={b.type} onChange={(e) => setType(b.id, e.target.value as BlockType)}>
                     {BLOCK_ORDER.map((t) => (
@@ -432,16 +389,17 @@ export function Builder({
           </div>
         ))}
         <button
-          style={{ ...quiet, marginTop: 10 }}
+          style={addLine}
           onClick={() => {
             const b = newBlock('cards', src.moduleIds[0])
             setBlocks([...draft.blocks, b])
             setActive(b.id)
           }}
         >
-          + thêm khối
+          + Thêm khối
         </button>
-          </>
+      </Section>
+    </>
   )
   const view = (
         <PortfolioView
@@ -460,27 +418,16 @@ export function Builder({
         />
   )
 
-  if (previewSlot !== undefined)
-    return (
-      <div style={{ padding: '4px 0 20px' }}>
-        {fields}
-        {previewSlot &&
-          createPortal(
-            <ScaledPreview>
-              <div style={{ height: '100%', overflowY: 'auto' }}>{view}</div>
-            </ScaledPreview>,
-            previewSlot,
-          )}
-      </div>
-    )
-
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: split.columns, alignItems: 'start' }}>
-      <div style={{ padding: '22px 22px 80px 56px', height: 'calc(100vh - 220px)', overflowY: 'auto', position: 'sticky', top: 0 }}>{fields}</div>
-      {split.handle}
-      <div style={{ height: 'calc(100vh - 220px)', overflowY: 'auto', position: 'sticky', top: 0 }}>
-        {view}
-      </div>
+    <div style={{ padding: '4px 0 20px' }}>
+      {fields}
+      {previewSlot &&
+        createPortal(
+          <ScaledPreview>
+            <div style={{ height: '100%', overflowY: 'auto' }}>{view}</div>
+          </ScaledPreview>,
+          previewSlot,
+        )}
     </div>
   )
 }
@@ -758,7 +705,9 @@ function ImageField({ label, value, onChange }: { label: string; value: string; 
 }
 
 const two: CSSProperties = { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: '0 22px' }
-const rowBox: CSSProperties = { border: `1px solid ${paper.rule}`, background: paper.white, padding: '8px 10px', marginBottom: 6 }
+const rowBox: CSSProperties = { borderTop: `1px solid ${paper.rule}`, padding: '10px 0 6px' }
+/** "+ Thêm …" as the detail template writes it: a green line of text, not a box. */
+const addLine: CSSProperties = { border: 0, background: 'none', padding: '8px 0', cursor: 'pointer', fontFamily: sans, fontSize: 13, color: ink.green }
 
 /**
  * Portfolio › Nội dung trang — the content every port page shares, edited the
@@ -777,10 +726,10 @@ export function ContentTab({
   content: PortContent
   setStored: (f: (s: Record<string, unknown>) => Record<string, unknown>) => void
   pages: PortPageRecord[]
-  /** One part only; without it, every part in one column as the Portfolio screen had it. */
-  only?: PortPart
+  /** The part Cấu hình has open; its heading and address are the detail template's. */
+  only: PortPart
 }) {
-  const show = (part: PortPart) => !only || only === part
+  const show = (part: PortPart) => only === part
   const save = useCallback((patch: Record<string, unknown>) => updateSite({ portfolio: patch } as never), [])
   const { push, error } = useDebounced<Record<string, unknown>>(save, (a, b) => ({ ...a, ...b }))
   const setGroup = <K extends keyof PortContent>(group: K, value: PortContent[K]) => {
@@ -806,19 +755,7 @@ export function ContentTab({
     next.splice(to, 0, m)
     saveFeatures(next)
   })
-  const notFeatured = published.filter((p) => !features.some((f) => f.pageId === p.id))
 
-  const view = (href: string) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" style={{ fontFamily: sans, fontSize: 10, letterSpacing: '.14em', textTransform: 'uppercase', color: ink.faint }}>
-      Xem trang ↗
-    </a>
-  )
-  const head = (t: string, href?: string) => (
-    <div style={{ ...sectionHead, display: 'flex', justifyContent: 'space-between' }}>
-      <span>{t}</span>
-      {href && view(href)}
-    </div>
-  )
   const text = (label: string, value: string, set: (v: string) => void, area = false) => (
     <Field label={label}>
       {area ? (
@@ -841,12 +778,11 @@ export function ContentTab({
   })
 
   return (
-    <div style={{ padding: only ? '0 0 20px' : '34px 56px 130px', maxWidth: 1080 }}>
+    <div style={{ padding: '6px 0 20px', maxWidth: 1080 }}>
       {error && <div style={{ color: '#8E1E42', fontFamily: sans, fontSize: 12.5, marginBottom: 12 }}>{error}</div>}
 
       {show('header') && (
         <>
-      {head('Header')}
       <div style={two}>
         {text('Chữ thương hiệu', header.brand, (v) => setGroup('header', { ...header, brand: v }))}
         {text('Chữ bên phải', header.right, (v) => setGroup('header', { ...header, right: v }))}
@@ -873,7 +809,6 @@ export function ContentTab({
 
       {show('footer') && (
         <>
-      {head('Footer')}
       <div style={two}>
         {text('Chữ bên trái', footer.left, (v) => setGroup('footer', { ...footer, left: v }))}
         {text('Chữ bên phải', footer.right, (v) => setGroup('footer', { ...footer, right: v }))}
@@ -884,12 +819,11 @@ export function ContentTab({
 
       {show('home') && (
         <>
-      {head('Trang tổng', toPath({ area: 'public', screen: 'portfolioHome' }))}
       <div style={two}>
         {text('Tiêu đề', home.title, (v) => setGroup('home', { ...home, title: v }))}
         {text('Giới thiệu', home.intro, (v) => setGroup('home', { ...home, intro: v }), true)}
       </div>
-      <div style={fieldLabel}>Trang giới thiệu</div>
+      <div style={fieldLabel}>Trang giới thiệu · bật “Hiện ở trang chủ” trên từng trang ở Mục lục</div>
       {features.map((f, i) => {
         const page = published.find((p) => p.id === f.pageId)
         const set = (patch: Partial<Feature>) => saveFeatures(features.map((x, j) => (j === i ? { ...x, ...patch } : x)))
@@ -910,25 +844,12 @@ export function ContentTab({
           </div>
         )
       })}
-      {notFeatured.length > 0 && (
-        <select
-          style={{ ...small, width: 'auto', marginTop: 4 }}
-          value=""
-          onChange={(e) => e.target.value && saveFeatures([...features, { pageId: e.target.value, label: '', intro: '', image: '' }])}
-        >
-          <option value="">+ Thêm trang</option>
-          {notFeatured.map((p) => (
-            <option key={p.id} value={p.id}>{p.title}</option>
-          ))}
-        </select>
-      )}
 
         </>
       )}
 
       {show('about') && (
         <>
-      {head('About', toPath({ area: 'public', screen: 'portfolioAbout' }))}
       {text('Đoạn chữ phủ ảnh', about.text, (v) => setGroup('about', { ...about, text: v }), true)}
       <div style={fieldLabel}>Nhãn trên ảnh</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,minmax(0,1fr))', gap: 8, marginBottom: 12 }}>
@@ -949,7 +870,6 @@ export function ContentTab({
 
       {show('sign') && (
         <>
-      {only ? head('Ký tên', toPath({ area: 'public', screen: 'portfolioAbout' })) : <div style={fieldLabel}>Ký tên</div>}
       {about.signs.map((sg, i) => (
         <div key={i} style={{ display: 'grid', gridTemplateColumns: '70px minmax(0,1fr) 24px', gap: 8, marginBottom: 6, alignItems: 'center' }}>
           <label style={{ fontFamily: sans, fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -975,7 +895,7 @@ export function ContentTab({
           </button>
         </div>
       ))}
-      <button style={{ ...quiet, marginTop: 4, marginBottom: 12 }} onClick={() => setGroup('about', { ...about, signs: [...about.signs, ''] })}>
+      <button style={addLine} onClick={() => setGroup('about', { ...about, signs: [...about.signs, ''] })}>
         + Thêm ký tên
       </button>
         </>
@@ -1001,7 +921,7 @@ export function ContentTab({
           </div>
         )
       })}
-      <button style={{ ...quiet, marginTop: 4 }} onClick={() => setGroup('about', { ...about, reach: [...about.reach, { label: '', url: '' }] })}>
+      <button style={addLine} onClick={() => setGroup('about', { ...about, reach: [...about.reach, { label: '', url: '' }] })}>
         + Thêm link
       </button>
         </>

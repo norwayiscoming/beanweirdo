@@ -3,7 +3,6 @@ import { POST_TEMPLATE_KEYS as TEMPLATES } from '../../content/templates'
 import {
   createRule,
   deleteOverride,
-  deletePage,
   saveOverride,
   updatePage,
   updateRule,
@@ -20,6 +19,8 @@ import { ancestorsOf } from '../../lib/contentTree'
 import { treeOrder, type ListingRule, type RuleGroup, type RuleSort, type RuleTier } from '../../lib/listingRule'
 import { toPath } from '../../lib/routes'
 import type { PortPart } from './PortEditors'
+import { Choice, Row, Section } from './Detail'
+import { VISIBILITY } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 
 /**
@@ -67,17 +68,6 @@ const TIER_NAMES: Record<RuleTier, string> = {
 const SORT_NAMES: Record<RuleSort, string> = { newest: 'mới nhất trước', oldest: 'cũ nhất trước', manual: 'xếp tay', tree: 'theo cây chủ đề' }
 const GROUP_NAMES: Record<RuleGroup, string> = { none: 'không nhóm', subject: 'subject', topic: 'topic', keyword: 'tag', kind: 'dạng bài', year: 'năm' }
 
-const head: CSSProperties = {
-  fontFamily: sans,
-  fontSize: 10.5,
-  fontWeight: 500,
-  letterSpacing: '.2em',
-  textTransform: 'uppercase',
-  color: ink.muted,
-  borderBottom: `2px solid ${ink.base}`,
-  paddingBottom: 9,
-  margin: '30px 0 12px',
-}
 const label: CSSProperties = { fontFamily: sans, fontSize: 10, letterSpacing: '.16em', textTransform: 'uppercase', color: ink.faint, marginBottom: 6 }
 const box: CSSProperties = {
   boxSizing: 'border-box',
@@ -288,8 +278,14 @@ const ruleIn = (layout: Layout) => (id: string | null | undefined) => layout.rul
 
 type NavItem = { ref: string; sidebar?: boolean; home?: boolean }
 
+export const SHOWN = [
+  { value: 'on' as const, label: 'hiện' },
+  { value: 'off' as const, label: 'ẩn' },
+]
+
 /**
- * Whether one page is listed in the blog's sidebar and on the blog home.
+ * Whether one page is listed in the blog's menu (its sidebar) and on the blog
+ * home — named as the port names its own pair, so the two sites read alike.
  *
  * There used to be a whole Điều hướng screen that also ordered that list, and
  * its order fought the topic tree's: drag a subject in the tree and the
@@ -320,14 +316,13 @@ export function NavFlags({
     run(() => updatePage(nav.id, { presentation: { ...nav.presentation, items: next } }))
   }
   return (
-    <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+    <>
       {(['sidebar', 'home'] as const).map((flag) => (
-        <label key={flag} style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: sans, fontSize: 12.5, color: ink.base }}>
-          <input type="checkbox" checked={shown(flag)} onChange={(e) => set(flag, e.target.checked)} />
-          {flag === 'sidebar' ? 'hiện ở thanh bên' : 'hiện ở trang chủ blog'}
-        </label>
+        <Row key={flag} label={flag === 'sidebar' ? 'Hiện trên menu' : 'Hiện ở trang chủ'}>
+          <Choice label={flag === 'sidebar' ? 'Hiện trên menu' : 'Hiện ở trang chủ'} options={SHOWN} value={shown(flag) ? 'on' : 'off'} onChange={(v) => set(flag, v === 'on')} />
+        </Row>
       ))}
-    </div>
+    </>
   )
 }
 
@@ -443,6 +438,20 @@ export function describePage(selected: BlogSelected, layout: Layout, pages: Page
   return { title, rule, preview, page, record, override, copyKey }
 }
 
+/**
+ * Why a hand-picked page cannot be deleted, if it cannot: old addresses still
+ * land on it, or it wears a module's looks. The ⋮ shows this under a greyed
+ * Xoá rather than the line vanishing, which left the owner guessing.
+ */
+export function pageDeleteBlocker(selected: BlogSelected, layout: Layout, pages: PageRow[]): string | undefined {
+  if (selected.kind !== 'curated') return 'trang hệ thống, không xoá được'
+  const { record } = describePage(selected, layout, pages)
+  if (!record) return undefined
+  if (record.aliases.length) return 'còn địa chỉ cũ trỏ về trang này'
+  if ((record.presentation as { module?: string }).module) return 'trang đang mượn một hình trang'
+  return undefined
+}
+
 export function PageEditor({
   selected,
   layout,
@@ -451,7 +460,6 @@ export function PageEditor({
   vocab,
   error,
   run,
-  onGone,
   renderCopy,
   renderModule,
 }: {
@@ -462,8 +470,6 @@ export function PageEditor({
   vocab: Vocab
   error: ReactNode
   run: (fn: () => Promise<unknown>) => void
-  /** Called once the page itself is deleted, so the screen can open something that still exists. */
-  onGone?: () => void
   renderCopy: (key: SystemPage) => ReactNode
   renderModule: (moduleId: string) => ReactNode
 }) {
@@ -477,67 +483,33 @@ export function PageEditor({
       {error}
 
       {record && selected.kind === 'curated' && (
-        <div style={{ display: 'flex', gap: 14, alignItems: 'center', margin: '12px 0' }}>
-          <input
-            aria-label="Tên trang"
-            defaultValue={record.title}
-            key={record.title}
-            onBlur={(e) => e.target.value.trim() && e.target.value !== record.title && run(() => updatePage(record.id, { title: e.target.value.trim() }))}
-            style={{ ...box, width: 260, fontFamily: serif, fontSize: 16 }}
-          />
-          <select aria-label="Quyền xem trang" value={record.visibility} onChange={(e) => run(() => updatePage(record.id, { visibility: e.target.value as 'public' | 'private' }))} style={box}>
-            <option value="public">công khai</option>
-            <option value="private">riêng tư</option>
-          </select>
-        </div>
+        <Section title="Thông tin">
+          <Row label="Trạng thái">
+            <Choice label="Trạng thái" options={VISIBILITY} value={record.visibility} onChange={(visibility) => run(() => updatePage(record.id, { visibility }))} />
+          </Row>
+          <NavFlags layout={layout} navRef={`page:${record.id}`} defaults={{ sidebar: false, home: false }} run={run} />
+        </Section>
       )}
-      {record && selected.kind === 'curated' && <NavFlags layout={layout} navRef={`page:${record.id}`} defaults={{ sidebar: false, home: false }} run={run} />}
 
       {rule && (
-        <>
-          <div style={head}>Quy chế</div>
+        <Section title="Quy chế" note="trang này liệt kê bài nào">
           <RuleEditor rule={rule} vocab={vocab} onChange={saveRule} />
-        </>
+        </Section>
       )}
 
       {rule?.sort === 'manual' && posts.length > 0 && (
-        <>
-          <div style={head}>Thứ tự</div>
+        <Section title="Thứ tự">
           <HandOrder rule={rule} posts={posts} onChange={saveRule} />
-        </>
+        </Section>
       )}
 
-      {linked && (
-        <>
-          <div style={head}>Hình trang</div>
-          {renderModule(linked)}
-        </>
-      )}
+      {linked && <Section title="Giao diện">{renderModule(linked)}</Section>}
 
-      {copyKey && (
-        <>
-          <div style={head}>Chữ cố định</div>
-          {renderCopy(copyKey)}
-        </>
-      )}
+      {copyKey && <Section title="Chữ cố định">{renderCopy(copyKey)}</Section>}
 
       {selected.kind === 'override' && (
         <button type="button" style={{ ...quiet, marginTop: 30 }} onClick={() => run(() => deleteOverride(selected.type, selected.node))}>
-          bỏ cài đặt riêng, dùng mẫu
-        </button>
-      )}
-      {selected.kind === 'curated' && record && record.aliases.length === 0 && !linked && (
-        <button
-          type="button"
-          style={{ ...quiet, marginTop: 30 }}
-          onClick={() =>
-            run(async () => {
-              await deletePage(record.id)
-              onGone?.()
-            })
-          }
-        >
-          xoá trang
+          bỏ cài đặt riêng, dùng quy chế chung
         </button>
       )}
     </div>

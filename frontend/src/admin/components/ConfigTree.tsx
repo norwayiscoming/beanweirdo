@@ -4,6 +4,7 @@ import {
   createKeyword,
   createPage,
   createTopic,
+  deletePage,
   deletePortPage,
   getLayout,
   listKeywords,
@@ -11,9 +12,12 @@ import {
   listTopics,
   renameKeyword,
   reorderTopics,
+  updatePage,
   updateSite,
   updateTopic,
   type Module,
+  type PortPageRecord,
+  type Topic,
 } from '../lib/apiClient'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { planMove, type DropWhere } from '../../lib/treeMove'
@@ -26,8 +30,10 @@ import { navLinks, type PortContent } from '../../portfolio/content'
 import type { PresetKey } from '../../portfolio/blocks'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { radius } from '../../design/controls'
-import { FlatSettings, TopicSettings } from './ContentWorkspace'
-import { Builder, ContentTab, createFromPreset, usePortAdmin, useSplit, type PortPart } from './PortEditors'
+import { retireKeyword, retireTopic } from '../lib/retire'
+import { Choice, DETAIL_CSS, DetailHead, ItemList, Row, Section, type AddSpec, type DetailAction, type ListItem } from './Detail'
+import { RetireTag, RetireTopic, TopicFields } from './NodeFields'
+import { Builder, ContentTab, createFromPreset, STATUS_CHOICES, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
 import { SiteTabs, useRememberedTab } from './SiteTabs'
 import {
@@ -35,6 +41,8 @@ import {
   NavFlags,
   NodePage,
   PageEditor,
+  pageDeleteBlocker,
+  SHOWN,
   PORT_PARTS,
   type BlogSelected,
   type Layout,
@@ -279,39 +287,6 @@ function Leaf({
 }
 
 /** A name to type and an explicit button — creating something never happens on blur. */
-function AddField({ label, placeholder, onAdd }: { label: string; placeholder: string; onAdd: (v: string) => void }) {
-  const [v, setV] = useState('')
-  const go = () => {
-    const t = v.trim()
-    if (!t) return
-    setV('')
-    onAdd(t)
-  }
-  return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '10px 0 18px' }}>
-      <input
-        aria-label={label}
-        placeholder={placeholder}
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && go()}
-        style={{ flex: 1, maxWidth: 320, boxSizing: 'border-box', border: `1px solid ${ink.border}`, borderRadius: radius, background: paper.white, fontFamily: sans, fontSize: 13, padding: '6px 10px', outline: 'none' }}
-      />
-      <button
-        type="button"
-        onClick={go}
-        disabled={!v.trim()}
-        style={{ border: `1px solid ${ink.border}`, borderRadius: radius, background: paper.white, fontFamily: sans, fontSize: 12.5, padding: '6px 12px', cursor: v.trim() ? 'pointer' : 'default', color: v.trim() ? ink.base : ink.faint }}
-      >
-        {label}
-      </button>
-    </div>
-  )
-}
-
-const sectionHead = { fontFamily: sans, fontSize: 10.5, fontWeight: 500, letterSpacing: '.2em', textTransform: 'uppercase', color: ink.muted, borderBottom: `2px solid ${ink.base}`, paddingBottom: 9, margin: '30px 0 12px' } as const
-const hint = { fontFamily: sans, fontSize: 13, lineHeight: 1.55, color: ink.muted, margin: '6px 0 14px', maxWidth: 520 } as const
-
 type MovePlan = Exclude<ReturnType<typeof planMove>, { error: string }>
 
 /** One row of a site's Mục lục; `parent_id` is null on a flat list. */
@@ -371,6 +346,9 @@ export function ConfigTree({
     setDropAt(null)
   }
   const [err, setErr] = useState<string | null>(null)
+  // The delete panel of the item open on the right; another pick closes it.
+  const [retiring, setRetiring] = useState(false)
+  useEffect(() => setRetiring(false), [picked])
   const [round, setRound] = useState(0)
   const [portRound, setPortRound] = useState(0)
   const [undo, setUndo] = useState<{ msg: string; saving: boolean; revert: () => Promise<unknown> } | null>(null)
@@ -744,15 +722,25 @@ export function ConfigTree({
     </nav>
   )
 
-  // ── the right side: a heading that says what is open, its fields, and its preview ──
+  // ── the right side: one template for every item (`Detail.tsx`) and the public page beside it ──
   let crumbs: string[] = []
+  let title = ''
+  let rename: ((v: string) => void) | undefined
   let address = ''
+  let facts: string[] = []
+  let actions: DetailAction[] = []
   let preview = ''
   let previewKey = round
-  // A topic or tag opens on its own name field, which is the title; a second one above it would read as two things.
-  let named = false
   let body: ReactNode = null
 
+  const fixed = (why: string): DetailAction[] => [{ label: 'Xoá', danger: true, off: why }]
+  const undoable = (fn: () => Promise<{ msg: string; revert: () => Promise<unknown> }>, then: () => void) =>
+    run(async () => {
+      const r = await fn()
+      setRetiring(false)
+      then()
+      setUndo({ msg: r.msg, saving: false, revert: r.revert })
+    })
   const page = (sel: BlogSelected) => (
     <PageEditor
       key={JSON.stringify(sel)}
@@ -763,7 +751,6 @@ export function ConfigTree({
       vocab={vocab}
       error={errorLine}
       run={run}
-      onGone={() => setPicked({ kind: 'group', id: 'curated' })}
       renderCopy={renderCopy}
       renderModule={renderModule}
     />
@@ -782,52 +769,159 @@ export function ConfigTree({
       renderModule={renderModule}
     />
   )
+  const asItems = (rows: TocItem[]): ListItem[] => rows.map((r) => ({ id: r.id, name: r.name, meta: r.meta, dot: r.dot, onOpen: pick(r.picked) }))
+  const addPortPage: AddSpec = {
+    label: 'Thêm trang',
+    placeholder: 'tên trang mới',
+    choose: {
+      label: 'bắt đầu từ',
+      options: [
+        { value: 'bibi', label: 'mẫu bibi' },
+        { value: 'bibe', label: 'mẫu bibe' },
+        { value: 'blank', label: 'trang trống' },
+      ],
+    },
+    onSave: (name, key) =>
+      run(async () => {
+        const p = await createFromPreset((key ?? 'blank') as PresetKey, name, port.pages, src.moduleIds)
+        port.setPages((ps) => [...ps, p])
+        setPicked({ kind: 'port-page', id: p.id })
+      }),
+  }
+  const addTopic = (parent: Topic | null): AddSpec => ({
+    label: parent ? 'Thêm mục con' : 'Thêm subject',
+    placeholder: parent ? `tên mục mới trong ${parent.title}` : 'tên subject',
+    onSave: (name) =>
+      run(async () => {
+        await createTopic(name, parent?.id ?? null)
+        if (parent)
+          setFolded((f) => {
+            const next = new Set(f)
+            next.delete(`toc:${parent.id}`)
+            return next
+          })
+      }),
+  })
+
+  /**
+   * A port page's two switches, named as a blog subject's are: on the top bar
+   * (the header link's hidden flag) and on the port home (its feature cards).
+   * Only a published page is on either.
+   */
+  const portFlags = (p: PortPageRecord): ReactNode => {
+    if (p.status !== 'published')
+      return (
+        <Row label="Hiện trên menu">
+          <span style={{ color: ink.muted }}>chỉ trang đã đăng mới lên thanh trên và trang chủ</span>
+        </Row>
+      )
+    const { header, home } = port.content
+    const published = port.pages.filter((x) => x.status === 'published')
+    const link = portLinks.find((l) => l.key === `page:${p.id}`)
+    const features = home.features.length ? home.features : published.map((x) => ({ pageId: x.id, label: '', intro: '', image: '' }))
+    const save = (patch: Partial<PortContent>) => {
+      port.setContentStored((st) => ({ ...st, ...patch }))
+      run(() => updateSite({ portfolio: patch } as never))
+    }
+    const setMenu = (on: boolean) =>
+      save({ header: { ...header, links: portLinks.map((l) => ({ key: l.key, label: l.label, hidden: l.key === `page:${p.id}` ? !on : l.hidden })) } })
+    const setHome = (on: boolean) =>
+      save({ home: { ...home, features: on ? [...features, { pageId: p.id, label: '', intro: '', image: '' }] : features.filter((f) => f.pageId !== p.id) } })
+    return (
+      <>
+        <Row label="Hiện trên menu">
+          <Choice label="Hiện trên menu" options={SHOWN} value={link && !link.hidden ? 'on' : 'off'} onChange={(v) => setMenu(v === 'on')} />
+        </Row>
+        <Row label="Hiện ở trang chủ">
+          <Choice label="Hiện ở trang chủ" options={SHOWN} value={features.some((f) => f.pageId === p.id) ? 'on' : 'off'} onChange={(v) => setHome(v === 'on')} />
+        </Row>
+      </>
+    )
+  }
 
   switch (picked.kind) {
     case 'port-part': {
-      const title = picked.part === 'home' ? 'Trang chủ port' : PORT_PARTS.find((x) => x.part === picked.part)?.title ?? picked.part
+      const part = PORT_PARTS.find((x) => x.part === picked.part)
+      title = picked.part === 'home' ? 'Trang chủ port' : part?.title ?? picked.part
       // About is a page of the top bar, so it sits in Mục lục; the rest every page shares.
-      crumbs = ['Port', ...(picked.part === 'home' ? [] : [picked.part === 'about' ? 'Mục lục' : 'Phần chung']), title]
+      crumbs = ['Port', ...(picked.part === 'home' ? [] : [picked.part === 'about' ? 'Mục lục' : 'Phần chung'])]
       preview = toPath({ area: 'public', screen: picked.part === 'about' || picked.part === 'sign' ? 'portfolioAbout' : 'portfolioHome' })
-      address = preview
+      address = picked.part === 'home' || picked.part === 'about' ? preview : ''
+      actions = fixed(picked.part === 'home' || picked.part === 'about' ? 'trang hệ thống, không xoá được' : 'phần chung của mọi trang, không xoá được')
       previewKey = portRound
-      body = port.loaded ? <ContentTab key={picked.part} only={picked.part} content={port.content} setStored={port.setContentStored} pages={port.pages} /> : null
+      body = port.loaded ? (
+        <Section title={picked.part === 'home' || picked.part === 'about' ? 'Nội dung trang' : 'Thông tin'}>
+          <ContentTab key={picked.part} only={picked.part} content={port.content} setStored={port.setContentStored} pages={port.pages} />
+        </Section>
+      ) : null
       break
     }
     case 'port-page': {
       const p = port.pages.find((x) => x.id === picked.id)
-      crumbs = ['Port', 'Mục lục', p?.title ?? picked.id]
-      address = p ? `/${p.slug}` : ''
-      // The builder draws its own live preview of the unsaved page into the preview column.
-      body = p ? (
-        <Builder
-          key={p.id}
-          page={p}
-          design={port.design}
-          src={src}
-          content={port.content}
-          pages={port.pages}
-          onSaved={(next) => port.setPages((ps) => ps.map((x) => (x.id === next.id ? next : x)))}
-          previewSlot={slot}
-          onDelete={() => {
+      if (!p) break
+      crumbs = ['Port', 'Mục lục']
+      title = p.title
+      address = p.status === 'published' ? `/${p.slug}` : ''
+      facts = [STATUS_CHOICES.find((s) => s.value === p.status)?.label ?? p.status]
+      actions = [
+        {
+          label: 'Xoá trang…',
+          danger: true,
+          onPick: () => {
             if (!window.confirm(`Xoá trang “${p.title}”? Thao tác này không hoàn tác được.`)) return
             run(async () => {
               await deletePortPage(p.id)
               port.setPages((ps) => ps.filter((x) => x.id !== p.id))
               setPicked({ kind: 'group', id: 'port-pages' })
             })
-          }}
-        />
-      ) : null
+          },
+        },
+      ]
+      // The builder draws its own live preview of the unsaved page into the preview column.
+      body = (
+        <>
+          {errorLine}
+          <Builder
+            key={p.id}
+            page={p}
+            design={port.design}
+            src={src}
+            content={port.content}
+            pages={port.pages}
+            onSaved={(next) => port.setPages((ps) => ps.map((x) => (x.id === next.id ? next : x)))}
+            previewSlot={slot}
+            flags={portFlags(p)}
+          />
+        </>
+      )
       break
     }
     case 'system':
     case 'curated': {
       const d = describePage(picked, layout, pages)
-      const where = picked.kind === 'curated' ? 'Trang chọn tay' : null
-      crumbs = ['Personal Blog', ...(where ? [where] : []), picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ blog' : d.title]
+      const blocker = pageDeleteBlocker(picked, layout, pages)
+      crumbs = ['Personal Blog', ...(picked.kind === 'curated' ? ['Trang chọn tay'] : [])]
+      title = picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ blog' : d.title
       preview = d.preview
       address = d.preview
+      if (picked.kind === 'curated' && d.record) {
+        const record = d.record
+        rename = (v) => run(() => updatePage(record.id, { title: v }))
+        facts = [record.visibility === 'public' ? 'công khai' : 'riêng tư']
+        actions = [
+          {
+            label: 'Xoá trang…',
+            danger: true,
+            off: blocker,
+            onPick: () =>
+              window.confirm(`Xoá trang “${title}”?`) &&
+              run(async () => {
+                await deletePage(record.id)
+                setPicked({ kind: 'group', id: 'curated' })
+              }),
+          },
+        ]
+      } else actions = fixed(blocker ?? 'trang hệ thống, không xoá được')
       body = page(picked)
       break
     }
@@ -837,43 +931,42 @@ export function ConfigTree({
     case 'topic': {
       const t = vocab.topics.find((x) => x.id === picked.id)
       if (!t) break
-      const path = [...ancestorsOf(sorted, t.id), t].map((x) => x.title)
-      crumbs = ['Personal Blog', 'Mục lục', ...path]
-      named = true
+      const kids = sorted.filter((x) => x.parent_id === t.id)
+      crumbs = ['Personal Blog', 'Mục lục', ...ancestorsOf(sorted, t.id).map((x) => x.title)]
+      title = t.title
+      rename = (v) => run(() => updateTopic(t.id, { title: v }))
       address = toPath({ area: 'public', screen: 'module', moduleId: t.id })
       preview = address
+      facts = [posts(t.posts), t.visibility === 'public' ? 'công khai' : 'riêng tư']
+      actions = [{ label: 'Xoá…', danger: true, onPick: () => setRetiring(true) }]
       body = (
         <>
           {errorLine}
-          <div style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
-            <TopicSettings
+          {retiring && (
+            <RetireTopic
+              topic={t}
+              tree={shownTopics}
+              kids={kids.length}
+              count={t.posts}
+              onCancel={() => setRetiring(false)}
+              onRetire={(to) => undoable(() => retireTopic(t, to, vocab.topics), () => setPicked({ kind: 'group', id: 'topics' }))}
+            />
+          )}
+          <Section title="Thông tin">
+            <TopicFields
               key={t.id}
               topic={t}
               parent={t.parent_id ? vocab.topics.find((x) => x.id === t.parent_id) : undefined}
               tree={shownTopics}
-              count={t.posts}
               used={[...new Set(vocab.topics.map((x) => x.accent).filter((c): c is string => !!c))]}
               save={(patch) => run(() => updateTopic(t.id, patch))}
             />
             <NavFlags layout={layout} navRef={`topic:${t.id}`} defaults={{ sidebar: true, home: t.parent_id === null }} run={run} />
-          </div>
-          <div style={sectionHead}>Mục con</div>
-          <AddField
-            label="Thêm mục"
-            placeholder={`tên mục mới trong ${t.title}`}
-            onAdd={(title) =>
-              run(async () => {
-                await createTopic(title, t.id)
-                setFolded((f) => {
-                  const next = new Set(f)
-                  next.delete(`t:${t.id}`)
-                  return next
-                })
-              })
-            }
-          />
-          <div style={sectionHead}>Trang</div>
-          {nodePage('topic', t.id)}
+          </Section>
+          <Section title="Mục con" note={kids.length ? `${kids.length} · kéo ⋮⋮ ở cây bên trái để đổi chỗ` : undefined}>
+            <ItemList label="Mục con" items={kids.map((k) => ({ id: k.id, name: k.title, meta: posts(k.posts), dot: k.accent, onOpen: pick({ kind: 'topic', id: k.id }) }))} add={addTopic(t)} />
+          </Section>
+          <Section title="Nội dung trang">{nodePage('topic', t.id)}</Section>
         </>
       )
       break
@@ -881,140 +974,146 @@ export function ConfigTree({
     case 'tag': {
       const k = vocab.keywords.find((x) => x.id === picked.id)
       if (!k) break
-      crumbs = ['Personal Blog', 'Tag', k.label]
-      named = true
+      crumbs = ['Personal Blog', 'Tag']
+      title = k.label
+      rename = (v) => run(() => renameKeyword(k.id, v))
       address = toPath({ area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${k.id}` })
       preview = address
+      facts = [posts(k.posts)]
+      actions = [{ label: 'Xoá hay gộp…', danger: true, onPick: () => setRetiring(true) }]
       body = (
         <>
           {errorLine}
-          <div style={{ display: 'grid', gap: 16, maxWidth: 520 }}>
-            <FlatSettings key={k.id} kind="Tag" entry={k} count={k.posts} onRename={(label) => run(() => renameKeyword(k.id, label))} />
+          {retiring && (
+            <RetireTag
+              tag={k}
+              others={tags.filter((x) => x.id !== k.id)}
+              count={k.posts}
+              onCancel={() => setRetiring(false)}
+              onRetire={(to) => undoable(() => retireKeyword(k, to), () => setPicked({ kind: 'group', id: 'tags' }))}
+            />
+          )}
+          <Section title="Thông tin">
             <NavFlags layout={layout} navRef={`tag:${k.id}`} defaults={{ sidebar: false, home: false }} run={run} />
-          </div>
-          <div style={sectionHead}>Trang</div>
-          {nodePage('keyword', k.id)}
+          </Section>
+          <Section title="Nội dung trang">{nodePage('keyword', k.id)}</Section>
         </>
       )
       break
     }
     case 'module': {
-      crumbs = ['Personal Blog', 'Phần chung', modules.find((m) => m.id === picked.id)?.title ?? picked.id]
+      crumbs = ['Personal Blog', 'Phần chung']
+      title = modules.find((m) => m.id === picked.id)?.title ?? picked.id
+      actions = fixed('hình trang chỉ sửa được; trang nào mượn thì đổi ở trang ấy')
       // A module is not a page of its own since the pages moved onto the topic
       // tree; it is previewed on the page that wears it.
       const w = wearer(picked.id)
       if (w) preview = w.screen === 'notes' ? toPath({ area: 'public', screen: 'notes' }) : toPath({ area: 'public', screen: 'module', moduleId: w.id })
-      address = preview
-      body = (
-        <>
-          <p style={hint}>{!w ? 'Chưa trang nào mượn hình này, nên không có gì để xem trước.' : w.source === 'module' ? 'Chưa trang nào mượn hình này; nó vẫn là một trang của riêng nó, xem ở khung bên cạnh.' : `Trang ${w.title} đang mượn hình này; khung bên cạnh là trang ấy.`}</p>
-          {renderModule(picked.id)}
-        </>
-      )
+      facts = [!w ? 'chưa trang nào mượn' : w.source === 'module' ? 'trang của riêng nó' : `trang ${w.title} đang mượn`]
+      body = <Section title="Giao diện">{renderModule(picked.id)}</Section>
       break
     }
     case 'practice':
-      crumbs = ['Practice', 'Ghi 02']
+      crumbs = ['Practice']
+      title = 'Ghi 02'
       preview = toPath({ area: 'practice', screen: 'hours' })
       address = preview
-      body = renderPractice()
+      actions = fixed('trang hệ thống, không xoá được')
+      body = <Section title="Thông tin">{renderPractice()}</Section>
       break
     case 'group': {
       const g = picked.id
+      actions = fixed('nhóm của site, không xoá được; xoá từng mục bên trong')
       if (g === 'port-pages') {
-        crumbs = ['Port', 'Mục lục']
+        crumbs = ['Port']
+        title = 'Mục lục'
         preview = '/'
-        const add = (key: PresetKey) =>
-          run(async () => {
-            const p = await createFromPreset(key, port.pages, src.moduleIds)
-            port.setPages((ps) => [...ps, p])
-            setPicked({ kind: 'port-page', id: p.id })
-          })
+        facts = [`${livePort.length} trang`]
         body = (
           <>
             {errorLine}
-            <p style={hint}>Thanh trên của port vẽ đúng thứ tự này. Chọn một trang ở bên trái để sửa; muốn đổi chỗ thì nắm ⋮⋮ ở cuối dòng và kéo lên hay xuống. Trang nháp và trang lưu trữ không lên thanh trên nên đứng cuối, không kéo được.</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {(
-                [
-                  ['bibi', 'từ mẫu bibi'],
-                  ['bibe', 'từ mẫu bibe'],
-                  ['blank', 'trang trống'],
-                ] as const
-              ).map(([key, text]) => (
-                <button key={key} type="button" onClick={() => add(key)} style={{ border: `1px solid ${ink.border}`, borderRadius: radius, background: paper.white, fontFamily: sans, fontSize: 12.5, padding: '6px 12px', cursor: 'pointer' }}>
-                  + Thêm trang {text}
-                </button>
-              ))}
-            </div>
+            <Section title="Các trang" note="thứ tự là thứ tự thanh trên · kéo ⋮⋮ ở cây bên trái">
+              <ItemList label="Các trang" items={asItems(portSite.toc?.items ?? [])} add={addPortPage} />
+            </Section>
           </>
         )
       } else if (g === 'topics') {
-        crumbs = ['Personal Blog', 'Mục lục']
+        crumbs = ['Personal Blog']
+        title = 'Mục lục'
         preview = toPath({ area: 'public', screen: 'home' })
         address = preview
+        const subjects = sorted.filter((t) => t.parent_id === null)
+        facts = [`${subjects.length} subject`]
         body = (
           <>
             {errorLine}
-            <p style={hint}>
-              Trang Mục lục và thanh bên vẽ đúng cây này, theo đúng thứ tự này. Chọn một mục ở bên trái để sửa tên, màu, lời dẫn và trang của nó. Muốn đổi chỗ thì nắm ⋮⋮ ở cuối dòng và kéo: thả vào giữa một dòng là cho vào trong mục đó, thả vào mép trên hay mép dưới là đặt trước hay sau.
-            </p>
-            <div style={sectionHead}>Subject mới</div>
-            <AddField label="Thêm subject" placeholder="tên subject" onAdd={(title) => run(() => createTopic(title, null))} />
-            {renderCopy('index')}
+            <Section title="Các subject" note="thứ tự là thứ tự thanh bên · kéo ⋮⋮ ở cây bên trái">
+              <ItemList label="Các subject" items={subjects.map((t) => ({ id: t.id, name: t.title, meta: posts(t.posts), dot: t.accent, onOpen: pick({ kind: 'topic', id: t.id }) }))} add={addTopic(null)} />
+            </Section>
+            <Section title="Chữ cố định">{renderCopy('index')}</Section>
           </>
         )
       } else if (g === 'tags') {
-        crumbs = ['Personal Blog', 'Tag']
+        crumbs = ['Personal Blog']
+        title = 'Tag'
+        facts = [`${tags.length} tag`]
         body = (
           <>
             {errorLine}
-            <p style={hint}>Chọn một tag ở bên trái để đổi tên hay chỉnh trang của nó. Gộp và xoá tag ở tab Nội dung, nơi thấy bài nào sẽ bị đổi.</p>
-            <div style={sectionHead}>Tag mới</div>
-            <AddField label="Thêm tag" placeholder="tên tag" onAdd={(label) => run(() => createKeyword(label))} />
+            <Section title="Các tag" note="xếp theo tên · mỗi tag là một trang">
+              <ItemList
+                label="Các tag"
+                items={tags.map((k) => ({ id: k.id, name: k.label, meta: leafMeta('keyword', k.id, k.posts), onOpen: pick({ kind: 'tag', id: k.id }) }))}
+                add={{ label: 'Thêm tag', placeholder: 'tên tag', onSave: (label) => run(() => createKeyword(label)) }}
+              />
+            </Section>
           </>
         )
       } else if (g === 'curated') {
-        crumbs = ['Personal Blog', 'Trang chọn tay']
+        crumbs = ['Personal Blog']
+        title = 'Trang chọn tay'
+        facts = [`${curated.length} trang`]
         body = (
           <>
             {errorLine}
-            <p style={hint}>Một trang chọn tay có quy chế riêng: kéo bài từ chủ đề, tag hay khuôn bài nào, xếp ra sao.</p>
-            <div style={sectionHead}>Trang mới</div>
-            <AddField
-              label="Thêm trang"
-              placeholder="địa chỉ, ví dụ doc-cham"
-              onAdd={(v) => {
-                const id = v.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-|-$/g, '')
-                run(async () => {
-                  await createPage(id, id)
-                  setPicked({ kind: 'curated', id })
-                })
-              }}
-            />
+            <Section title="Các trang" note="mỗi trang tự chọn kéo bài nào, xếp ra sao">
+              <ItemList
+                label="Các trang"
+                items={curated.map((p) => ({ id: p.id, name: p.title || p.id, meta: `/${p.id}`, onOpen: pick({ kind: 'curated', id: p.id }) }))}
+                add={{
+                  label: 'Thêm trang',
+                  placeholder: 'tên trang mới',
+                  onSave: (name) => {
+                    const id = toSlug(name)
+                    if (id) run(async () => (await createPage(id, name), setPicked({ kind: 'curated', id })))
+                  },
+                }}
+              />
+            </Section>
           </>
         )
+      } else if (g === 'port-parts') {
+        crumbs = ['Port']
+        title = 'Phần chung'
+        body = (
+          <Section title="Các phần" note="mọi trang port dùng chung">
+            <ItemList label="Các phần" items={PORT_PARTS.filter((x) => x.part !== 'about').map((x) => ({ id: x.part, name: x.title, onOpen: pick({ kind: 'port-part', part: x.part }) }))} />
+          </Section>
+        )
       } else {
-        crumbs = [g === 'port-parts' ? 'Port' : 'Personal Blog', 'Phần chung']
-        body = <p style={hint}>Chọn một mục ở cây bên trái để sửa.</p>
+        crumbs = ['Personal Blog']
+        title = 'Phần chung'
+        body = (
+          <Section title="Hình trang" note="dàn trang, ảnh và chữ mà một trang mượn">
+            <ItemList label="Hình trang" items={moduleRows.map(({ row }) => ({ id: row.id, name: row.title, dot: row.accent, meta: wearer(row.id) ? undefined : 'chưa dùng', onOpen: pick({ kind: 'module', id: row.id }) }))} />
+          </Section>
+        )
       }
       break
     }
   }
 
-  const header = (
-    <div style={{ margin: '4px 0 18px' }}>
-      <div aria-label="Đang sửa" style={{ fontFamily: sans, fontSize: 11.5, color: ink.muted }}>
-        {crumbs.slice(0, -1).join(' › ')}
-      </div>
-      {!named && <h2 style={{ fontFamily: serif, fontWeight: 400, fontSize: 26, letterSpacing: '-.02em', margin: '2px 0 4px', color: ink.base }}>{crumbs[crumbs.length - 1]}</h2>}
-      {address && (
-        <a href={address} target="_blank" rel="noreferrer" style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, color: ink.soft }}>
-          {address} ↗
-        </a>
-      )}
-    </div>
-  )
+  const header = <DetailHead crumbs={crumbs} title={title} rename={rename} address={address} facts={facts} actions={actions} />
 
   // The port builder draws its own preview into the slot; everything else gets the public page.
   const previewPane =
@@ -1022,7 +1121,7 @@ export function ConfigTree({
       ? createPortal(
           preview ? (
             <ScaledPreview>
-              <iframe key={`${preview}#${previewKey}`} title={`xem trước ${crumbs[crumbs.length - 1] ?? ''}`} src={preview} style={{ width: '100%', height: '100%', border: 0 }} />
+              <iframe key={`${preview}#${previewKey}`} title={`xem trước ${title}`} src={preview} style={{ width: '100%', height: '100%', border: 0 }} />
             </ScaledPreview>
           ) : (
             <div style={{ padding: 24, fontFamily: sans, fontSize: 13, color: ink.muted }}>Mục này không có trang riêng để xem trước.</div>
@@ -1050,10 +1149,10 @@ export function ConfigTree({
         padding: columns === 1 ? '16px 16px 90px' : '20px 32px 120px',
       }}
     >
-      <style>{'.cfg-leaf .cfg-grip{opacity:0}.cfg-leaf:hover .cfg-grip,.cfg-leaf:focus-within .cfg-grip{opacity:1}'}</style>
+      <style>{'.cfg-leaf .cfg-grip{opacity:0}.cfg-leaf:hover .cfg-grip,.cfg-leaf:focus-within .cfg-grip{opacity:1}' + DETAIL_CSS}</style>
       <div style={columns === 2 ? { gridRow: '1 / span 2' } : undefined}>{tree}</div>
       {columns > 1 && <div style={{ alignSelf: 'stretch', ...(columns === 2 ? { gridRow: '1 / span 2' } : {}) }}>{treeSplit.handle}</div>}
-      <div ref={editor} style={{ minWidth: 0, scrollMarginTop: 16, ...(columns === 3 ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
+      <div ref={editor} className="cfg-detail" style={{ minWidth: 0, scrollMarginTop: 16, ...(columns === 3 ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
         {header}
         {body}
       </div>
