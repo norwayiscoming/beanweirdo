@@ -29,12 +29,6 @@ export const STATUS_CHOICES: { value: NodeStatus; label: string }[] = [
 
 export const statusLabel = (s: NodeStatus) => STATUS_CHOICES.find((c) => c.value === s)?.label ?? s
 
-/** Curated pages (`pages`, 0028) still say who may read them this way. */
-export const VISIBILITY = [
-  { value: 'public' as const, label: 'công khai' },
-  { value: 'private' as const, label: 'riêng tư' },
-]
-
 /** A node's colour — its dot in the tree and its accent on the site — on every site alike. */
 export function ColorRow({ node, parent, used, save }: { node: Node; parent?: Node; used: string[]; save: (patch: Parameters<typeof updateNode>[1]) => void }) {
   const setColor = (hex: string | null) => save(hex ? { accent: hex, ...shades(hex) } : { accent: null, on_color: null, tint: null, tint2: null })

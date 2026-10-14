@@ -216,7 +216,7 @@ function uniqueSlug(base: string, pages: Node[]) {
 }
 
 /** An address word from a name: accents off, đ as d, anything else a hyphen. */
-export function toSlug(name: string): string {
+function toSlug(name: string): string {
   return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
 

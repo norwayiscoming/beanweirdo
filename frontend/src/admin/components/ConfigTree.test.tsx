@@ -17,11 +17,9 @@ const api = vi.hoisted(() => ({
   reorderNodes: vi.fn(),
   createNode: vi.fn(),
   createKeyword: vi.fn(),
-  createPage: vi.fn(),
   createRule: vi.fn(),
   saveOverride: vi.fn(),
   deleteOverride: vi.fn(),
-  deletePage: vi.fn(),
   updatePage: vi.fn(),
   updateSite: vi.fn(),
   updateRule: vi.fn(),
@@ -161,8 +159,8 @@ describe('Cấu hình', () => {
     await userEvent.click(card('Mục lục'))
     // The group lists its subjects; adding one is the last line, and nothing is created before Lưu.
     expect(rowsOf('Các mục')).toEqual(['coffee0 bài', 'tea0 bài'])
-    await userEvent.click(screen.getByRole('button', { name: 'Thêm' }))
-    await userEvent.type(screen.getByLabelText('Thêm'), 'cacao')
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm subject' }))
+    await userEvent.type(screen.getByLabelText('Thêm subject'), 'cacao')
     expect(api.createNode).not.toHaveBeenCalled()
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
     expect(api.createNode).toHaveBeenCalledWith({ site: 'blog', title: 'cacao', parent_id: null })

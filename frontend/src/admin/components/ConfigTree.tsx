@@ -2,9 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { createPortal } from 'react-dom'
 import {
   createKeyword,
-  createPage,
   createNode,
-  deletePage,
   deleteNode,
   getLayout,
   listKeywords,
@@ -13,7 +11,6 @@ import {
   colorKeyword,
   renameKeyword,
   reorderNodes,
-  updatePage,
   updateSite,
   updateNode,
   type Module,
@@ -37,17 +34,17 @@ import { retireKeyword, retireTopic } from '../lib/retire'
 import { Switch, desk, DetailHead, ItemList, Row, Section, WHERE_WORDS, type AddSpec, type Crumb, type DetailAction, type ItemDrag, type ListItem } from './Detail'
 import { ColorField, RetireTag, RetireTopic, statusLabel, TopicFields } from './NodeFields'
 import { tagColor } from '../../lib/tagColor'
-import { Builder, ContentTab, PRESET_CHOICES, createFromPreset, toSlug, usePortAdmin, useSplit, type PortPart } from './PortEditors'
+import { Builder, ContentTab, PRESET_CHOICES, createFromPreset, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
 import { TagBadges } from '../../components/TagBadges'
 import { SiteTabs, useRememberedTab } from './SiteTabs'
 import { AuthorsPanel } from './AuthorsPanel'
 import {
   describePage,
+  pagePath,
   NavFlags,
   NodePage,
   PageEditor,
-  pageDeleteBlocker,
   type BlogSelected,
   type Layout,
   type SystemPage,
@@ -412,8 +409,6 @@ export function ConfigTree({
     </div>
   )
 
-  // A page drawn by the practice journal's screen is Practice's, not the blog's.
-  const curated = layout.pages.filter((p) => p.kind === 'curated' && p.presentation.screen !== 'hours')
   const overrideOf = (type: 'topic' | 'keyword', id: string) => layout.overrides.find((o) => o.node_type === type && o.node_id === id)
   // One count per node, the one its settings show too: the posts filed under it.
   const leafMeta = (type: 'topic' | 'keyword', id: string, n: number) => `${overrideOf(type, id) ? 'riêng · ' : ''}${posts(n)}`
@@ -436,11 +431,11 @@ export function ConfigTree({
   const topicToc: Toc = {
     id: 'topics',
     title: 'Mục lục',
-    note: `${shownTopics.filter((t) => t.parent_id === null).length} subject${curated.length ? ` · ${curated.length} trang chọn tay` : ''} · theo thứ tự của thanh bên và trang Mục lục`,
+    note: `${shownTopics.filter((t) => t.parent_id === null).length} subject · theo thứ tự của thanh bên và trang Mục lục`,
     nest: true,
     move: moveTopic,
-    items: [
-      ...shownTopics.map((t): TocItem => ({
+    // Ghi and tư duy tư duy are subjects since 0036: a hand-picked page is a node with a rule of its own.
+    items: shownTopics.map((t): TocItem => ({
       id: t.id,
       parent_id: t.parent_id,
       name: t.title,
@@ -449,12 +444,6 @@ export function ConfigTree({
       picked: { kind: 'topic', id: t.id },
       movable: true,
     })),
-      // A curated page (Ghi, tư duy tư duy) is a blog page like a subject, only it picks its own posts;
-      // the sidebar already lists it after the tree, so the Mục lục does too.
-      ...curated.map(
-        (pg): TocItem => ({ id: pg.id, parent_id: null, name: pg.title || pg.id, dot: null, meta: tocMeta(pg.visibility === 'public' ? 'published' : 'draft', `chọn tay · /${pg.id}`), picked: { kind: 'curated', id: pg.id }, movable: false }),
-      ),
-    ],
   }
 
   const bizToc: Toc = {
@@ -521,7 +510,6 @@ export function ConfigTree({
       case 'group':
         return p.id
       case 'topic':
-      case 'curated':
         return 'topics'
       case 'tag':
         return 'tags'
@@ -641,24 +629,6 @@ export function ConfigTree({
           },
         ]
       }
-      case 'curated': {
-        const record = describePage(p, layout, pages).record
-        if (!record) return undefined
-        const name = record.title || record.id
-        return [
-          {
-            label: 'Xoá trang…',
-            danger: true,
-            off: pageDeleteBlocker(p, layout, pages),
-            onPick: () =>
-              window.confirm(`Xoá trang “${name}”?`) &&
-              run(async () => {
-                await deletePage(record.id)
-                setPicked((cur) => (same(cur, p) ? { kind: 'group', id: 'topics' } : cur))
-              }),
-          },
-        ]
-      }
       default:
         return undefined
     }
@@ -684,23 +654,6 @@ export function ConfigTree({
         setPicked({ kind: 'port-page', id: p.id })
       }),
   })
-  // The blog's Mục lục holds subjects and curated pages alike, so one "+ Thêm" makes either.
-  const addToBlog: AddSpec = {
-    label: 'Thêm',
-    placeholder: 'tên mới',
-    choose: {
-      label: 'là',
-      options: [
-        { value: 'subject', label: 'subject' },
-        { value: 'curated', label: 'trang chọn tay' },
-      ],
-    },
-    onSave: (name, kind) => {
-      if (kind !== 'curated') return addTopic(null).onSave(name)
-      const id = toSlug(name)
-      if (id) run(async () => (await createPage(id, name), setPicked({ kind: 'curated', id })))
-    },
-  }
   const addTopic = (parent: Node | null): AddSpec => ({
     label: parent ? 'Thêm mục con' : 'Thêm subject',
     placeholder: parent ? `tên mục mới trong ${parent.title}` : 'tên subject',
@@ -806,20 +759,13 @@ export function ConfigTree({
       )
       break
     }
-    case 'system':
-    case 'curated': {
+    case 'system': {
       const d = describePage(picked, layout, pages)
-      const blocker = pageDeleteBlocker(picked, layout, pages)
-      crumbs = [siteCrumb('bean'), ...(picked.kind === 'curated' ? [groupCrumb('topics', 'Mục lục')] : [])]
-      title = picked.kind === 'system' && picked.key === 'landing' ? 'details' : d.title
+      crumbs = [siteCrumb('bean')]
+      title = picked.key === 'landing' ? 'details' : d.title
       preview = d.preview
       address = d.preview
-      if (picked.kind === 'curated' && d.record) {
-        const record = d.record
-        rename = (v) => run(() => updatePage(record.id, { title: v }))
-        facts = [record.visibility === 'public' ? 'công khai' : 'riêng tư']
-        actions = deleteOf(picked) ?? []
-      } else actions = fixed(blocker ?? 'trang hệ thống, không xoá được')
+      actions = fixed('trang hệ thống, không xoá được')
       body = page(picked)
       break
     }
@@ -833,7 +779,8 @@ export function ConfigTree({
       crumbs = [siteCrumb('bean'), groupCrumb('topics', 'Mục lục'), ...ancestorsOf(sorted, t.id).map((x): Crumb => ({ label: x.title, open: pick({ kind: 'topic', id: x.id }) }))]
       title = t.title
       rename = (v) => run(() => updateNode(t.id, { title: v }))
-      address = toPath({ area: 'public', screen: 'module', moduleId: t.id })
+      const drawn = findPage(pages, t.id)
+      address = drawn ? pagePath(drawn) : toPath({ area: 'public', screen: 'module', moduleId: t.id })
       preview = address
       facts = [posts(t.posts), statusLabel(t.status)]
       actions = deleteOf(picked) ?? []
@@ -969,7 +916,7 @@ export function ConfigTree({
           <>
             {errorLine}
             <Section title="Các mục" note={`theo thứ tự thanh bên · ${dragNote(true)}`}>
-              <ItemList label="Các mục" items={tocList(topicToc, topicToc.items.filter((r) => r.parent_id === null))} add={addToBlog} />
+              <ItemList label="Các mục" items={tocList(topicToc, topicToc.items.filter((r) => r.parent_id === null))} add={addTopic(null)} />
             </Section>
             <Section title="Chữ cố định">{renderCopy('index')}</Section>
           </>
