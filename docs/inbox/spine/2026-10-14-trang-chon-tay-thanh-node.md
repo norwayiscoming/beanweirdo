@@ -1,6 +1,6 @@
 # Trang chọn tay của bean thành mục trong `nodes`
 
-- **PR:** (số PR điền khi mở) · nhánh `claude/config-one-tree-539wvd`
+- **PR:** #91 · nhánh `claude/config-one-tree-539wvd`
 - **Migration:** `backend/supabase/migrations/0036_curated_pages_to_nodes.sql`, chủ site chạy tay.
 
 ## Đã đổi
