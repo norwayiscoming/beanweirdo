@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { Fragment, useEffect, useRef, type CSSProperties, type ReactNode } from 'react'
 import { resolvePosts, type Block, type PortPost } from './blocks'
 import { TagBadges } from '../components/TagBadges'
 import { gridArea, imageOf, seriesLayout, storyLayout, type Placed } from './layout'
 import { PF_CSS } from './styles'
+import { PostPeek, usePeek, type PeekTrigger } from './PostPeek'
 import { cssVars, fontFaceCss, fontHrefs, type Design } from './tokens'
 import { aboutSign, type NavLink, type PortContent } from './content'
 
@@ -118,7 +118,7 @@ function PortFrame({ design, palette, chrome, children }: { design: Design; pale
 
 export function PortfolioView(props: PortfolioViewProps) {
   const { design, palette, blocks, posts, moduleTitles, postHref, onward, activeId, onPick } = props
-  const [open, setOpen] = useState<PortPost | null>(null)
+  const { peek, trigger, card: peekCard, close } = usePeek()
   const vars = cssVars(design, palette) as CSSProperties
 
   const card = (p: PortPost, key: string, hidden = false) => (
@@ -127,7 +127,7 @@ export function PortfolioView(props: PortfolioViewProps) {
       className="card"
       tabIndex={hidden ? -1 : undefined}
       aria-hidden={hidden || undefined}
-      onClick={() => setOpen(p)}
+      {...trigger(p)}
     >
       <Img url={p.hero_image_url} />
       <span className="meta">{metaOf(p, moduleTitles)}</span>
@@ -159,7 +159,7 @@ export function PortfolioView(props: PortfolioViewProps) {
         const cap = (p: PortPost | undefined, cls = '') =>
           p && (
             <figcaption className={cls}>
-              <button onClick={() => setOpen(p)}>
+              <button {...trigger(p)}>
                 <span className="mk">{moduleTitles[p.module_id] ?? p.module_id}</span>
               </button>
               <span className="meta">{p.en}</span>
@@ -239,7 +239,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                   <ol>
                     {list.map((p, i) => (
                       <li key={p.id}>
-                        <button onClick={() => setOpen(p)}>
+                        <button {...trigger(p)}>
                           <span className="n">{String(i + 1).padStart(2, '0')}</span>
                           <span>
                             <span className="title">
@@ -252,7 +252,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                     ))}
                   </ol>
                 </div>
-                <Fib places={places} list={list} onOpen={setOpen} />
+                <Fib places={places} list={list} trigger={trigger} />
               </div>
             </div>
           </section>
@@ -291,7 +291,7 @@ export function PortfolioView(props: PortfolioViewProps) {
                   )}
                 </div>
                 <div className="fib-wrap">
-                  <Fib places={places} list={list} onOpen={setOpen} tall />
+                  <Fib places={places} list={list} trigger={trigger} tall />
                 </div>
               </div>
             </div>
@@ -352,11 +352,9 @@ export function PortfolioView(props: PortfolioViewProps) {
           {onward && i === 0 && b.type === 'head' && <Onward {...onward} />}
         </Fragment>
       ))}
-      {open &&
-        createPortal(
-          <Summary post={open} vars={vars} moduleTitles={moduleTitles} href={postHref(open)} onClose={() => setOpen(null)} />,
-          document.body,
-        )}
+      {peek && (
+        <PostPeek peek={peek} vars={vars} meta={metaOf(peek.post, moduleTitles)} href={postHref(peek.post)} card={peekCard} onClose={close} />
+      )}
     </PortFrame>
   )
 }
@@ -480,14 +478,14 @@ export function PortAbout({ design, chrome, posts }: { design: Design; chrome: C
 
 type LinkItemOut = { label: string; url: string }
 
-function Fib({ places, list, onOpen, tall }: { places: Placed[]; list: PortPost[]; onOpen: (p: PortPost) => void; tall?: boolean }) {
+function Fib({ places, list, trigger, tall }: { places: Placed[]; list: PortPost[]; trigger: PeekTrigger; tall?: boolean }) {
   return (
     <div className={`fib${tall ? ' tall' : ''}`}>
       {places.map((pl, i) => {
         const p = list[i]
         if (!p) return null
         return (
-          <button key={p.id} style={{ gridArea: gridArea(pl) }} onClick={() => onOpen(p)} aria-label={p.en}>
+          <button key={p.id} style={{ gridArea: gridArea(pl) }} {...trigger(p)} aria-label={p.en}>
             <Img url={p.hero_image_url} />
           </button>
         )
@@ -545,47 +543,5 @@ function Slider({
         </div>
       </div>
     </section>
-  )
-}
-
-function Summary({
-  post,
-  vars,
-  moduleTitles,
-  href,
-  onClose,
-}: {
-  post: PortPost
-  vars: CSSProperties
-  moduleTitles: Record<string, string>
-  href: string
-  onClose: () => void
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-  return (
-    <div className="pf-pop" style={vars} onClick={(e) => e.target === e.currentTarget && onClose()} role="dialog" aria-modal="true">
-      <div className="summary pf">
-        <button className="close" onClick={onClose} aria-label="đóng">
-          ×
-        </button>
-        <Img url={post.hero_image_url} />
-        <div className="txt">
-          <span className="meta">{metaOf(post, moduleTitles)}</span>
-          <TagBadges tags={post.tags ?? []} style={{ margin: '6px 0 2px' }} />
-          <h3 className="head">{post.en}</h3>
-          <span className="lbl">trước khi đọc</span>
-          <p className="read">{post.lead || post.vi}</p>
-          <div className="foot">
-            <a className="lbl" href={href}>
-              <span className="mk">đọc bài →</span>
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
   )
 }

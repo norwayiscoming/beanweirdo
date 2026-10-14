@@ -118,14 +118,19 @@ export const PF_CSS = `
 .pf .open-c figure:first-child figcaption{padding-left:var(--gut)}
 .pf .open-c figure:first-child .over{left:var(--gut)}
 
-.pf-pop{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;background:rgba(29,29,27,.35);padding:13px}
-.pf-pop .summary{position:relative;width:min(760px,100%);background:var(--paper);border:1px solid var(--line);border-radius:var(--r-2);display:grid;grid-template-columns:minmax(0,5fr) minmax(0,8fr);gap:var(--s-5);padding:var(--s-5);color:var(--ink);font:var(--t-body)}
-.pf-pop .summary>.ph{aspect-ratio:5/8}
-.pf-pop .txt{display:flex;flex-direction:column;gap:var(--s-3);min-width:0}
-.pf-pop .txt>.lbl{color:var(--acc-700)}
-.pf-pop .read{color:var(--ink-2)}
-.pf-pop .foot{display:flex;justify-content:flex-end;margin-top:auto;padding-top:var(--s-3)}
-.pf-pop .close{position:absolute;right:var(--s-2);top:2px;color:var(--ink-3);font-size:18px}
+.pf-peek{position:fixed;z-index:50;min-height:0;display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-2);box-shadow:0 12px 40px rgba(29,29,27,.18);overflow:hidden;color:var(--ink);font:var(--t-body)}
+.pf-peek-dim{position:fixed;inset:0;z-index:49;background:rgba(29,29,27,.35)}
+.pf-peek .head{display:flex;align-items:center;gap:var(--s-2);padding:var(--s-2) var(--s-3);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pf-peek .head .close{margin-left:auto;color:var(--ink-3);font-size:18px;line-height:1}
+.pf-peek .body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.pf-peek .note{padding:var(--s-5);color:var(--ink-3)}
+.pf-peek .cut{position:relative;overflow:hidden}
+/* A preview, not the post: nothing in it is clickable, and the template's own
+   pinned controls (long-form's index rail) are kept inside the card, then hidden. */
+.pf-peek .post{pointer-events:none;contain:paint}
+.pf-peek .post [style*="position: fixed"]{display:none}
+.pf-peek .fade{position:absolute;left:0;right:0;bottom:0;height:min(60%,320px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--s-5);background:linear-gradient(to bottom,transparent,var(--paper) 70%)}
+.pf-peek .more{font:var(--t-label);padding:10px 22px;border-radius:999px;background:var(--ink);color:var(--paper);text-decoration:none}
 
 .pf .lbl.acc{color:var(--acc-700)}
 .pf .home-card .d2{margin-top:2px}

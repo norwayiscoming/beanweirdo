@@ -24,8 +24,9 @@ import type {
  * rộng bao nhiêu, nên chỗ gọi quyết định.
  *
  * Mặc định `false`, và **khu admin cố ý không truyền gì**: chủ site chốt admin
- * không có bản điện thoại. Đúng hai chỗ truyền, cả hai đều là trang công khai —
- * `screens/Article.tsx` và `screens/Notes.tsx`.
+ * không có bản điện thoại. Ba chỗ truyền, cả ba đều là trang công khai —
+ * `screens/Article.tsx`, `screens/Notes.tsx`, và thẻ xem trước của trang port
+ * (`portfolio/PostPeek.tsx`, luôn `true` vì thẻ chỉ rộng 440px).
  */
 type Chrome = { breadcrumb?: ReactNode; footer?: ReactNode; mobile?: boolean }
 
