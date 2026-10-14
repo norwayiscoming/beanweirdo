@@ -12,6 +12,7 @@ import { ListItemNode, ListNode } from '@lexical/list'
 import { $convertFromMarkdownString, $convertToMarkdownString } from '@lexical/markdown'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { $createParagraphNode, $createTextNode, $getRoot, createEditor } from 'lexical'
+import { textToRuns } from 'post-renderer'
 import { SITE_TRANSFORMERS, unescapeSite } from './liveMarkdown'
 
 const NODES = [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, CodeNode, CodeHighlightNode]
@@ -66,7 +67,19 @@ describe('phương ngữ markdown của site trong mặt soạn', () => {
   })
 
   it('ký hiệu site không đọc được thì nằm nguyên làm chữ thường', () => {
-    expect(roundTrip('không đọc ~~gạch ngang~~ được')).toBe('không đọc ~~gạch ngang~~ được')
+    expect(roundTrip('không đọc ==tô sáng== được')).toBe('không đọc ==tô sáng== được')
+  })
+
+  it('`code` và ~~gạch ngang~~ đi qua mặt soạn, và trang đọc vẽ được chúng', () => {
+    const md = roundTrip('a `x*y*z` **~~đậm gạch~~** b')
+    expect(md).toBe('a `x*y*z` **~~đậm gạch~~** b')
+    expect(textToRuns(md)).toEqual([
+      { t: 'a ' },
+      { t: 'x*y*z', code: true },
+      { t: ' ' },
+      { t: 'đậm gạch', b: true, del: true },
+      { t: ' b' },
+    ])
   })
 
   it('link, địa chỉ trần, danh sách, trích dẫn, tiêu đề đều nguyên', () => {

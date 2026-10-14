@@ -8,6 +8,7 @@ import { PlateCorner, plateHost, type PlateAction } from './plates'
 import { frame, layout, sans, serif, wrapTitle } from './tokens'
 import type { LongformBlock, LongformPostData, LongformRun } from './types'
 import { indentOf, normalizeBlocks } from './longformBlocks'
+import { markStyle } from './elements/codeStrike'
 import { runsToText } from './longformText'
 
 type LongformProps = LongformEdit & {
@@ -91,6 +92,7 @@ function prepare(input: LongformBlock[]): Prepared[] {
 const runStyle = (r: LongformRun): CSSProperties => ({
   fontWeight: r.w ? Number(r.w) : undefined,
   fontStyle: r.s === 'italic' ? 'italic' : 'normal',
+  ...markStyle(r),
 })
 
 const plain = (runs?: LongformRun[]) => (runs ?? []).map((r) => r.t).join('')
