@@ -1,6 +1,6 @@
 # Ngăn "Thông tin bài" trong trang soạn
 
-Nhánh `claude/project-thread-ymdx0y`. Số PR: điền khi mở.
+PR #90 · nhánh `claude/project-thread-ymdx0y`.
 
 Chủ site chê dải thông tin trên đầu trang soạn rải rác (tám ô trên ba dòng, bảng
 màu trôi sang phải) và chọn kiểu B trong mock: ngăn thuộc tính trượt ra bên phải,
