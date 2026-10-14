@@ -1,6 +1,6 @@
 # Avatar chồng không còn trong suốt · ảnh bìa ở đầu bài long-form
 
-PR: (số PR điền khi mở) · nhánh `claude/project-thread-7qtcke`
+PR: #88 · nhánh `claude/project-thread-7qtcke`
 
 ## [SỬA LỖI] Avatar tác giả chồng nhau bị trong suốt
 
