@@ -39,7 +39,7 @@ vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], mod
 const portPage = (id: string, status: string, sort_order: number) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id: null, sort_order })
 vi.mock('./PortEditors', () => ({
   usePortAdmin: () => ({
-    pages: [portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3)],
+    pages: [portPage('Biz-hkd', 'draft', 0), portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3)],
     // Beta was put first on the top bar and given its own label; home sits second.
     content: { header: { brand: '', right: '', links: [{ key: 'page:Beta', label: 'Bê' }] }, home: { title: 'port', intro: '', features: [] }, footer: {}, about: {} },
     setContentStored: () => {},
@@ -227,8 +227,11 @@ describe('Cấu hình', () => {
     expect(screen.getByText('port:header')).toBeTruthy()
     expect(screen.getByText('port:footer')).toBeTruthy()
 
+    // biz opens on its home, the page the owner named; its Mục lục holds the rest.
     await userEvent.click(screen.getByRole('tab', { name: 'biz' }))
-    expect(heading()).toBe('Mục lục')
+    expect(card('Trang chủ biz').getAttribute('aria-current')).toBe('true')
+    expect(crumbs()).toBe('biz')
+    await userEvent.click(card('Mục lục'))
     expect(rowsOf('Các mục')).toEqual(['Alpha/alpha', 'Beta/beta', 'Draftnháp · /draft'])
   })
 

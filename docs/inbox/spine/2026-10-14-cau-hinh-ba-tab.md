@@ -10,7 +10,7 @@
 Trước: Personal Blog | Port | Practice (`ConfigTree.tsx: SITES`).
 Sau: beanweirdo | biz | bean. Tab nhớ ở khoá localStorage `beanweirdo.config.tab` (khoá cũ `beanweirdo.config.site` bỏ).
 - beanweirdo: Trang chủ (port home), Mục lục = thanh trên (`rootToc`, kéo ghi `site_settings.portfolio.header.links` như trước), Khung chung (ContentTab `header` + `footer`), Tag, Tác giả, Ghi 02.
-- biz: Mục lục = `nodes` site `port` dựng thành cây (`bizToc`, `moveBizPage`), lồng được, mỗi trang có "Mục con".
+- biz: Trang chủ biz = trang port slug `biz-hkd` (chủ site chỉ định, hằng `BIZ_HOME_SLUG`); Mục lục = các `nodes` site `port` còn lại dựng thành cây (`bizToc`, `moveBizPage`), lồng được, mỗi trang có "Mục con".
 - bean: Trang chủ bean (landing), Mục lục (cây chủ đề + trang chọn tay), Hình trang.
 
 ### [ĐỔI HÀNH VI] Kéo trang port
@@ -33,4 +33,4 @@ Không đổi schema. Đọc/ghi như cũ: `nodes` (`sort_order`, `parent_id` na
 `frontend/src/content/logic.ts` không có trong repo (kiểm 2026-10-14), chưa đối chiếu được.
 
 ## Đề xuất (ý kiến)
-biz chưa có trang chủ riêng: cần dữ liệu cho biz (bước 2, SQL) và địa chỉ `/biz` (bước 3) theo sơ đồ chủ site đã chốt.
+Trang chủ biz đang nhận ra bằng slug `biz-hkd`; đổi slug trang ấy thì tab biz mất thẻ Trang chủ. Bước dữ liệu (SQL) nên đánh dấu gốc biz trong `nodes` thay cho hằng này.
