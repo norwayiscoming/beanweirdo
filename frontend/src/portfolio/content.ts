@@ -1,4 +1,4 @@
-import { toPath } from '../lib/routes'
+import { portPagePath, toPath, type PortSite } from '../lib/routes'
 
 /**
  * Fixed content shared by every portfolio page: header, footer, the main
@@ -67,7 +67,7 @@ export function aboutSign(about: PortContent['about']): string {
   return about.signs[about.signUse] ?? about.signs[0] ?? ''
 }
 
-export type NavPage = { id: string; slug: string; title: string; status: string }
+export type NavPage = { id: string; slug: string; title: string; status: string; home_of?: PortSite | null }
 export type NavLink = { key: string; label: string; href: string; hidden: boolean }
 
 /**
@@ -80,7 +80,7 @@ export function navLinks(content: PortContent, pages: NavPage[]): NavLink[] {
     { key: 'home', label: content.home.title || 'portfolio', href: toPath({ area: 'public', screen: 'portfolioHome' }), hidden: false },
     ...pages
       .filter((p) => p.status === 'published')
-      .map((p) => ({ key: `page:${p.id}`, label: p.title, href: toPath({ area: 'public', screen: 'portfolioPage', slug: p.slug }), hidden: false })),
+      .map((p) => ({ key: `page:${p.id}`, label: p.title, href: portPagePath(p), hidden: false })),
     { key: 'about', label: 'about', href: toPath({ area: 'public', screen: 'portfolioAbout' }), hidden: false },
   ]
   const byKey = new Map(auto.map((l) => [l.key, l]))

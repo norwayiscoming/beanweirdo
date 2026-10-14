@@ -58,8 +58,9 @@ const STATUSES = ['draft', 'published', 'archived'] as const
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 /**
- * Root addresses a port page may not take. `bean` is not here on purpose: the
- * port page at /bean is the one the blog hangs under.
+ * Words a port page's slug may not take. Pages live at /biz/<slug> since
+ * 2026-10-14, but their old root addresses (/<slug>) still forward there, so a
+ * slug still must not shadow a root word.
  */
 const RESERVED_SLUGS = ['about', 'portfolio', 'practice', 'ad', 'admin', 'post', 'module', 'tag', 'muc-luc', 'ghi']
 
@@ -81,8 +82,6 @@ export function nodeColumns(body: Record<string, unknown>, site: string): Record
   }
   if ('slug' in body) {
     if (typeof body.slug !== 'string' || !SLUG.test(body.slug)) return 'slug chỉ gồm chữ thường, số và gạch nối'
-    // Port pages sit at the root (/<slug>), next to the about page, the journal,
-    // the back office and the blog's old addresses, which still forward.
     if (site === 'port' && (RESERVED_SLUGS.includes(body.slug) || body.slug.startsWith('ad-')))
       return `slug ${body.slug} đã dành cho một trang khác của site`
     out.slug = body.slug

@@ -21,7 +21,7 @@ import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { planMove, type DropWhere } from '../../lib/treeMove'
 import { bySiteOrder } from '../../lib/moduleOrder'
 import { activeWords } from '../../lib/routeWords'
-import { TAG_PAGE, toPath } from '../../lib/routes'
+import { TAG_PAGE, portPagePath, toPath } from '../../lib/routes'
 import { findPage, useModules } from '../../data/useModules'
 import { usePortSources } from '../../portfolio/data'
 import { navLinks, type PortContent } from '../../portfolio/content'
@@ -452,13 +452,13 @@ export function ConfigTree({
     note: `${shownBiz.filter((p) => p.parent_id === null).length} mục · cây trang của biz`,
     nest: true,
     move: moveBizPage,
-    items: shownBiz.filter((pg) => !pg.home_of).map((pg): TocItem => ({ id: pg.id, parent_id: pg.parent_id, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: true })),
+    items: shownBiz.filter((pg) => !pg.home_of).map((pg): TocItem => ({ id: pg.id, parent_id: pg.parent_id, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, portPagePath(pg)), picked: { kind: 'port-page', id: pg.id }, movable: true })),
   }
 
   const beanSite: SiteSpec = {
     id: 'bean',
     path: `${blog}/…`,
-    home: beanHome && { title: 'Trang chủ bean', note: `/${beanHome.slug} · ${beanHome.title}`, picked: { kind: 'port-page', id: beanHome.id } },
+    home: beanHome && { title: 'Trang chủ bean', note: `${portPagePath(beanHome)} · ${beanHome.title}`, picked: { kind: 'port-page', id: beanHome.id } },
     toc: topicToc,
     cards: [
       // The blog's own front page; the owner named it "details" (2026-10-14).
@@ -469,8 +469,8 @@ export function ConfigTree({
 
   const bizSite: SiteSpec = {
     id: 'biz',
-    path: '/…',
-    home: bizHome && { title: 'Trang chủ biz', note: `/${bizHome.slug} · ${bizHome.title}`, picked: { kind: 'port-page', id: bizHome.id } },
+    path: '/biz/…',
+    home: bizHome && { title: 'Trang chủ biz', note: `${portPagePath(bizHome)} · ${bizHome.title}`, picked: { kind: 'port-page', id: bizHome.id } },
     toc: bizToc,
   }
 
@@ -484,7 +484,7 @@ export function ConfigTree({
     items: portLinks.flatMap((l): TocItem[] => {
       if (l.key === 'about') return [{ id: l.key, parent_id: null, name: 'About', dot: null, meta: tocMeta('published', '/about', l.hidden), picked: { kind: 'port-part', part: 'about' }, movable: true }]
       const pg = port.pages.find((x) => `page:${x.id}` === l.key)
-      return pg ? [{ id: l.key, parent_id: null, name: l.label, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`, l.hidden), picked: { kind: 'port-page', id: pg.id }, movable: true }] : []
+      return pg ? [{ id: l.key, parent_id: null, name: l.label, dot: portDot(pg), meta: tocMeta(pg.status, portPagePath(pg), l.hidden), picked: { kind: 'port-page', id: pg.id }, movable: true }] : []
     }),
   }
 
@@ -734,7 +734,7 @@ export function ConfigTree({
         const next = await updateNode(p.id, { title: v })
         port.setPages((ps) => ps.map((x) => (x.id === next.id ? next : x)))
       })
-      address = p.status === 'published' ? `/${p.slug}` : ''
+      address = p.status === 'published' ? portPagePath(p) : ''
       facts = [statusLabel(p.status)]
       actions = deleteOf(picked) ?? []
       // The builder draws its own live preview of the unsaved page into the preview column.

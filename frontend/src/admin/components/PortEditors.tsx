@@ -401,7 +401,7 @@ export function Builder({
           posts={src.posts}
           moduleTitles={src.moduleTitles}
           postHref={postHref}
-          onward={onwardOf(draft.slug)}
+          onward={onwardOf(page)}
           activeId={active}
           onPick={setActive}
           chrome={buildChrome(content, pages.map((p) => (p.id === draft.id ? { ...p, title: page.title, slug: draft.slug, status: draft.status } : p)), `page:${draft.id}`)}

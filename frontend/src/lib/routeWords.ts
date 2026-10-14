@@ -21,9 +21,9 @@ export type RouteWords = {
   notes: string
   practice: string
   /**
-   * The bean blog's prefix: every blog page lives under `/bean/…`, and the
-   * blog's own front page is `/bean/details`. `/bean` alone is the port page
-   * with that slug — the blog is reached from it, one level down.
+   * The bean site's prefix: `/bean` alone is bean's home (the port page
+   * flagged `home_of` bean), every blog page lives under `/bean/…`, and the
+   * blog's own front page is `/bean/details`.
    */
   bean: string
   details: string

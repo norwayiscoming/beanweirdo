@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { usePublishedPosts, type PostRow } from '../data/usePublishedPosts'
 import { useModules } from '../data/useModules'
 import { usePostAddresses } from '../data/usePostAddresses'
-import { toPath } from '../lib/routes'
+import { portPagePath, toPath, type PortSite } from '../lib/routes'
 import { activeWords } from '../lib/routeWords'
 import type { Node } from 'api-contract'
 import { parseBlocks, type Block, type PortPost } from './blocks'
@@ -12,7 +12,7 @@ import { navLinks, resolveContent, type NavPage, type PortContent } from './cont
 import type { Chrome, HomeCard } from './PortfolioView'
 
 /** A node of site 'port' (0032), with its look resolved and its blocks parsed. */
-type PortPage = Pick<Node, 'id' | 'slug' | 'title' | 'intro' | 'status' | 'sort_order'> & { look: string; blocks: Block[] }
+type PortPage = Pick<Node, 'id' | 'slug' | 'title' | 'intro' | 'status' | 'sort_order' | 'home_of'> & { look: string; blocks: Block[] }
 
 const toPortPost = (p: PostRow): PortPost => ({
   id: p.id,
@@ -64,11 +64,11 @@ export function usePortSources(): { posts: PortPost[]; moduleTitles: Record<stri
 }
 
 /**
- * One public port page, read directly with the anon key. RLS (0032) only
- * returns published pages, so a draft still comes back as "not found" even
- * when its exact address is typed in.
+ * One public port page, by its slug or as a child site's home, read directly
+ * with the anon key. RLS (0032) only returns published pages, so a draft still
+ * comes back as "not found" even when its exact address is typed in.
  */
-export function usePublicPort(slug: string | null): { page: PortPage | null; design: Design; loading: boolean } {
+export function usePublicPort(slug: string | null, site?: PortSite): { page: PortPage | null; design: Design; loading: boolean } {
   const [page, setPage] = useState<PortPage | null>(null)
   const [design, setDesign] = useState<Design>(() => resolveDesign({}))
   const [loading, setLoading] = useState(true)
@@ -77,7 +77,11 @@ export function usePublicPort(slug: string | null): { page: PortPage | null; des
     let alive = true
     setLoading(true)
     Promise.all([
-      slug ? supabase.from('nodes').select('*').eq('site', 'port').eq('slug', slug).maybeSingle() : Promise.resolve({ data: null }),
+      site
+        ? supabase.from('nodes').select('*').eq('home_of', site).maybeSingle()
+        : slug
+          ? supabase.from('nodes').select('*').eq('site', 'port').eq('slug', slug).maybeSingle()
+          : Promise.resolve({ data: null }),
       supabase.from('portfolio_design').select('data').eq('id', true).maybeSingle(),
     ]).then(([p, d]: [{ data: Record<string, unknown> | null }, { data: { data: unknown } | null }]) => {
       if (!alive) return
@@ -89,7 +93,7 @@ export function usePublicPort(slug: string | null): { page: PortPage | null; des
     return () => {
       alive = false
     }
-  }, [slug])
+  }, [slug, site])
 
   return { page, design, loading }
 }
@@ -130,18 +134,16 @@ const toPortPage = (row: Record<string, unknown>): PortPage => ({
   blocks: parseBlocks(row.blocks),
   status: row.status === 'published' || row.status === 'archived' ? row.status : 'draft',
   sort_order: Number(row.sort_order ?? 0),
+  home_of: row.home_of === 'biz' || row.home_of === 'bean' ? row.home_of : null,
 })
 
 /**
- * The way down from a port page into the blog it heads.
- *
- * The bean blog lives under the port page whose slug is the blog's own word
- * (`/bean` → `/bean/details`), so that page — and only that one — leads there.
+ * The way down from a port page into the blog it heads: bean's home (`/bean`)
+ * leads to the blog's front page (`/bean/details`); no other page does.
  */
-export function onwardOf(slug: string): { href: string; label: string } | undefined {
-  const w = activeWords()
-  if (slug !== w.bean) return undefined
-  return { href: toPath({ area: 'public', screen: 'landing' }), label: w.details }
+export function onwardOf(page: Pick<PortPage, 'home_of'>): { href: string; label: string } | undefined {
+  if (page.home_of !== 'bean') return undefined
+  return { href: toPath({ area: 'public', screen: 'landing' }), label: activeWords().details }
 }
 
 /** Header links and footer for a page; `current` marks the link of the page being shown. */
@@ -163,7 +165,7 @@ export function homeCards(content: PortContent, pages: PortPage[], design: Desig
     const page = live.find((p) => p.id === f.pageId)
     if (!page) return []
     return [{
-      href: toPath({ area: 'public', screen: 'portfolioPage', slug: page.slug }),
+      href: portPagePath(page),
       title: page.title,
       label: f.label || design.palettes[page.look]?.name || '',
       intro: f.intro || page.intro,
