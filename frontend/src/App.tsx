@@ -178,6 +178,7 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       articleFrom,
       cmsTab: where.tab ?? 'posts',
       slug: where.slug ?? null,
+      portSite: where.site,
       goLanding: () => at({ screen: 'landing' }),
       goHome: () => at({ screen: 'home' }),
       goArchive: () => at({ screen: 'archive' }),

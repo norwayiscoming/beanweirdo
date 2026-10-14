@@ -232,7 +232,7 @@ describe('Cấu hình', () => {
     expect(card('Trang chủ biz').getAttribute('aria-current')).toBe('true')
     expect(crumbs()).toBe('biz')
     await userEvent.click(card('Mục lục'))
-    expect(rowsOf('Các mục')).toEqual(['Alpha/alpha', 'Beta/beta', 'Draftnháp · /draft'])
+    expect(rowsOf('Các mục')).toEqual(['Alpha/biz/alpha', 'Beta/biz/beta', 'Draftnháp · /biz/draft'])
   })
 
   it('opens /ad-authors on the authors card of beanweirdo', async () => {

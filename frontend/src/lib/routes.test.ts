@@ -134,12 +134,13 @@ describe('routes — địa chỉ cũ', () => {
   })
 })
 
-describe('routes — cây site: portfolio ở gốc, blog dưới /bean', () => {
+describe('routes — cây site: beanweirdo ở gốc, biz dưới /biz, bean dưới /bean', () => {
   it('đặt từng trang vào chỗ mới của nó', () => {
     expect(toPath({ area: 'public', screen: 'portfolioHome' })).toBe('/')
     expect(toPath({ area: 'public', screen: 'portfolioAbout' })).toBe('/about')
-    expect(toPath({ area: 'public', screen: 'portfolioPage', slug: 'business' })).toBe('/business')
-    expect(toPath({ area: 'public', screen: 'portfolioPage', slug: 'bean' })).toBe('/bean')
+    expect(toPath({ area: 'public', screen: 'portfolioPage', site: 'biz' })).toBe('/biz')
+    expect(toPath({ area: 'public', screen: 'portfolioPage', site: 'bean' })).toBe('/bean')
+    expect(toPath({ area: 'public', screen: 'portfolioPage', slug: 'business' })).toBe('/biz/business')
     expect(toPath({ area: 'public', screen: 'landing' })).toBe('/bean/details')
     expect(toPath({ area: 'public', screen: 'home' })).toBe('/bean/muc-luc')
     expect(toPath({ area: 'public', screen: 'notes' })).toBe('/bean/ghi')
@@ -148,8 +149,9 @@ describe('routes — cây site: portfolio ở gốc, blog dưới /bean', () => 
   it('đọc lại đúng các địa chỉ mới', () => {
     expect(parsePath('/')).toMatchObject({ area: 'public', screen: 'portfolioHome' })
     expect(parsePath('/about')).toMatchObject({ screen: 'portfolioAbout' })
-    expect(parsePath('/business')).toMatchObject({ screen: 'portfolioPage', slug: 'business' })
-    expect(parsePath('/bean')).toMatchObject({ screen: 'portfolioPage', slug: 'bean' })
+    expect(parsePath('/biz')).toMatchObject({ screen: 'portfolioPage', site: 'biz' })
+    expect(parsePath('/biz/business')).toMatchObject({ screen: 'portfolioPage', slug: 'business' })
+    expect(parsePath('/bean')).toMatchObject({ screen: 'portfolioPage', site: 'bean' })
     expect(parsePath('/bean/details')).toMatchObject({ screen: 'landing' })
   })
 
@@ -158,7 +160,9 @@ describe('routes — cây site: portfolio ở gốc, blog dưới /bean', () => 
     const old: [string, string][] = [
       ['/portfolio', '/'],
       ['/portfolio/about', '/about'],
-      ['/portfolio/business', '/business'],
+      ['/portfolio/business', '/biz/business'],
+      // biz's pages sat at the root until 2026-10-14.
+      ['/business', '/biz/business'],
       ['/muc-luc', '/bean/muc-luc'],
       ['/ghi', '/bean/ghi'],
       ['/module/biochemistry', '/bean/module/biochemistry'],

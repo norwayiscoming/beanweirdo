@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Area } from './area'
-import type { CmsTab } from './routes'
+import type { CmsTab, PortSite } from './routes'
 
 export type Screen =
   | 'landing'
@@ -11,7 +11,7 @@ export type Screen =
   | 'hours'
   | 'notes'
   | 'cms'
-  /** Public port page, /<slug>. */
+  /** Public port page: a child site's home (/biz, /bean) or a biz page, /biz/<slug>. */
   | 'portfolioPage'
   /** / — the main page, and /about. */
   | 'portfolioHome'
@@ -52,6 +52,8 @@ export type Nav = {
   cmsTab: CmsTab
   /** Slug of the public port page currently open. */
   slug: string | null
+  /** The child site whose home is open (`/biz`, `/bean`), instead of a slug. */
+  portSite?: PortSite
   goLanding(): void
   goHome(): void
   goArchive(): void
