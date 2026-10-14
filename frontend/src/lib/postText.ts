@@ -34,3 +34,24 @@ export function postDescription(post: TitledPost): string {
  * A number the reader can count along with has to come from what is shown.
  */
 export const displayNumber = (index: number): string => String(index + 1).padStart(2, '0')
+
+/** Keys whose strings are addresses, ids or styling — never words a reader reads. */
+const NOT_PROSE = new Set(['type', 'k', 'key', 'id', 'url', 'src', 'href', 'imageUrl', 'image_url', 'tint', 'color', 'w', 'h_px', 'margin', 'align', 'variant', 'kind'])
+
+/**
+ * Minutes to read a post's body, Medium-style: words over 200 a minute,
+ * rounded up, at least one. `body` is one of several shapes (sections, blocks,
+ * stored elements), so this walks it rather than knowing each one; null when
+ * there are no words at all, so the byline leaves the part out.
+ */
+export function readMinutes(body: unknown): number | null {
+  let words = 0
+  const walk = (v: unknown, key: string) => {
+    if (typeof v === 'string') {
+      if (!NOT_PROSE.has(key) && !/^(https?:|data:|#)/.test(v)) words += v.split(/\s+/).filter(Boolean).length
+    } else if (Array.isArray(v)) v.forEach((x) => walk(x, key))
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, k)
+  }
+  walk(body, '')
+  return words === 0 ? null : Math.max(1, Math.ceil(words / 200))
+}

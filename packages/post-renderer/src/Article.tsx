@@ -76,6 +76,8 @@ export type ArticleProps = ArticleOverrides & {
    * renderer package stays independent of how routing works.
    */
   breadcrumb?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  footer?: ReactNode
   post: ArticlePostData
 }
 
@@ -86,7 +88,7 @@ export type ArticleProps = ArticleOverrides & {
  * of the piece. Ported from frontend/src/screens/Article.tsx, parameterized
  * over `post` instead of the static article/articleMeta content modules.
  */
-export function Article({ post, breadcrumb, mobile = false, ...overrides }: ArticleProps) {
+export function Article({ post, breadcrumb, footer, mobile = false, ...overrides }: ArticleProps) {
   // Store elements paint themselves from the module's colours, the same way
   // they do on every other template; the band's fallback is repeated below.
   const palette = paletteFrom(post.band?.bg ?? garden.leaf, post.band?.fg)
@@ -355,6 +357,7 @@ export function Article({ post, breadcrumb, mobile = false, ...overrides }: Arti
               )
             })}
             {overrides.renderAfterSections?.()}
+            {footer}
           </div>
 
           <div style={{ position: 'sticky', top: 44, display: 'flex', flexDirection: 'column', gap: 20 }}>

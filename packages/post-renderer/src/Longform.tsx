@@ -22,6 +22,8 @@ type LongformProps = LongformEdit & {
    * renderer package stays independent of how routing works.
    */
   breadcrumb?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  footer?: ReactNode
 }
 
 /** Which heading owns a block, and whether that heading is folded away. */
@@ -395,6 +397,7 @@ const TITLE_GAP = 30
 export function Longform({
   post,
   breadcrumb,
+  footer,
   mobile = false,
   renderText,
   wrapBlock,
@@ -912,6 +915,7 @@ export function Longform({
             return <Fragment key={p.key}>{wrapBlock ? wrapBlock(drawn, at, b.k) : drawn}</Fragment>
           })}
           {renderAfterBlocks?.()}
+          {footer}
         </div>
       </div>
     </div>

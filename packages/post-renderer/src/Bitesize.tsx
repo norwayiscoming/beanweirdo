@@ -122,6 +122,8 @@ export type BitesizeOverrides = {
 export type BitesizeProps = BitesizeOverrides & {
   post: BitesizePostData
   breadcrumb?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  footer?: ReactNode
   mobile?: boolean
 }
 
@@ -433,6 +435,7 @@ export function BitesizeCard({
 export function Bitesize({
   post,
   breadcrumb,
+  footer,
   mobile = false,
   renderTitle,
   renderText,
@@ -578,7 +581,7 @@ export function Bitesize({
         boxShadow: '0 40px 80px -50px rgba(18,18,15,.55), 0 2px 0 rgba(18,18,15,.06)',
       }}
     >
-      {breadcrumb}
+      {/* The band is pulled up to the sheet's top edge, so it has to come first: drawn after the trail, it lay over it. */}
       {post.band ? (
         <div
           style={{
@@ -589,6 +592,7 @@ export function Bitesize({
           }}
         />
       ) : null}
+      {breadcrumb}
       <Meta post={post} wide renderTag={renderTag} renderDate={renderDate} />
       {/*
         * Lề phải của thân bài giữ nguyên một đường từ trên xuống dưới.
@@ -636,6 +640,7 @@ export function Bitesize({
           {subBox && mobile ? <div style={{ marginTop: 22 }}>{subBox}</div> : null}
         </>
       )}
+      {footer}
     </div>
   )
 }
