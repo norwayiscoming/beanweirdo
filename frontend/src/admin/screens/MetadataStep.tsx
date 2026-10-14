@@ -7,7 +7,7 @@ import {
   type TemplateSummary,
   type Node,
 } from '../lib/apiClient'
-import { topicOptions } from '../components/PostPlacement'
+import { topicOptions } from '../components/PostSettings'
 import { ink, paper } from '../../design/tokens'
 import { ThemePicker } from '../components/ThemePicker'
 import { Button } from '../../design/Button'

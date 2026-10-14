@@ -26,8 +26,12 @@ function Avatar({ author, size, ring }: { author: BylineAuthor; size: number; ri
     borderRadius: 999,
     flex: 'none',
     objectFit: 'cover',
+    // Opaque on purpose: stacked faces overlap, and a see-through disc (or a
+    // transparent PNG) lets the face underneath show through.
+    background: '#E4E0D8',
+    color: '#3A3833',
     // The ring keeps overlapping faces apart on any band colour.
-    boxShadow: ring ? '0 0 0 2px rgba(255,255,255,.9)' : undefined,
+    boxShadow: ring ? '0 0 0 2px #fff' : undefined,
   }
   if (author.avatar_url) return <img src={author.avatar_url} alt="" style={style} />
   return (
@@ -38,7 +42,6 @@ function Avatar({ author, size, ring }: { author: BylineAuthor; size: number; ri
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(127,127,127,.22)',
         fontSize: size * 0.42,
         textTransform: 'uppercase',
       }}

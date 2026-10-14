@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { createContext, Fragment, useContext, useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { cropStyle, stripFocus } from './focus'
+import { coverStyle, cropStyle, stripFocus } from './focus'
 import { ElementList } from './elements'
 import { paletteFrom, type Palette } from './palette'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
@@ -667,6 +667,12 @@ export function Longform({
         }
       >
         <div>
+          {post.cover && (
+            <div
+              data-testid="lf-cover"
+              style={{ ...coverStyle(post.cover), aspectRatio: '1200 / 628', margin: `0 0 ${TITLE_GAP + 10}px` }}
+            />
+          )}
           {/*
             * Tên bài, khi trong thân bài không có khối tiêu đề nào.
             *
