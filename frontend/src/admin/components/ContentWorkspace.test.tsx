@@ -46,6 +46,7 @@ const api = vi.hoisted(() => ({
   listPosts: vi.fn(),
   listNodes: vi.fn(),
   listKeywords: vi.fn(),
+  listAuthors: vi.fn(),
   listTags: vi.fn(),
   transitionStatus: vi.fn(),
   updatePost: vi.fn(),
@@ -62,6 +63,7 @@ beforeEach(() => {
   api.listPosts.mockImplementation(() => Promise.resolve(posts))
   api.listNodes.mockResolvedValue(topics)
   api.listKeywords.mockResolvedValue([])
+  api.listAuthors.mockResolvedValue([{ id: 'a1', name: 'Norway', slug: 'norway', avatar_url: null, bio: '', active: true, created_at: '', post_count: 1 }])
   api.listTags.mockResolvedValue([{ id: 'note', label: 'note' }, { id: 'book-film', label: 'book-film' }])
   api.transitionStatus.mockResolvedValue({})
   api.updatePost.mockResolvedValue({})
@@ -128,6 +130,29 @@ describe('ContentWorkspace', () => {
     await vi.waitFor(() => expect(api.updatePost).toHaveBeenCalledWith('Detachment', { topic_id: 'book-film' }))
     expect(api.updatePost).toHaveBeenCalledWith('Senses of Flavors', { topic_id: 'sensory' })
   })
+  it('filters by any metadata from one search bar, in step with the left column', async () => {
+    posts[2] = { ...posts[2], authors: ['a1'] }
+    render(<ContentWorkspace />)
+    await screen.findByRole('button', { name: 'Senses of Flavors' })
+    const box = screen.getByRole('combobox', { name: 'Lọc bài' })
+
+    // Free text reads the topic's parent too, accent-blind.
+    await userEvent.type(box, 'bean weirdo')
+    expect(screen.getByRole('button', { name: 'Senses of Flavors' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Detachment' })).not.toBeInTheDocument()
+
+    // @ picks an author; the pick becomes a chip and lights the rail's twin entries.
+    await userEvent.clear(box)
+    await userEvent.type(box, '@nor{Enter}')
+    expect(screen.getByRole('button', { name: 'Wings of Desire' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Detachment' })).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Bỏ lọc Norway' }))
+    await userEvent.click(within(screen.getByRole('navigation', { name: 'Phân loại' })).getByRole('button', { name: /^bean weirdo/ }))
+    expect(screen.getByRole('button', { name: 'Bỏ lọc bean weirdo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Detachment' })).not.toBeInTheDocument()
+  })
+
   it('pins a post from its row, whichever page lists it', async () => {
     render(<ContentWorkspace />)
     await screen.findByRole('button', { name: 'Senses of Flavors' })

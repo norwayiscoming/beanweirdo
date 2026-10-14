@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import {
   createPost,
+  listAuthors,
   listKeywords,
   listPosts,
   listNodes,
@@ -22,6 +23,9 @@ import { PostAuthorsDialog } from './PostAuthorsDialog'
 import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
+import { tagColor } from '../../lib/tagColor'
+import type { Author } from 'api-contract'
+import { PostSearch, fold, freeWords, type Facet, type Suggestion, type Token } from './PostSearch'
 import { desk, Menu } from './Detail'
 import { Button, IconButton } from '../../design/Button'
 import { IconClose, IconEdit, IconPlus } from '../../design/icons'
@@ -32,7 +36,9 @@ import { radius } from '../../design/controls'
  * screen (Phân loại and Quản lý bài used to be two tabs that could not see each
  * other: Phân loại knew a dạng bài had ten posts and could not say which).
  *
- * Left: every vocabulary entry with its live count; a click filters the list.
+ * Top: one search bar over every way a post is filed (PostSearch).
+ * Left: every vocabulary entry with its live count; a click adds it to the
+ * search bar as a chip, so both show one filter.
  * Right: the posts themselves, bulk-editable.
  *
  * Naming, colouring, adding, arranging and deleting topics and tags is Cấu
@@ -41,7 +47,6 @@ import { radius } from '../../design/controls'
  */
 
 type Vocab = 'topic' | 'tpl' | 'kw'
-type Filters = { topic: string | null; tpl: string | null; kw: string | null; status: PostStatus | null }
 type Undo = { msg: string; revert?: () => Promise<unknown> }
 
 const isUndo = (u: unknown): u is Undo => !!u && typeof u === 'object' && typeof (u as Undo).msg === 'string'
@@ -85,7 +90,6 @@ const BULK_STATUS: { action: StatusAction; label: string }[] = [
 const SEL = '#EEF5F8'
 const WARN = '#B4552E'
 const label: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 600, color: ink.strong }
-const box: CSSProperties = { boxSizing: 'border-box', background: paper.white, border: `1px solid ${paper.rule}`, color: ink.base, fontFamily: sans, fontSize: 13, padding: '6px 9px', outline: 'none', width: '100%' }
 const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSize: 13, padding: '0 7px', lineHeight: '18px', border: `1px solid ${paper.rule}`, borderRadius: 10, color: ink.soft, whiteSpace: 'nowrap', cursor: 'pointer', background: 'none', margin: '1px 3px 1px 0' }
 
 const CSS = `
@@ -93,9 +97,6 @@ const CSS = `
 .cw-r:focus-visible,.cw-row:focus-within{outline:2px solid ${ink.green};outline-offset:-2px}
 .cw-row:hover td{background:${paper.hover}}
 .cw-pill:hover{border-color:${ink.green}!important;color:${ink.green}!important}
-.cw-unchip{all:unset;cursor:pointer;display:inline-flex;padding:2px;border-radius:4px;color:${ink.soft}}
-.cw-unchip:hover{background:rgba(0,0,0,.08);color:${ink.base}}
-.cw-unchip:focus-visible{outline:2px solid ${ink.green}}
 @media (max-width:900px){.cw-ws{grid-template-columns:1fr!important}.cw-rail{border-right:none!important;border-bottom:1px solid ${paper.rule};max-height:280px;overflow-y:auto}}
 `
 
@@ -162,9 +163,10 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const addresses = usePostAddresses()
   const [topics, setTopics] = useState<Node[]>([])
   const [keywords, setKeywords] = useState<Keyword[]>([])
+  const [authors, setAuthors] = useState<Author[]>([])
   const [posts, setPosts] = useState<PostSummary[]>([])
   const [err, setErr] = useState<string | null>(null)
-  const [f, setF] = useState<Filters>({ topic: null, tpl: null, kw: null, status: null })
+  const [tokens, setTokens] = useState<Token[]>([])
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<Undo | null>(null)
@@ -174,11 +176,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
 
   const load = useCallback(
     () =>
-      Promise.all([listNodes('blog'), listKeywords(), listPosts('all')])
-        .then(([t, k, p]) => {
+      Promise.all([listNodes('blog'), listKeywords(), listPosts('all'), listAuthors()])
+        .then(([t, k, p, a]) => {
           setTopics(t)
           setKeywords(k)
           setPosts(p)
+          setAuthors(a)
         })
         .catch((e: Error) => setErr(e.message)),
     [],
@@ -217,16 +220,50 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const postsOf = (vocab: Vocab, id: string, from = live) =>
     from.filter((p) => (vocab === 'topic' ? inTopic(p, id) : vocab === 'tpl' ? p.template === id : kwOf(p).includes(id)))
 
+  const authorById = useMemo(() => new Map(authors.map((a) => [a.id, a])), [authors])
+  const kwName = (id: string) => keywords.find((k) => k.id === id)?.label ?? id
+  /** Everything a post is filed under, as one accent-blind string the free text is looked up in. */
+  const haystack = (p: PostSummary) =>
+    fold(
+      [
+        p.en,
+        p.vi,
+        ...(p.topic_id ? [p.topic_id, ...ancestorsOf(topics, p.topic_id).map((a) => a.id)].map((id) => topicById.get(id)?.title ?? '') : ['chưa xếp']),
+        ...kwOf(p).map(kwName),
+        ...(p.authors ?? []).map((id) => authorById.get(id)?.name ?? ''),
+        templateName(p.template),
+        STATUS_LABEL[p.status],
+        p.date_label ?? '',
+      ].join(' '),
+    )
+  /** Does the post carry this one exact filter? */
+  const wears = (p: PostSummary, t: Token) =>
+    t.kind === 'topic'
+      ? inTopic(p, t.id)
+      : t.kind === 'kw'
+        ? kwOf(p).includes(t.id)
+        : t.kind === 'author'
+          ? (p.authors ?? []).includes(t.id)
+          : t.kind === 'tpl'
+            ? p.template === t.id
+            : p.status === t.id
+  // Chips of one kind widen (this topic or that one); different kinds narrow
+  // (this topic and that tag) — two topics ANDed would only ever match nothing.
+  const kindsOn = [...new Set(tokens.map((t) => t.kind))]
+  const words = freeWords(q)
+
   const visible = posts
-    .filter((p) => (f.status ? p.status === f.status : p.status !== 'deleted'))
-    .filter((p) => !f.topic || inTopic(p, f.topic))
-    .filter((p) => !f.tpl || p.template === f.tpl)
-    .filter((p) => !f.kw || kwOf(p).includes(f.kw))
-    .filter((p) => !q.trim() || `${p.en} ${p.vi}`.toLowerCase().includes(q.trim().toLowerCase()))
+    .filter((p) => tokens.some((t) => t.kind === 'status') || p.status !== 'deleted')
+    .filter((p) => kindsOn.every((k) => tokens.some((t) => t.kind === k && wears(p, t))))
+    .filter((p) => {
+      if (!words.length) return true
+      const hay = haystack(p)
+      return words.every((w) => hay.includes(w))
+    })
     .sort((a, b) => (b.date_label ?? '').localeCompare(a.date_label ?? '') || b.updated_at.localeCompare(a.updated_at))
   const selected = posts.filter((p) => sel.has(p.id))
 
-  const nameOf = (vocab: Vocab | 'status', id: string) =>
+  const nameOf = (vocab: Facet, id: string) =>
     vocab === 'topic'
       ? id === UNPLACED
         ? 'chưa xếp'
@@ -234,10 +271,15 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
       : vocab === 'tpl'
         ? templateName(id)
         : vocab === 'kw'
-          ? keywords.find((k) => k.id === id)?.label ?? id
-          : STATUS_LABEL[id as PostStatus]
+          ? kwName(id)
+          : vocab === 'author'
+            ? authorById.get(id)?.name ?? id
+            : STATUS_LABEL[id as PostStatus]
 
-  const toggle = (vocab: keyof Filters, id: string) => setF((o) => ({ ...o, [vocab]: o[vocab] === id ? null : id }))
+  const isOn = (kind: Facet, id: string) => tokens.some((t) => t.kind === kind && t.id === id)
+  const add = (t: Token) => setTokens((o) => (o.some((x) => x.kind === t.kind && x.id === t.id) ? o : [...o, t]))
+  const remove = (t: Token) => setTokens((o) => o.filter((x) => !(x.kind === t.kind && x.id === t.id)))
+  const toggle = (kind: Facet, id: string) => (isOn(kind, id) ? remove({ kind, id }) : add({ kind, id }))
   // ── post actions ─────────────────────────────────────────────────────────
   const act = (id: string, action: StatusAction) =>
     run(async () => {
@@ -304,6 +346,34 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     })
   }
 
+  // ── search bar ───────────────────────────────────────────────────────────
+  const suggestions: Suggestion[] = [
+    ...shown.map(({ row: t }) => ({
+      kind: 'topic' as const,
+      id: t.id,
+      label: t.title,
+      path: ancestorsOf(topics, t.id).map((a) => a.title).join(' › ') || undefined,
+      color: t.accent ?? undefined,
+      count: postsOf('topic', t.id).length,
+    })),
+    ...keywords.map((k) => ({ kind: 'kw' as const, id: k.id, label: k.label, color: tagColor(k.id, k.color), count: postsOf('kw', k.id).length })),
+    ...authors.map((a) => ({ kind: 'author' as const, id: a.id, label: a.name, count: live.filter((p) => (p.authors ?? []).includes(a.id)).length })),
+    ...TEMPLATE_KEYS.map((t) => ({ kind: 'tpl' as const, id: t, label: templateName(t), count: postsOf('tpl', t).length })),
+    ...(Object.keys(STATUS_LABEL) as PostStatus[]).map((st) => ({ kind: 'status' as const, id: st, label: STATUS_LABEL[st], count: posts.filter((p) => p.status === st).length })),
+  ]
+  const search = (
+    <PostSearch
+      text={q}
+      onText={setQ}
+      tokens={tokens}
+      nameOf={(t) => nameOf(t.kind, t.id)}
+      suggestions={suggestions}
+      onAdd={add}
+      onRemove={remove}
+      onClear={() => (setTokens([]), setQ(''))}
+    />
+  )
+
   // ── left column ──────────────────────────────────────────────────────────
   const unplaced = live.filter((p) => !p.topic_id).length
   const statusCount = (s: PostStatus) => posts.filter((p) => p.status === s).length
@@ -317,19 +387,19 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                 big={depth === 0}
                 indent={14 + depth * 16}
                 count={postsOf('topic', t.id).length}
-                on={f.topic === t.id}
+                on={isOn('topic', t.id)}
                 onClick={() => toggle('topic', t.id)}
                 dot={<Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
                 flag={t.status !== 'published' ? statusLabel(t.status) : undefined}
               />
             </div>
         ))}
-        {unplaced > 0 && <RailRow name="chưa xếp" count={unplaced} on={f.topic === UNPLACED} onClick={() => toggle('topic', UNPLACED)} />}
+        {unplaced > 0 && <RailRow name="chưa xếp" count={unplaced} on={isOn('topic', UNPLACED)} onClick={() => toggle('topic', UNPLACED)} />}
       </SectionHead>
       {/* Dạng bài is retired: the template a post is written in says what it is. */}
       <SectionHead id="content.templates" title="Template">
         {TEMPLATE_KEYS.map((t) => (
-          <RailRow key={t} name={templateName(t)} count={postsOf('tpl', t).length} on={f.tpl === t} onClick={() => toggle('tpl', t)} />
+          <RailRow key={t} name={templateName(t)} count={postsOf('tpl', t).length} on={isOn('tpl', t)} onClick={() => toggle('tpl', t)} />
         ))}
       </SectionHead>
       <SectionHead id="content.tags" title="Tag">
@@ -338,24 +408,23 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
             key={k.id}
             name={k.label}
             count={postsOf('kw', k.id).length}
-            on={f.kw === k.id}
+            on={isOn('kw', k.id)}
             onClick={() => toggle('kw', k.id)}
           />
         ))}
       </SectionHead>
       <SectionHead id="content.status" title="Trạng thái">
         {(Object.keys(STATUS_LABEL) as PostStatus[]).map((s) => (
-          <RailRow key={s} name={STATUS_LABEL[s]} count={statusCount(s)} on={f.status === s} onClick={() => toggle('status', s)} />
+          <RailRow key={s} name={STATUS_LABEL[s]} count={statusCount(s)} on={isOn('status', s)} onClick={() => toggle('status', s)} />
         ))}
       </SectionHead>
     </nav>
   )
 
   // ── middle column ────────────────────────────────────────────────────────
-  const chips = (['topic', 'tpl', 'kw', 'status'] as const).filter((v) => f[v])
   const allOn = visible.length > 0 && visible.every((p) => sel.has(p.id))
-  const pillBtn = (vocab: keyof Filters, id: string, text: string, dashed = false) => (
-    <button key={id} type="button" className="cw-pill" onClick={() => setF((o) => ({ ...o, [vocab]: id }))} style={{ ...pill, borderStyle: dashed ? 'dashed' : 'solid' }}>
+  const pillBtn = (vocab: Facet, id: string, text: string, dashed = false) => (
+    <button key={id} type="button" className="cw-pill" onClick={() => add({ kind: vocab, id })} style={{ ...pill, borderStyle: dashed ? 'dashed' : 'solid' }}>
       {text}
     </button>
   )
@@ -381,15 +450,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
       )}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '10px 14px', borderBottom: `1px solid ${paper.rule}`, fontFamily: sans, fontSize: 12.5, color: ink.soft }}>
         <span style={{ fontVariantNumeric: 'tabular-nums' }}>{visible.length} bài</span>
-        {chips.map((v) => (
-          <span key={v} style={{ display: 'inline-flex', gap: 6, alignItems: 'center', background: SEL, color: ink.base, padding: '2px 8px', borderRadius: 3 }}>
-            {nameOf(v, f[v] as string)}
-            <button type="button" aria-label={`Bỏ lọc ${nameOf(v, f[v] as string)}`} onClick={() => (setF((o) => ({ ...o, [v]: null })))} className="cw-unchip">
-              <IconClose size={12} />
-            </button>
-          </span>
-        ))}
-        <input type="search" aria-label="Tìm bài" placeholder="Tìm bài" value={q} onChange={(e) => setQ(e.target.value)} style={{ ...box, width: 200, marginLeft: 'auto' }} />
+        <span style={{ marginLeft: 'auto' }} />
         <Button level="primary" icon={<IconPlus />} onClick={() => nav.newPost()}>
           Bài mới
         </Button>
@@ -510,6 +571,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   return (
     <div style={{ padding: '16px 24px 40px' }}>
       <style>{CSS}</style>
+      {search}
       {err && (
         <div role="alert" style={{ background: '#FBE7E5', color: '#8E1E42', fontFamily: sans, fontSize: 12.5, padding: '8px 16px' }}>
           {err}

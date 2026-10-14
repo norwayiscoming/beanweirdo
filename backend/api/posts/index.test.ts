@@ -75,16 +75,20 @@ describe('GET /api/posts', () => {
       .mockReturnValueOnce(queryBuilder({ data: [SAMPLE_ROW, { ...SAMPLE_ROW, id: 'p2' }], error: null }))
       .mockReturnValueOnce(queryBuilder({ data: [{ post_id: 'p2' }], error: null }))
       .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
+      .mockReturnValueOnce(queryBuilder({ data: [{ post_id: 'p2', author_id: 'a2' }, { post_id: 'p2', author_id: 'a1' }], error: null }))
     const res = mockRes()
     await handler(mockReq({ method: 'GET', headers: authHeaders(token), query: {} }), res)
     expect(fromMock).toHaveBeenNthCalledWith(2, 'post_drafts')
     expect(res.body.posts.map((p: { has_draft: boolean }) => p.has_draft)).toEqual([false, true])
+    // Authors come in byline order, so the list can name the lead author first.
+    expect(res.body.posts.map((p: { authors: string[] }) => p.authors)).toEqual([[], ['a2', 'a1']])
   })
 
   it('still lists posts before migration 0028 has run', async () => {
     fromMock
       .mockReturnValueOnce(queryBuilder({ data: [SAMPLE_ROW], error: null }))
       .mockReturnValueOnce(queryBuilder({ data: null, error: { code: 'PGRST205', message: 'post_drafts not found' } }))
+      .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
       .mockReturnValueOnce(queryBuilder({ data: [], error: null }))
     const res = mockRes()
     await handler(mockReq({ method: 'GET', headers: authHeaders(token), query: {} }), res)
