@@ -1,6 +1,6 @@
 # Trang chủ của biz và bean đánh dấu trong `nodes`
 
-- **PR:** (số PR điền khi mở) · nhánh `claude/config-one-tree-539wvd`
+- **PR:** #89 · nhánh `claude/config-one-tree-539wvd`
 - **Migration:** `0034_node_home.sql` (chủ site đã chạy 2026-10-14), `0035_node_home_of.sql` (thay cột của 0034).
 
 ## Đã đổi
