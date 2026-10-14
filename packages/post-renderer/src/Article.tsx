@@ -1,7 +1,7 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ElementList, Inline } from './elements'
 import { paletteFrom } from './palette'
-import { garden, ink, layout, paper, sans, serif, wrapTitle } from './tokens'
+import { frame, garden, ink, layout, paper, sans, serif, wrapTitle } from './tokens'
 import { fillStyle } from './focus'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
 import type { ArticlePlateData, ArticlePostData, FigureData } from './types'
@@ -111,6 +111,8 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
           position: 'relative',
         }}
       >
+        {/* `measure` counts the band's 56px side margins; the frame is what sits between them. */}
+        <div style={frame(layout.measure - 112)}>
         {breadcrumb}
         <div style={{ ...label, opacity: 0.7, marginBottom: 24 }}>
           {overrides.renderEyebrow ? overrides.renderEyebrow(post.moduleTitle) : `← ${post.moduleTitle}`}
@@ -161,6 +163,7 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             {overrides.renderLead ? overrides.renderLead(post.lead) : post.lead}
           </div>
         )}
+        </div>
 
         <div
           data-testid="article-hero-plate"
@@ -194,7 +197,7 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
         </div>
       </div>
 
-      <div style={{ padding: '56px 56px 140px', maxWidth: layout.measure }}>
+      <div style={{ padding: '56px 56px 140px', maxWidth: layout.measure, margin: '0 auto' }}>
         <div
           style={{
             display: 'grid',

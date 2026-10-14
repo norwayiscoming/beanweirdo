@@ -5,7 +5,7 @@ import { cropStyle, stripFocus } from './focus'
 import { ElementList } from './elements'
 import { paletteFrom, type Palette } from './palette'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
-import { sans, serif, wrapTitle } from './tokens'
+import { frame, layout, sans, serif, wrapTitle } from './tokens'
 import type { LongformBlock, LongformPostData, LongformRun } from './types'
 import { indentOf, normalizeBlocks } from './longformBlocks'
 import { runsToText } from './longformText'
@@ -488,7 +488,8 @@ export function Longform({
           padding: mobile ? '18px 20px 16px' : '22px 56px 20px',
         }}
       >
-        {breadcrumb}
+        {/* Lines up with the text column below, including the 56px it keeps clear for the index rail. */}
+        <div style={mobile ? undefined : { ...frame(layout.reading + 56), paddingRight: 56 }}>{breadcrumb}</div>
       </div>
       <div style={{ padding: mobile ? '28px 20px 130px' : '40px 56px 140px' }}>
       {/* Floating index: a rail of numbers that opens on hover. */}
@@ -662,7 +663,7 @@ export function Longform({
         style={
           mobile
             ? { padding: '30px 20px 130px' }
-            : { display: 'grid', gridTemplateColumns: 'minmax(0,760px)', justifyContent: 'center', paddingRight: 56 }
+            : { display: 'grid', gridTemplateColumns: `minmax(0,${layout.reading}px)`, justifyContent: 'center', paddingRight: 56 }
         }
       >
         <div>
