@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react'
 import type { Tag } from '../lib/tagColor'
 
-const badge = (color: string): CSSProperties => ({
+/** One tag's badge look; the admin list reuses it so a tag looks the same everywhere. */
+export const tagBadge = (color: string): CSSProperties => ({
   display: 'inline-block',
   padding: '1px 8px',
   borderRadius: 999,
@@ -21,7 +22,7 @@ export function TagBadges({ tags, style }: { tags: Tag[]; style?: CSSProperties 
   return (
     <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 6, ...style }}>
       {tags.map((t) => (
-        <span key={t.id} style={badge(t.color)}>
+        <span key={t.id} style={tagBadge(t.color)}>
           #{t.label}
         </span>
       ))}
