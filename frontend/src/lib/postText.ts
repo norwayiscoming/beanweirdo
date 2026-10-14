@@ -36,7 +36,7 @@ export function postDescription(post: TitledPost): string {
 export const displayNumber = (index: number): string => String(index + 1).padStart(2, '0')
 
 /** Keys whose strings are addresses, ids or styling — never words a reader reads. */
-const NOT_PROSE = new Set(['type', 'k', 'key', 'id', 'url', 'src', 'href', 'imageUrl', 'image_url', 'tint', 'color', 'w', 'h_px', 'margin', 'align', 'variant', 'kind'])
+const NOT_PROSE = new Set(['type', 'k', 'key', 'id', 'url', 'src', 'href', 'imageUrl', 'image_url', 'tint', 'color', 'w', 's', 'h_px', 'margin', 'align', 'variant', 'kind', 'len', 'media', 'mediaHint', 'hue', 'n'])
 
 /**
  * Minutes to read a post's body, Medium-style: words over 200 a minute,

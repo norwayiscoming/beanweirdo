@@ -3,6 +3,7 @@ import { withCors } from '../../lib/cors.js'
 import { requireAuth } from '../../lib/auth.js'
 import { getSupabase } from '../../lib/supabase.js'
 import {
+  bodyPreview,
   firstImageIn,
   withoutImages,
   POST_STATUSES,
@@ -39,7 +40,8 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
   }
 
   const supabase = getSupabase()
-  let query = supabase.from('posts').select(POST_SUMMARY_COLUMNS).order('updated_at', { ascending: false })
+  // `body` is read here only to cut the preview line; it is not sent on.
+  let query = supabase.from('posts').select(`${POST_SUMMARY_COLUMNS}, body`).order('updated_at', { ascending: false })
 
   if (statusParam !== 'all') {
     query = query.eq('status', statusParam)
@@ -76,6 +78,7 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
   res.status(200).json({
     posts: (data as PostRow[]).map((row) => ({
       ...toPostSummary(row),
+      ...bodyPreview(row.body),
       keywords: tags.get(row.id) ?? [],
       authors: authors.get(row.id) ?? [],
       has_draft: pending.has(row.id),

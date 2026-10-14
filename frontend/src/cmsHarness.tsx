@@ -89,9 +89,11 @@ let TOPICS: Row[] = [
 const post = (id: string, vi: string, topic_id: string, status: string, template: string, date_label: string, keywords: string[] = [], authors: string[] = ['a1']): Row => ({
   id, module_id: 'bean', en: vi, vi, lead: null, kind: 'note', date_label, status, template, hero_image_url: null, theme_color: null, thumbnail_url: null,
   sort_order: null, pinned: false, topic_id, keywords, authors, visibility: 'public', slug: id,
+  excerpt: `${vi} là câu hỏi mình gặp mỗi lần đứng trước máy rang: cùng một mẻ hạt, chỉ đổi vài giây cuối là vị trong tách đổi hẳn, từ chua sáng sang ngọt trầm…`,
+  read_minutes: 6,
 })
 const POSTS: Row[] = [
-  post('p-a', 'Rang nhạt hay rang đậm', 'roasting', 'published', 'article', '12.10.2026', ['heat']),
+  { ...post('p-a', 'Rang nhạt hay rang đậm', 'roasting', 'published', 'article', '12.10.2026', ['heat'], ['a1', 'a2']), has_draft: true },
   post('p-b', 'Vị chua đến từ đâu', 'sensory', 'published', 'memo', '08.10.2026', ['acid']),
   post('p-c', 'Ghi chép buổi cupping', 'ghi', 'draft', 'cards', '02.10.2026', [], ['a2']),
 ]

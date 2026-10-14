@@ -60,6 +60,7 @@ const { ContentWorkspace } = await import('./ContentWorkspace')
 
 beforeEach(() => {
   Object.values(api).forEach((f) => f.mockReset())
+  editPost.mockReset()
   api.listPosts.mockImplementation(() => Promise.resolve(posts))
   api.listNodes.mockResolvedValue(topics)
   api.listKeywords.mockResolvedValue([])
@@ -72,13 +73,13 @@ beforeEach(() => {
   api.createTag.mockImplementation((label: string) => Promise.resolve({ id: label, label }))
   posts = [
     post('Senses of Flavors', { status: 'draft' }),
-    post('Detachment', { kind: 'book-film', topic_id: 'book-film', date_label: '2025.02' }),
+    post('Detachment', { kind: 'book-film', topic_id: 'book-film', date_label: '2025.02', excerpt: 'Một dòng xem trước' }),
     post('Wings of Desire', { kind: 'book-film', topic_id: 'book-film', date_label: '2021.10' }),
     post('Chlorogenic Acids', { status: 'deleted' }),
   ]
 })
 
-// Everything but Sửa sits behind the row's ⋮.
+// Every action sits behind the post's ⋮; a click on the post itself opens it.
 const pick = async (title: string, action: string) => {
   await userEvent.click(screen.getByRole('button', { name: `Thao tác ${title}` }))
   await userEvent.click(screen.getByRole('menuitem', { name: action }))
@@ -92,12 +93,17 @@ describe('ContentWorkspace', () => {
     expect(screen.queryByRole('button', { name: 'Chlorogenic Acids' })).not.toBeInTheDocument()
     await pick('Senses of Flavors', 'Đăng')
     expect(api.transitionStatus).toHaveBeenCalledWith('Senses of Flavors', 'publish')
+    // Choosing a menu line or ticking the box must not also open the post.
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Chọn Detachment' }))
+    expect(editPost).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByText('Một dòng xem trước'))
+    expect(editPost).toHaveBeenCalledWith('Detachment')
   })
 
   it('shows the trash on its own, with restore and permanent delete', async () => {
     render(<ContentWorkspace />)
     await screen.findByRole('button', { name: 'Senses of Flavors' })
-    await userEvent.click(screen.getByRole('button', { name: /^Thùng rác/ }))
+    await userEvent.click(screen.getByRole('tab', { name: /^Thùng rác/ }))
     expect(screen.queryByRole('button', { name: 'Senses of Flavors' })).not.toBeInTheDocument()
     await pick('Chlorogenic Acids', 'Khôi phục')
     expect(api.transitionStatus).toHaveBeenCalledWith('Chlorogenic Acids', 'restore-trash')
