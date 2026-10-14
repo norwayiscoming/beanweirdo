@@ -15,7 +15,7 @@ import type { PortPost } from './blocks'
  * A mouse resting on a post for HOVER_MS opens it; a click (and every tap,
  * since touch has no hover) opens it at once and keeps it open until closed.
  */
-const HOVER_MS = 2000
+const HOVER_MS = 3000
 /** Grace to cross the gap between the title and the card without it closing. */
 const LEAVE_MS = 250
 /** Share of the post the card lets a reader see before the fade. */
