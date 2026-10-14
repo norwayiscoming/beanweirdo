@@ -92,11 +92,8 @@ import {
  * Mục lục. So the tabs are beanweirdo | biz | bean, the Tác giả tab moved in
  * here, and "Phần chung" — which meant the frame on the port and the borrowed
  * looks on the blog — is gone as a name. Until the data moves, biz's pages are
- * `nodes` with site 'port' and its home is the one the owner named.
+ * `nodes` with site 'port'; its home is the one flagged `is_home` (0034).
  */
-
-/** The port page that is biz's home (owner, 2026-10-14: "/biz-hkd là trang chủ của bizops"). */
-const BIZ_HOME_SLUG = 'biz-hkd'
 
 type Group = 'root-toc' | 'biz-pages' | 'frame' | 'topics' | 'tags' | 'authors' | 'modules'
 
@@ -213,7 +210,7 @@ export function ConfigTree({
 }) {
   const { data: pages, postsOf, reload: reloadPages } = useModules()
   const port = usePortAdmin()
-  const bizHome = port.pages.find((p) => p.slug === BIZ_HOME_SLUG)
+  const bizHome = port.pages.find((p) => p.is_home)
   const src = usePortSources()
   const [layout, setLayout] = useState<Layout | null>(null)
   const [vocab, setVocab] = useState<Vocab>({ topics: [], keywords: [], kinds: [] })

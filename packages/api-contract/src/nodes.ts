@@ -31,6 +31,8 @@ export type Node = {
   /** The page's own content, top to bottom. */
   blocks: unknown[]
   status: NodeStatus
+  /** The site's home page; one per site (0034). */
+  is_home: boolean
   sort_order: number
   accent: string | null
   on_color: string | null

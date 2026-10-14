@@ -36,7 +36,7 @@ vi.mock('../../data/useModules', () => ({
   findPage: () => undefined,
 }))
 vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], moduleTitles: {}, moduleIds: [], loading: false }) }))
-const portPage = (id: string, status: string, sort_order: number) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id: null, sort_order })
+const portPage = (id: string, status: string, sort_order: number) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id: null, sort_order, is_home: id === 'Biz-hkd' })
 vi.mock('./PortEditors', () => ({
   usePortAdmin: () => ({
     pages: [portPage('Biz-hkd', 'draft', 0), portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3)],
