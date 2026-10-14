@@ -1,6 +1,6 @@
 # Dọn code cũ và tài liệu lỗi thời
 
-PR: (số PR điền khi mở) · nhánh `claude/center-layout-cleanup-ox7k4a`, mở sau
+PR #86 · nhánh `claude/center-layout-cleanup-ox7k4a`, mở sau
 khi PR #85 (căn giữa bài) đã merge.
 
 "Chết" ở đây xác định bằng grep và knip, không bằng màn hình. Không đụng
