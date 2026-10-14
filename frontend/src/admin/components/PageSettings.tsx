@@ -18,7 +18,6 @@ import { findPage, type PageRow } from '../../data/useModules'
 import { ancestorsOf } from '../../lib/contentTree'
 import { treeOrder, type ListingRule, type RuleGroup, type RuleSort, type RuleTier } from '../../lib/listingRule'
 import { toPath } from '../../lib/routes'
-import type { PortPart } from './PortEditors'
 import { Choice, Row, Section, Switch } from './Detail'
 import { Button } from '../../design/Button'
 import { IconGrip } from '../../design/icons'
@@ -260,13 +259,6 @@ function HandOrder({ rule, posts, onChange }: { rule: StoredRule; posts: { id: s
     </div>
   )
 }
-
-export const PORT_PARTS: { part: PortPart; title: string }[] = [
-  { part: 'about', title: 'About' },
-  { part: 'sign', title: 'Signature' },
-  { part: 'header', title: 'Thanh trên' },
-  { part: 'footer', title: 'Chân trang' },
-]
 
 const ruleIn = (layout: Layout) => (id: string | null | undefined) => layout.rules.find((r) => r.id === id)
 

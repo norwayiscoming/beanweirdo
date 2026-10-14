@@ -36,10 +36,10 @@ vi.mock('../../data/useModules', () => ({
   findPage: () => undefined,
 }))
 vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], moduleTitles: {}, moduleIds: [], loading: false }) }))
-const portPage = (id: string, status: string) => ({ id, title: id, slug: id.toLowerCase(), status })
+const portPage = (id: string, status: string, sort_order: number) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id: null, sort_order })
 vi.mock('./PortEditors', () => ({
   usePortAdmin: () => ({
-    pages: [portPage('Alpha', 'published'), portPage('Beta', 'published'), portPage('Draft', 'draft')],
+    pages: [portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3)],
     // Beta was put first on the top bar and given its own label; home sits second.
     content: { header: { brand: '', right: '', links: [{ key: 'page:Beta', label: 'Bê' }] }, home: { title: 'port', intro: '', features: [] }, footer: {}, about: {} },
     setContentStored: () => {},
@@ -53,6 +53,8 @@ vi.mock('./PortEditors', () => ({
   createFromPreset: vi.fn(),
   PRESET_CHOICES: [{ value: 'bibi', label: 'mẫu bibi' }, { value: 'bibe', label: 'mẫu bibe' }, { value: 'blank', label: 'trang trống' }],
 }))
+
+vi.mock('./AuthorsPanel', () => ({ AuthorsPanel: () => <div>authors-panel</div> }))
 
 const { ConfigTree } = await import('./ConfigTree')
 
@@ -92,17 +94,20 @@ const rowsOf = (list: string) => within(screen.getByRole('list', { name: list })
 const heading = () => screen.getByRole('heading', { level: 2 }).textContent
 const crumbs = () => screen.getByLabelText('Đang sửa').textContent
 
-const renderScreen = async () => {
+/** Opens on bean, the tab most of these tests are about; `tab` picks another. */
+const renderScreen = async (tab = 'bean', openAuthors = false) => {
+  localStorage.setItem('beanweirdo.config.tab', tab)
   render(
     <ConfigTree
       modules={[{ id: 'bean', title: 'Bean', accent: '#7FB87E', parent_id: null, sort_order: 1, kind: 'normal' }] as never[]}
       renderCopy={(key) => <div>copy:{key}</div>}
       renderModule={(id) => <div>module:{id}</div>}
       renderPractice={() => <div>practice</div>}
+      openAuthors={openAuthors}
     />,
   )
   await screen.findByRole('navigation', { name: 'Cây cấu hình' })
-  await waitFor(() => expect(card('Mục lục').textContent).toContain('2 subject'))
+  if (tab === 'bean' && !openAuthors) await waitFor(() => expect(card('Mục lục').textContent).toContain('2 subject'))
 }
 
 /** Opens a topic the way the owner does: the Mục lục card, then down the lists. */
@@ -124,9 +129,9 @@ const dropOn = (row: HTMLElement, clientY: number, types: ('dragOver' | 'drop')[
 const li = (el: HTMLElement) => el.closest('li') as HTMLElement
 
 describe('Cấu hình', () => {
-  it('opens on the blog home, with its fields on the right and its public page previewed', async () => {
+  it('opens on bean’s home, with its fields on the right and its public page previewed', async () => {
     await renderScreen()
-    expect(heading()).toBe('Trang chủ blog')
+    expect(heading()).toBe('Trang chủ bean')
     expect(screen.getByText('copy:landing')).toBeTruthy()
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/details')
   })
@@ -137,7 +142,7 @@ describe('Cấu hình', () => {
     expect(within(tree()).queryByRole('textbox')).toBeNull()
 
     await openTopic('coffee', 'sensory')
-    expect(crumbs()).toBe('Personal Blog › Mục lục › coffee')
+    expect(crumbs()).toBe('bean › Mục lục › coffee')
     expect(screen.getByLabelText('Tên')).toHaveProperty('value', 'sensory')
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/module/sensory')
     // The card stays lit while something inside it is open.
@@ -208,31 +213,45 @@ describe('Cấu hình', () => {
     await waitFor(() => expect(api.saveOverride).toHaveBeenCalledWith({ node_type: 'topic', node_id: 'sensory', rule_id: 'r2' }))
   })
 
-  it('shows one site at a time, picked from the tabs, and the port has the blog’s cards', async () => {
-    await renderScreen()
-    expect(within(tree()).queryByRole('button', { name: /^Trang chủ port/ })).toBeNull()
-
-    await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
-    expect(heading()).toBe('Trang chủ port')
-    // Same names as the blog: Mục lục holds the top bar's pages and About, Phần chung the rest.
-    expect(card('Phần chung')).toBeTruthy()
+  it('has three tabs: beanweirdo holds the root and what both sites share, biz and bean their own pages', async () => {
+    await renderScreen('root')
+    expect(heading()).toBe('Trang chủ')
+    for (const name of ['Trang chủ', 'Mục lục', 'Khung chung', 'Tag', 'Tác giả', 'Ghi 02']) expect(card(name)).toBeTruthy()
+    expect(within(tree()).queryByRole('button', { name: /^Phần chung/ })).toBeNull()
+    // About sits on the top bar, so in Mục lục, and opens with its signature.
     await userEvent.click(card('Mục lục'))
-    await userEvent.click(listRow('Các trang', 'About'))
-    expect(crumbs()).toBe('Port › Mục lục')
+    await userEvent.click(listRow('Thanh trên', 'About'))
+    expect(crumbs()).toBe('beanweirdo › Mục lục')
+    expect(screen.getByText('port:sign')).toBeTruthy()
+    await userEvent.click(card('Khung chung'))
+    expect(screen.getByText('port:header')).toBeTruthy()
+    expect(screen.getByText('port:footer')).toBeTruthy()
+
+    await userEvent.click(screen.getByRole('tab', { name: 'biz' }))
+    expect(heading()).toBe('Mục lục')
+    expect(rowsOf('Các mục')).toEqual(['Alpha/alpha', 'Beta/beta', 'Draftnháp · /draft'])
   })
 
-  it('drags the port’s Mục lục into the top bar order, keeping labels and home in place', async () => {
-    await renderScreen()
-    await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
+  it('opens /ad-authors on the authors card of beanweirdo', async () => {
+    await renderScreen('bean', true)
+    expect(heading()).toBe('Tác giả')
+    expect(screen.getByText('authors-panel')).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'beanweirdo' }).getAttribute('aria-selected')).toBe('true')
+    await userEvent.click(screen.getByRole('tab', { name: 'bean' }))
+    expect(heading()).toBe('Trang chủ bean')
+  })
+
+  it('drags beanweirdo’s Mục lục into the top bar order, keeping labels and home in place', async () => {
+    await renderScreen('root')
     await userEvent.click(card('Mục lục'))
-    // A draft is not on the top bar, so it cannot be moved along it.
+    // A draft is not on the top bar; it lives in biz.
     expect(screen.queryByRole('img', { name: 'Kéo Draft' })).toBeNull()
 
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo About' }))
-    const beta = li(listRow('Các trang', 'Beta'))
+    const beta = li(listRow('Thanh trên', 'Bê'))
     // The middle of a row is not "inside" on a flat list.
     dropOn(beta, 15, ['dragOver'])
-    expect(await screen.findByText('trước Beta')).toBeTruthy()
+    expect(await screen.findByText('trước Bê')).toBeTruthy()
     dropOn(beta, 15, ['drop'])
     await waitFor(() =>
       expect(api.updateSite).toHaveBeenCalledWith({
@@ -241,12 +260,20 @@ describe('Cấu hình', () => {
     )
   })
 
+  it('drags biz’s Mục lục the way bean’s drags, inside another page too', async () => {
+    await renderScreen('biz')
+    fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo Draft' }))
+    dropOn(li(listRow('Các mục', 'Alpha')), 20)
+    await waitFor(() => expect(api.reorderNodes).toHaveBeenCalledWith(['Alpha', 'Draft', 'Beta']))
+    expect(api.updateNode).toHaveBeenCalledWith('Draft', { parent_id: 'Alpha' })
+  })
+
   it('keeps one card per thing: Mục lục is the topic tree, and nothing without a page is left', async () => {
     await renderScreen()
     await userEvent.click(card('Mục lục'))
     expect(screen.getByText('copy:index')).toBeTruthy()
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/muc-luc')
-    for (const gone of ['Điều hướng', 'Mẫu', 'Lưu trữ', 'Cây chủ đề']) expect(within(tree()).queryByRole('button', { name: new RegExp(`^${gone}`) })).toBeNull()
+    for (const gone of ['Điều hướng', 'Mẫu', 'Lưu trữ', 'Cây chủ đề', 'Phần chung']) expect(within(tree()).queryByRole('button', { name: new RegExp(`^${gone}`) })).toBeNull()
   })
 
   it('puts the menu and home switches on the subject itself, named as the port names them', async () => {
@@ -295,26 +322,22 @@ describe('Cấu hình', () => {
     expect(del.textContent).toContain('trang hệ thống')
   })
 
-  it('lists the port’s pages under its Mục lục and adds one, named, from a chosen preset', async () => {
+  it('adds a biz page, named, from a chosen preset', async () => {
     const { createFromPreset } = await import('./PortEditors')
     vi.mocked(createFromPreset).mockResolvedValue({ id: 'n1', title: 'reading room', slug: 'reading-room', status: 'draft' } as never)
-    await renderScreen()
-    await userEvent.click(screen.getByRole('tab', { name: 'Port' }))
-    await userEvent.click(card('Mục lục'))
-    expect(rowsOf('Các trang')).toEqual(['Beta/beta', 'Alpha/alpha', 'About/about', 'Draftnháp · /draft'])
-    // A page is deleted from its row; About is a system page and has no ⋮.
+    await renderScreen('biz')
+    // A page is deleted from its row.
     expect(screen.getByRole('button', { name: 'Thao tác Beta' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Thao tác About' })).toBeNull()
     await userEvent.click(screen.getByRole('button', { name: 'Thêm trang' }))
     await userEvent.type(screen.getByLabelText('Thêm trang'), 'reading room')
     await userEvent.click(screen.getByRole('button', { name: 'mẫu bibe' }))
     await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
-    await waitFor(() => expect(createFromPreset).toHaveBeenCalledWith('bibe', 'reading room', expect.anything(), []))
+    await waitFor(() => expect(createFromPreset).toHaveBeenCalledWith('bibe', 'reading room', expect.anything(), [], null))
   })
 
   it('walks the cards with the arrow keys', async () => {
     await renderScreen()
-    card('Trang chủ blog').focus()
+    card('Trang chủ bean').focus()
     await userEvent.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(card('Mục lục'))
     await userEvent.keyboard('{ArrowDown}{ArrowUp}')

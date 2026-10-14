@@ -26,7 +26,6 @@ import { Hover } from '../lib/Hover'
 import { ContentWorkspace } from '../admin/components/ContentWorkspace'
 import { ConfigTree } from '../admin/components/ConfigTree'
 import { DisplaySettings } from '../admin/components/DisplaySettings'
-import { AuthorsPanel } from '../admin/components/AuthorsPanel'
 import { DETAIL_CSS, desk } from '../admin/components/Detail'
 import { useNav } from '../lib/nav'
 
@@ -91,12 +90,11 @@ const nameRow = 'minmax(0,1fr) 112px 124px 128px'
 const nameRowPlain = 'minmax(0,1fr) 112px'
 
 
-/** The four tabs, named once so the site map and the tab bar cannot drift. */
+/** The three tabs, named once so the site map and the tab bar cannot drift. Tác giả lives in Cấu hình since 2026-10-14; `/ad-authors` opens it there. */
 const TABS = [
   { k: 'posts', t: 'Nội dung' },
   { k: 'pages', t: 'Cấu hình' },
   { k: 'display', t: 'Cài đặt hiển thị' },
-  { k: 'authors', t: 'Tác giả' },
 ] as const
 
 /** Names where a field turns up on the site — identification, not instruction. */
@@ -859,7 +857,7 @@ export function Cms() {
 
         <div role="tablist" aria-label="Khu quản trị" className="ab-tabs" style={{ marginTop: 26 }}>
           {TABS.map((x) => (
-            <button type="button" role="tab" key={x.k} aria-selected={tab === x.k} onClick={() => nav.goCms(x.k)} className="ab-tab">
+            <button type="button" role="tab" key={x.k} aria-selected={tab === x.k || (tab === 'authors' && x.k === 'pages')} onClick={() => nav.goCms(x.k)} className="ab-tab">
               {x.t}
             </button>
           ))}
@@ -882,14 +880,9 @@ export function Cms() {
 
       {tab === 'posts' && <ContentWorkspace onChanged={() => void load()} />}
 
-      {tab === 'authors' && (
-        <div style={{ padding: '34px 56px 130px', maxWidth: 1080 }}>
-          <AuthorsPanel />
-        </div>
-      )}
-
-      {tab === 'pages' && (
+      {(tab === 'pages' || tab === 'authors') && (
         <ConfigTree
+          openAuthors={tab === 'authors'}
           modules={modules}
           renderPractice={() => {
             const practice = site.practice ?? {}

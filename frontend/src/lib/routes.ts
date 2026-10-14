@@ -60,7 +60,7 @@ const adminPages = (w: RouteWords): Record<string, Screen> => ({
   [`${w.admin}-${w.adPortDesign}`]: 'cms',
 })
 
-/** Nội dung (posts and the vocabularies filing them) · Cấu hình (every page and its settings) · Cài đặt hiển thị · Tác giả. */
+/** Nội dung (posts and the vocabularies filing them) · Cấu hình (every page and its settings) · Cài đặt hiển thị. `authors` is Cấu hình opened on its Tác giả card. */
 export type CmsTab = 'posts' | 'pages' | 'display' | 'authors'
 
 /**
