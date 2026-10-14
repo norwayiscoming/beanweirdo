@@ -353,7 +353,7 @@ export function PortfolioView(props: PortfolioViewProps) {
         </Fragment>
       ))}
       {peek && (
-        <PostPeek peek={peek} vars={vars} meta={metaOf(peek.post, moduleTitles)} href={postHref(peek.post)} card={peekCard} onClose={close} />
+        <PostPeek peek={peek} vars={vars} meta={metaOf(peek.post, moduleTitles)} cover={<Img url={peek.post.hero_image_url} />} href={postHref(peek.post)} card={peekCard} onClose={close} />
       )}
     </PortFrame>
   )

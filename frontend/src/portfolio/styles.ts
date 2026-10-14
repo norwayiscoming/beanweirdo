@@ -118,19 +118,21 @@ export const PF_CSS = `
 .pf .open-c figure:first-child figcaption{padding-left:var(--gut)}
 .pf .open-c figure:first-child .over{left:var(--gut)}
 
-.pf-peek{position:fixed;z-index:50;min-height:0;display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-2);box-shadow:0 12px 40px rgba(29,29,27,.18);overflow:hidden;color:var(--ink);font:var(--t-body)}
+.pf-peek{position:fixed;z-index:50;min-height:0;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,8fr);gap:var(--s-5);padding:var(--s-5);background:var(--paper);border:1px solid var(--line);border-radius:var(--r-2);box-shadow:0 12px 40px rgba(29,29,27,.18);color:var(--ink);font:var(--t-body)}
 .pf-peek-dim{position:fixed;inset:0;z-index:49;background:rgba(29,29,27,.35)}
-.pf-peek .head{display:flex;align-items:center;gap:var(--s-2);padding:var(--s-2) var(--s-3);border-bottom:1px solid var(--line);flex-wrap:wrap}
-.pf-peek .head .close{margin-left:auto;color:var(--ink-3);font-size:18px;line-height:1}
-.pf-peek .body{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
-.pf-peek .note{padding:var(--s-5);color:var(--ink-3)}
+.pf-peek>.ph{height:100%}
+.pf-peek .close{position:absolute;right:var(--s-2);top:2px;z-index:1;color:var(--ink-3);font-size:18px}
+.pf-peek .txt{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.pf-peek .txt .head{margin:var(--s-2) 0 var(--s-3)}
+.pf-peek .lead{color:var(--acc-700);margin-bottom:var(--s-4)}
+.pf-peek .note{color:var(--ink-3)}
+.pf-peek .prose{font:var(--t-read);color:var(--ink-2)}
+.pf-peek .prose p{margin:0 0 var(--s-3)}
+.pf-peek .prose h4{font:var(--t-title);color:var(--ink);margin:var(--s-4) 0 var(--s-2)}
 .pf-peek .cut{position:relative;overflow:hidden}
-/* A preview, not the post: nothing in it is clickable, and the template's own
-   pinned controls (long-form's index rail) are kept inside the card, then hidden. */
-.pf-peek .post{pointer-events:none;contain:paint}
-.pf-peek .post [style*="position: fixed"]{display:none}
-.pf-peek .fade{position:absolute;left:0;right:0;bottom:0;height:min(60%,320px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--s-5);background:linear-gradient(to bottom,transparent,var(--paper) 70%)}
+.pf-peek .fade{position:absolute;left:0;right:0;bottom:0;height:min(55%,260px);display:flex;align-items:flex-end;justify-content:center;padding-bottom:var(--s-3);background:linear-gradient(to bottom,transparent,var(--paper) 70%)}
 .pf-peek .more{font:var(--t-label);padding:10px 22px;border-radius:999px;background:var(--ink);color:var(--paper);text-decoration:none}
+@media (max-width:639px){.pf-peek{grid-template-columns:1fr;grid-template-rows:140px minmax(0,1fr);gap:var(--s-3);padding:var(--s-4)}}
 
 .pf .lbl.acc{color:var(--acc-700)}
 .pf .home-card .d2{margin-top:2px}

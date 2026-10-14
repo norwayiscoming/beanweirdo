@@ -16,12 +16,15 @@ click mới hiện thẻ; dừng chuột 2 giây là hiện (sau đó chủ site
     thì đóng. Chỉ áp cho `pointerType === 'mouse'`.
   - Click (và chạm trên điện thoại) mở ngay, thẻ ở lại tới khi bấm ×, Esc hoặc
     bấm ra ngoài. Màn hẹp hơn 640px: thẻ nằm giữa trên nền tối.
-  - Thẻ cố định 440×600 (thấp hơn nếu cửa sổ thấp), thân bài vẽ bằng
-    `PostRenderer` khuôn của chính bài với `mobile`, cuộn được tới `SHOWN` = 30%
-    chiều cao bài (không dưới một khung thẻ, không quá 2,5 khung), rồi lớp mờ và
-    nút "Đọc tiếp" trỏ tới `postHref` (cùng địa chỉ "đọc bài →" cũ dùng).
+  - Thẻ giữ khung cũ (ảnh bìa trái, meta, tag, tiêu đề, lead) và cố định
+    720×520 (thấp hơn nếu cửa sổ thấp). Cột phải cuộn được: sau lead là chữ
+    của bài lấy bằng `lib/postText.ts`: `proseOf` (đi qua `body` mọi khuôn, lấy
+    tiêu đề mục và đoạn văn, vẽ bằng chữ của trang port, không bằng khuôn bài),
+    tới `SHOWN` = 30% chiều cao (không dưới một khung, không quá 2,5 khung), rồi
+    lớp mờ và nút "Đọc tiếp" trỏ tới `postHref` (cùng địa chỉ "đọc bài →" cũ).
+    Màn hẹp: ảnh lên trên, cao 140px.
   - Hộp thoại cũ (`Summary` trong `PortfolioView.tsx`, CSS `.pf-pop`) đã xoá.
-    Dòng "trước khi đọc" + lead không còn trong thẻ.
+    Nhãn "trước khi đọc" bỏ; lead vẫn nằm dưới tiêu đề.
 - **[SỬA LỖI]** không có.
 
 ## Đã đụng
@@ -30,8 +33,6 @@ click mới hiện thẻ; dừng chuột 2 giây là hiện (sau đó chủ site
   vừa vào bài, trước 3 giây), giữ trong bộ nhớ cho cả lượt xem (`loadPost`).
   Trước đây thẻ không đọc thêm gì.
 - Không đổi endpoint, cột hay migration.
-- `packages/post-renderer/src/PostRenderer.tsx`: chỉ sửa chú thích liệt kê chỗ
-  truyền `mobile`.
 
 ## Kiểm
 
@@ -41,6 +42,5 @@ ngoài đóng. Ảnh: `/mnt/project-files/the-xem-truoc/`.
 
 ## Đề xuất
 
-- Các thành phần `position: fixed` của khuôn (dải mục lục long-form) bị ẩn trong
-  thẻ bằng CSS `.pf-peek .post [style*="position: fixed"]`. Nếu khuôn đổi cách
-  viết style, selector này cần xem lại.
+- `proseOf` bỏ ảnh, bảng số liệu và định dạng chữ (đậm, nghiêng). Nếu chủ site
+  muốn thẻ giống hệt trang bài, cần một bản vẽ thu nhỏ của từng khuôn.

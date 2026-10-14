@@ -1,16 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { PostRenderer } from 'post-renderer'
 import { supabase } from '../lib/supabaseClient'
 import type { PostRow } from '../data/usePublishedPosts'
-import { findPage, useModules } from '../data/useModules'
-import { toArticleData, toBitesizeData, toCardsData, toLongformData, toMemoData, toReportData } from '../lib/postToRenderer'
+import { proseOf } from '../lib/postText'
 import { TagBadges } from '../components/TagBadges'
 import type { PortPost } from './blocks'
 
 /**
- * A post's preview card on a port page: the top of the real post, the rest
- * faded out under a "Đọc tiếp" button, Medium-paywall style.
+ * A post's preview card on a port page: its picture, meta and title as the
+ * card always had, then the opening of its text, the rest faded out under a
+ * "Đọc tiếp" button, Medium-paywall style.
  *
  * A mouse resting on a post for HOVER_MS opens it; a click (and every tap,
  * since touch has no hover) opens it at once and keeps it open until closed.
@@ -20,8 +19,8 @@ const HOVER_MS = 3000
 const LEAVE_MS = 250
 /** Share of the post the card lets a reader see before the fade. */
 const SHOWN = 0.3
-const CARD_W = 440
-const CARD_H = 600
+const CARD_W = 720
+const CARD_H = 520
 /** Below this the card is centred over a dimmed page instead of beside the post. */
 const NARROW = 640
 
@@ -114,6 +113,7 @@ export function PostPeek({
   peek,
   vars,
   meta,
+  cover,
   href,
   card,
   onClose,
@@ -121,12 +121,15 @@ export function PostPeek({
   peek: Peek
   vars: CSSProperties
   meta: string
+  /** The post's picture, drawn by the page so it crops like every other one there. */
+  cover: ReactNode
   href: string
   card: ReturnType<typeof usePeek>['card']
   onClose: () => void
 }) {
   const box = useRef<HTMLDivElement>(null)
   const narrow = window.innerWidth < NARROW
+  const { post } = peek
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -143,23 +146,25 @@ export function PostPeek({
   return createPortal(
     <>
       {narrow && <div className="pf-peek-dim" />}
-      <div ref={box} className="pf-peek pf" style={{ ...vars, ...place(peek.at) }} role="dialog" aria-label={peek.post.en} {...card}>
-        <div className="head">
+      <div ref={box} className="pf-peek pf" style={{ ...vars, ...place(peek.at) }} role="dialog" aria-label={post.en} {...card}>
+        <button className="close" onClick={onClose} aria-label="đóng">
+          ×
+        </button>
+        {cover}
+        <PeekText id={post.id} href={href}>
           <span className="meta">{meta}</span>
-          <TagBadges tags={peek.post.tags ?? []} />
-          <button className="close" onClick={onClose} aria-label="đóng">
-            ×
-          </button>
-        </div>
-        <PeekBody id={peek.post.id} href={href} />
+          <TagBadges tags={post.tags ?? []} style={{ margin: '6px 0 2px' }} />
+          <h3 className="head">{post.en}</h3>
+          {(post.lead || post.vi) && <p className="lead">{post.lead || post.vi}</p>}
+        </PeekText>
       </div>
     </>,
     document.body,
   )
 }
 
-function PeekBody({ id, href }: { id: string; href: string }) {
-  const { data: modules, tagsOf } = useModules()
+/** The card's right column: its heading, then the text up to the cut. */
+function PeekText({ id, href, children }: { id: string; href: string; children: ReactNode }) {
   const [post, setPost] = useState<PostRow | null | 'error'>(null)
   const view = useRef<HTMLDivElement>(null)
   const inner = useRef<HTMLDivElement>(null)
@@ -177,7 +182,7 @@ function PeekBody({ id, href }: { id: string; href: string }) {
     }
   }, [id])
 
-  // Images arrive after the text, so the post keeps growing; the cut follows it.
+  // Late fonts reflow the text, so the cut follows its height rather than reading it once.
   useLayoutEffect(() => {
     if (!inner.current || !view.current) return
     const measure = () => setSize({ full: inner.current?.offsetHeight ?? 0, view: view.current?.clientHeight ?? 0 })
@@ -187,30 +192,23 @@ function PeekBody({ id, href }: { id: string; href: string }) {
     return () => ro.disconnect()
   }, [post])
 
-  if (post === null) return <div className="body note">Đang tải…</div>
-  if (post === 'error') return <div className="body note">Không tải được bài.</div>
-
-  // A short post still fills the card; a long one never asks for more than a
+  // A short post still fills the column; a long one never asks for more than a
   // few screens of scrolling before the fade.
   const cut = Math.min(Math.max(size.full * SHOWN, size.view), size.view * 2.5, size.full)
-  const mod = findPage(modules, post.module_id)
 
   return (
-    <div className="body" ref={view}>
+    <div className="txt" ref={view}>
       <div className="cut" style={{ height: cut || undefined }}>
-        <div className="post" ref={inner}>
-          {post.template === 'bitesize' ? (
-            <PostRenderer mobile template="bitesize" post={toBitesizeData(post, { mod, tag: tagsOf?.(post.id)[0]?.label })} />
-          ) : post.template === 'memo' ? (
-            <PostRenderer mobile template="memo" post={toMemoData(post, mod)} />
-          ) : post.template === 'longform' ? (
-            <PostRenderer mobile template="longform" post={toLongformData(post, mod)} />
-          ) : post.template === 'cards' ? (
-            <PostRenderer mobile template="cards" post={toCardsData(post, mod)} />
-          ) : post.template === 'report' ? (
-            <PostRenderer mobile template="report" post={toReportData(post, mod)} />
+        <div ref={inner}>
+          {children}
+          {post === null ? (
+            <p className="note">Đang tải…</p>
+          ) : post === 'error' ? (
+            <p className="note">Không tải được bài.</p>
           ) : (
-            <PostRenderer mobile template="article" post={toArticleData(post, mod?.title ?? post.module_id, [], -1, mod)} />
+            <div className="prose">
+              {proseOf(post.body).map((b, i) => (b.h ? <h4 key={i}>{b.text}</h4> : <p key={i}>{b.text}</p>))}
+            </div>
           )}
         </div>
         <div className="fade">
