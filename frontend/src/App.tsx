@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { NewVersionNotice } from './components/NewVersionNotice'
 import { Sidebar } from './components/Sidebar'
 import { ModulesProvider, findPage, useModules } from './data/useModules'
 import { PostAddressProvider, usePostAddresses } from './data/usePostAddresses'
@@ -81,6 +82,7 @@ export function App() {
           </ModulesProvider>
         </SiteCopyProvider>
       </AuthProvider>
+      <NewVersionNotice />
       </ToastProvider>
     </SettingsContext.Provider>
   )
