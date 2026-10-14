@@ -1,7 +1,7 @@
 import { PostRenderer } from 'post-renderer'
 import { useIsMobile } from '../lib/useIsMobile'
 import { usePost } from '../data/usePost'
-import { postTitle } from '../lib/postText'
+import { postTitle, readMinutes } from '../lib/postText'
 import {
   toArticleData,
   toBitesizeData,
@@ -15,8 +15,7 @@ import { ink, sans } from '../design/tokens'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useNav } from '../lib/nav'
 import { usePostAuthors } from '../data/usePostAuthors'
-import { Byline } from '../components/Byline'
-import { TagBadges } from '../components/TagBadges'
+import { AuthorCard, Byline } from '../components/Byline'
 import { openModule } from '../lib/moduleTarget'
 
 const status = {
@@ -82,32 +81,32 @@ export function Article() {
   const crumbs = (
     <>
       {/* The byline sits close under the trail rather than a full gap below it. */}
-      <Breadcrumbs
-        style={{ opacity: 0.75, ...(authors.length > 0 && { marginBottom: 12 }) }}
-        trailing={postTitle(post)}
-        moduleId={post.module_id}
+      <Breadcrumbs style={{ opacity: 0.75, marginBottom: 14 }} trailing={postTitle(post)} moduleId={post.module_id} />
+      <Byline
+        authors={authors}
+        publishedAt={post.status === 'published' ? post.published_at : null}
+        minutes={readMinutes(post.body)}
+        tags={tagsOf?.(post.id) ?? []}
       />
-      <Byline authors={authors} />
-      {/* Every template shows the post's tags the same way, as #badges under the trail. */}
-      <TagBadges tags={tagsOf?.(post.id) ?? []} style={{ margin: '4px 0 12px' }} />
     </>
   )
+  const footer = <AuthorCard authors={authors} />
   const moduleTitle = module_?.title ?? post.module_id
 
   if (post.template === 'bitesize') {
-    return <PostRenderer template="bitesize" post={toBitesizeData(post, { mod: module_, tag: tagsOf?.(post.id)[0]?.label })} breadcrumb={crumbs} mobile={mobile} />
+    return <PostRenderer template="bitesize" post={toBitesizeData(post, { mod: module_, tag: tagsOf?.(post.id)[0]?.label })} breadcrumb={crumbs} footer={footer} mobile={mobile} />
   }
   if (post.template === 'memo') {
-    return <PostRenderer template="memo" post={toMemoData(post, module_)} breadcrumb={crumbs} mobile={mobile} />
+    return <PostRenderer template="memo" post={toMemoData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
   }
   if (post.template === 'longform') {
-    return <PostRenderer template="longform" post={toLongformData(post, module_)} breadcrumb={crumbs} mobile={mobile} />
+    return <PostRenderer template="longform" post={toLongformData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
   }
   if (post.template === 'cards') {
-    return <PostRenderer template="cards" post={toCardsData(post, module_)} breadcrumb={crumbs} mobile={mobile} />
+    return <PostRenderer template="cards" post={toCardsData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
   }
   if (post.template === 'report') {
-    return <PostRenderer template="report" post={toReportData(post, module_)} breadcrumb={crumbs} mobile={mobile} />
+    return <PostRenderer template="report" post={toReportData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
   }
 
   const related = siblings.data.filter((p) => p.id !== post.id)
@@ -119,6 +118,7 @@ export function Article() {
       template="article"
       post={toArticleData(post, moduleTitle, related, position, module_)}
       breadcrumb={crumbs}
+      footer={footer}
       renderEyebrow={(eyebrowModuleTitle) => (
         // Through moduleTarget, like the index: Ghi 01 and Ghi 02 have their
         // own screens, and the generic module page is a second, wrong door.

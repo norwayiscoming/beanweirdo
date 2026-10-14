@@ -68,6 +68,8 @@ type MemoProps = MemoOverrides & {
    * renderer package stays independent of how routing works.
    */
   breadcrumb?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  footer?: ReactNode
 }
 
 /** Only a memo with no module behind it — the standalone sample — uses this. */
@@ -198,6 +200,7 @@ const MEMO_VIEWS: Record<
 export function Memo({
   post,
   breadcrumb,
+  footer,
   mobile = false,
   renderTitle,
   renderSubtitle,
@@ -336,6 +339,7 @@ export function Memo({
             return <Fragment key={i}>{wrapElement ? wrapElement(drawn, i, el) : drawn}</Fragment>
           })}
           {renderAfterElements?.()}
+          {footer}
         </div>
       </div>
     </div>

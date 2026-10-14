@@ -41,6 +41,8 @@ export type CardsProps = CardsOverrides & {
    * renderer package stays independent of how routing works.
    */
   breadcrumb?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  footer?: ReactNode
   post: CardsPostData
 }
 
@@ -139,7 +141,7 @@ function groupsOf(cards: CardData[], hues: Record<string, string> = {}): Group[]
  * filter bar and a sticky table of contents. Modeled on the "isCards"
  * section of the design source.
  */
-export function Cards({ post, breadcrumb, mobile = false, ...overrides }: CardsProps) {
+export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }: CardsProps) {
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(() => new Set())
   const [activeGroup, setActiveGroup] = useState<string | null>(null)
   const [hoverCard, setHoverCard] = useState<number | null>(null)
@@ -395,6 +397,7 @@ export function Cards({ post, breadcrumb, mobile = false, ...overrides }: CardsP
             )
           })}
           {overrides.renderAfterCards?.()}
+          {footer}
         </div>
 
         <div style={{ position: 'sticky', top: 24 }}>

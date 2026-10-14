@@ -35,6 +35,8 @@ export type ReportProps = ReportOverrides & {
    * renderer package stays independent of how routing works.
    */
   breadcrumb?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  footer?: ReactNode
   post: ReportPostData
 }
 
@@ -49,7 +51,7 @@ const REPORT_BLUE = '#6FA8C0'
  * of a report's blocks — the admin app's insert-menu / contentEditable
  * editing chrome is not part of this shared package.
  */
-export function Report({ post, breadcrumb, mobile = false, ...overrides }: ReportProps) {
+export function Report({ post, breadcrumb, footer, mobile = false, ...overrides }: ReportProps) {
   const palette = paletteFrom(post.band?.bg ?? REPORT_BLUE, post.band?.fg)
   return (
     <div style={{ background: paper.cream, color: ink.base, minHeight: '100vh' }}>
@@ -87,7 +89,7 @@ export function Report({ post, breadcrumb, mobile = false, ...overrides }: Repor
         </div>
       </div>
 
-      <ReportBody post={post} palette={palette} overrides={overrides} mobile={mobile} />
+      <ReportBody post={post} palette={palette} overrides={overrides} mobile={mobile} footer={footer} />
     </div>
   )
 }
@@ -110,11 +112,13 @@ function ReportBody({
   palette,
   overrides,
   mobile,
+  footer,
 }: {
   post: ReportPostData
   palette: Palette
   overrides: ReportOverrides
   mobile?: boolean
+  footer?: ReactNode
 }) {
   const notes = post.notes
   const withNotes = hasNotes(notes)
@@ -161,6 +165,8 @@ function ReportBody({
           </Fragment>
         )
       })}
+      {/* Auto-placed: the first row whose first column is free is the one after the last block. */}
+      {footer && <div style={{ gridColumn: 1, minWidth: 0 }}>{footer}</div>}
     </div>
   )
 }
