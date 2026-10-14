@@ -17,6 +17,18 @@ import { isDraftTableUnreadable, readDraft } from '../../lib/drafts.js'
 
 const LIST_FILTERS = [...POST_STATUSES, 'all'] as const
 
+/** Link-table rows grouped by post, in the order they were read. A missing table reads as none. */
+function byPost(rows: unknown, column: 'keyword_id' | 'author_id'): Map<string, string[]> {
+  const out = new Map<string, string[]>()
+  for (const r of (Array.isArray(rows) ? rows : []) as Record<string, unknown>[]) {
+    const post = r.post_id
+    const id = r[column]
+    if (typeof post !== 'string' || typeof id !== 'string') continue
+    out.set(post, [...(out.get(post) ?? []), id])
+  }
+  return out
+}
+
 async function handleList(req: VercelRequest, res: VercelResponse): Promise<void> {
   const rawStatus = req.query.status
   const statusParam = Array.isArray(rawStatus) ? rawStatus[0] : (rawStatus ?? 'all')
@@ -33,10 +45,11 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
     query = query.eq('status', statusParam)
   }
 
-  const [{ data, error }, { data: drafts, error: draftError }, { data: worn }] = await Promise.all([
+  const [{ data, error }, { data: drafts, error: draftError }, { data: worn }, { data: named }] = await Promise.all([
     query,
     supabase.from('post_drafts').select('post_id'),
     supabase.from('post_keywords').select('post_id, keyword_id'),
+    supabase.from('post_authors').select('post_id, author_id').order('position', { ascending: true }),
   ])
   if (error) {
     res.status(500).json({ error: error.message })
@@ -56,15 +69,17 @@ async function handleList(req: VercelRequest, res: VercelResponse): Promise<void
   }
   const pending = new Set(((drafts ?? []) as { post_id: string }[]).map((d) => d.post_id))
 
-  // The content workspace filters and bulk-edits by theme tag, so the list
-  // carries each post's tags; one query for all of them, not one per post.
-  const tags = new Map<string, string[]>()
-  for (const r of (Array.isArray(worn) ? worn : []) as { post_id?: unknown; keyword_id?: unknown }[]) {
-    if (typeof r.post_id !== 'string' || typeof r.keyword_id !== 'string') continue
-    tags.set(r.post_id, [...(tags.get(r.post_id) ?? []), r.keyword_id])
-  }
+  // The content workspace filters by tag and by author, so the list carries
+  // each post's tag and author ids; one query per link table, not one per post.
+  const tags = byPost(worn, 'keyword_id')
+  const authors = byPost(named, 'author_id')
   res.status(200).json({
-    posts: (data as PostRow[]).map((row) => ({ ...toPostSummary(row), keywords: tags.get(row.id) ?? [], has_draft: pending.has(row.id) })),
+    posts: (data as PostRow[]).map((row) => ({
+      ...toPostSummary(row),
+      keywords: tags.get(row.id) ?? [],
+      authors: authors.get(row.id) ?? [],
+      has_draft: pending.has(row.id),
+    })),
   })
 }
 

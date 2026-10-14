@@ -76,6 +76,8 @@ export type PostSummary = {
   topic_id: string | null
   /** Tag theme ids; only the list endpoint fills it (GET /api/posts). */
   keywords?: string[]
+  /** Author ids in byline order; only the list endpoint fills it (GET /api/posts). */
+  authors?: string[]
   visibility: PostVisibility
   /** Địa chỉ đã cố định; null với bài nháp, vốn được gọi bằng địa chỉ suy ra. */
   slug: string | null

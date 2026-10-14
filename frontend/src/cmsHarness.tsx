@@ -86,14 +86,14 @@ let TOPICS: Row[] = [
   topic('p2', 'bean', 2, null, null, 0, 'port', { slug: 'bean', look: 'baen', status: 'draft' }),
 ]
 // A few posts so the Nội dung table has rows to look at.
-const post = (id: string, vi: string, topic_id: string, status: string, template: string, date_label: string, keywords: string[] = []): Row => ({
+const post = (id: string, vi: string, topic_id: string, status: string, template: string, date_label: string, keywords: string[] = [], authors: string[] = ['a1']): Row => ({
   id, module_id: 'bean', en: vi, vi, lead: null, kind: 'note', date_label, status, template, hero_image_url: null, theme_color: null, thumbnail_url: null,
-  sort_order: null, pinned: false, topic_id, keywords, visibility: 'public', slug: id,
+  sort_order: null, pinned: false, topic_id, keywords, authors, visibility: 'public', slug: id,
 })
 const POSTS: Row[] = [
   post('p-a', 'Rang nhạt hay rang đậm', 'roasting', 'published', 'article', '12.10.2026', ['heat']),
   post('p-b', 'Vị chua đến từ đâu', 'sensory', 'published', 'memo', '08.10.2026', ['acid']),
-  post('p-c', 'Ghi chép buổi cupping', 'ghi', 'draft', 'cards', '02.10.2026'),
+  post('p-c', 'Ghi chép buổi cupping', 'ghi', 'draft', 'cards', '02.10.2026', [], ['a2']),
 ]
 const KEYWORDS: Row[] = [
   { id: 'heat', label: 'heat', posts: 4 },

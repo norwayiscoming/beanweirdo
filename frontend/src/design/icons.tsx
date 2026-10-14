@@ -99,6 +99,16 @@ export const IconCrop = ({ size = 16, style }: IconProps) =>
     </>,
   )
 
+export const IconSearch = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="M15.5 15.5L20.5 20.5" />
+    </>,
+  )
+
 export const IconPlus = ({ size = 16, style }: IconProps) =>
   svg(size, style, <path d="M12 4v16M4 12h16" />)
 

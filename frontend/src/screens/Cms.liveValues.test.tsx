@@ -35,6 +35,7 @@ vi.mock('../admin/lib/apiClient', () => ({
   // Cấu hình (bước 3c) đọc tầng feature.
   getLayout: () => Promise.resolve({ pages: [], overrides: [], rules: [] }),
   listKeywords: () => Promise.resolve([]),
+  listAuthors: () => Promise.resolve([]),
   // Cấu hình cũng giữ các trang port.
   getPortDesign: () => Promise.resolve({}),
   createModule: vi.fn(), deleteModule: vi.fn(), reorderModules: vi.fn(),
