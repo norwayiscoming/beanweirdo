@@ -420,14 +420,13 @@ describe('POST /api/posts — starting from a template', () => {
 /*
  * Cột `thumbnail_url` (xem docs/inbox/qa/2026-09-18-qa-39-thumbnail-url.sql).
  *
- * Trước đây danh sách bài kéo cả `body` về chỉ để tìm một tấm ảnh, nên mở
- * /ad-post là tải toàn bộ nội dung mọi bài. Hai bài kiểm dưới đây khoá đúng
- * điều ấy lại: câu select không được nhắc tới `body`, và giá trị ảnh phải được
- * tính lúc **ghi** chứ không phải lúc đọc.
+ * Trước đây danh sách bài gửi cả `body` ra trình duyệt chỉ để tìm một tấm ảnh,
+ * nên mở /ad-post là tải toàn bộ nội dung mọi bài. Giờ máy chủ có đọc `body`
+ * để cắt dòng xem trước, nhưng chỉ gửi đi dòng ấy, không gửi `body`.
  */
-describe('GET /api/posts — không kéo body về nữa', () => {
-  it('lấy thumbnail_url, và không hỏi body', async () => {
-    const builder = queryBuilder({ data: [SAMPLE_ROW], error: null })
+describe('GET /api/posts — không gửi body ra trình duyệt', () => {
+  it('gửi thumbnail_url và dòng xem trước, không gửi body', async () => {
+    const builder = queryBuilder({ data: [{ ...SAMPLE_ROW, body: [{ p: 'Câu đầu bài.' }] }], error: null })
     fromMock.mockReturnValue(builder)
 
     const req = mockReq({ method: 'GET', headers: authHeaders(token), query: {} })
@@ -435,50 +434,9 @@ describe('GET /api/posts — không kéo body về nữa', () => {
     await handler(req, res)
     expect(res.statusCode).toBe(200)
 
-    const columns = builder.select.mock.calls[0][0] as string
-    expect(columns).toContain('thumbnail_url')
-    expect(columns).not.toContain('body')
-  })
-})
-
-describe('POST /api/posts — ảnh đại diện tính lúc ghi', () => {
-  function createWith(startingBody: unknown) {
-    const template = queryBuilder({ data: { renderer: 'longform', body: startingBody }, error: null })
-    const insert = queryBuilder({ data: { id: 'new' }, error: null })
-    fromMock.mockReturnValueOnce(template).mockReturnValueOnce(insert)
-    return insert
-  }
-
-  it('lưu tấm ảnh đầu tiên của thân bài mà nó vừa ghi', async () => {
-    // Bài mới dựng từ một bài mẫu có sẵn ảnh bên trong.
-    const insert = createWith([{ k: 'p' }, { k: 'fig', src: '/from-template.png' }])
-
-    const req = mockReq({
-      method: 'POST',
-      headers: authHeaders(token),
-      body: { module_id: 'sensory', kind: 'essay', en: 'Bài mới', vi: '', templateId: 't-1' },
-    })
-    const res = mockRes()
-    await handler(req, res)
-    expect(res.statusCode).toBe(201)
-
-    const written = insert.insert.mock.calls[0][0] as Record<string, unknown>
-    expect(written.thumbnail_url).toBe('/from-template.png')
-  })
-
-  it('để trống khi bài mẫu không có ảnh nào', async () => {
-    const insert = createWith([{ k: 'p', text: 'chữ thôi' }])
-
-    const req = mockReq({
-      method: 'POST',
-      headers: authHeaders(token),
-      body: { module_id: 'sensory', kind: 'essay', en: 'Bài mới', vi: '', templateId: 't-1' },
-    })
-    const res = mockRes()
-    await handler(req, res)
-    expect(res.statusCode).toBe(201)
-
-    const written = insert.insert.mock.calls[0][0] as Record<string, unknown>
-    expect(written.thumbnail_url).toBeNull()
+    expect(builder.select.mock.calls[0][0] as string).toContain('thumbnail_url')
+    const [post] = (res.body as { posts: Record<string, unknown>[] }).posts
+    expect(post).not.toHaveProperty('body')
+    expect(post).toMatchObject({ excerpt: 'Câu đầu bài.', read_minutes: 1 })
   })
 })

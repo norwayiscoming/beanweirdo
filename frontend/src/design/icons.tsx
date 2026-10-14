@@ -150,16 +150,6 @@ export const IconGrip = ({ size = 16, style }: IconProps) =>
     true,
   )
 
-export const IconEdit = ({ size = 16, style }: IconProps) =>
-  svg(
-    size,
-    style,
-    <>
-      <path d="M4 20h4L19 9l-4-4L4 16z" />
-      <path d="M13.5 6.5l4 4" />
-    </>,
-  )
-
 /** Opens somewhere else — a new tab. */
 export const IconExternal = ({ size = 16, style }: IconProps) =>
   svg(

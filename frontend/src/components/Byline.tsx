@@ -19,7 +19,7 @@ function names(authors: BylineAuthor[]): string {
   return all.length < 2 ? (all[0] ?? '') : `${all.slice(0, -1).join(', ')} và ${all[all.length - 1]}`
 }
 
-function Avatar({ author, size, ring }: { author: BylineAuthor; size: number; ring?: boolean }) {
+export function Avatar({ author, size, ring }: { author: BylineAuthor; size: number; ring?: boolean }) {
   const style: CSSProperties = {
     width: size,
     height: size,
