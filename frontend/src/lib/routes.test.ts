@@ -38,7 +38,6 @@ describe('routes — đi một vòng rồi về đúng chỗ cũ', () => {
       expect(back.screen).toBe(where.screen)
       if (where.moduleId) expect(back.moduleId).toBe(where.moduleId)
       if (where.slug) expect(back.slug).toBe(where.slug)
-      if (where.templateId) expect(back.templateId).toBe(where.templateId)
       if (where.from) expect(back.from).toBe(where.from)
     })
   }

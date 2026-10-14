@@ -21,12 +21,8 @@ export type Where = {
   moduleId?: string
   /** The post being read, edited or previewed — by slug, never by id. */
   slug?: string
-  /** The template open inside the Templates screen. */
-  templateId?: string
   /** Which tab of Content management is open. */
   tab?: CmsTab
-  /** Which tab of Portfolio is open. */
-  portTab?: PortTab
   /** Which door an article was opened through — see `Origin`. */
   from?: Origin
 }
@@ -66,14 +62,6 @@ const adminPages = (w: RouteWords): Record<string, Screen> => ({
 
 /** Nội dung (posts and the vocabularies filing them) · Cấu hình (every page and its settings) · Cài đặt hiển thị · Tác giả. */
 export type CmsTab = 'posts' | 'pages' | 'display' | 'authors'
-
-/** Portfolio has two tabs: port pages (create, arrange) and the design system. */
-export type PortTab = 'pages' | 'content' | 'design'
-const portTabs = (w: RouteWords): Record<string, PortTab> => ({
-  [`${w.admin}-${w.adPortfolio}`]: 'pages',
-  [`${w.admin}-${w.adPortContent}`]: 'content',
-  [`${w.admin}-${w.adPortDesign}`]: 'design',
-})
 
 /**
  * Which tab of Content management an `/ad-…` address opens on.
@@ -187,7 +175,6 @@ function readPath(pathname: string, search: string, w: RouteWords): Where | null
       if (screen) return { area: 'admin', screen, slug: slug || undefined }
     }
     const screen = adminPages(w)[head]
-    if (screen === 'portfolio') return { area: 'admin', screen, portTab: portTabs(w)[head] }
     if (screen) return { area: 'admin', screen, tab: cmsTabs(w)[head] }
     return { area: 'admin', screen: 'cms' }
   }
@@ -232,8 +219,6 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
     if (action) return where.slug ? `${adPost}/${action}=${where.slug}` : `${adPost}/${action}`
     if (where.screen === 'article') return where.slug ? `${blog}/${w.post}/${where.slug}?from=admin` : adHome
     if (where.screen === 'cms') return where.tab ? `/${pageOfTab(w)[where.tab]}` : adHome
-    if (where.screen === 'portfolio')
-      return `/${w.admin}-${where.portTab === 'design' ? w.adPortDesign : where.portTab === 'content' ? w.adPortContent : w.adPortfolio}`
     const page = screenPage(w)[where.screen]
     return page ? `/${page}` : adHome
   }

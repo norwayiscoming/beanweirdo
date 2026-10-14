@@ -49,10 +49,6 @@ type PageSlot = 1 | 2 | 3 | 4
  */
 export const pageSlotCount = pageSlotCountOf
 
-export function pageSlots(layout: string): PageSlot[] {
-  return ([1, 2, 3, 4] as PageSlot[]).slice(0, pageSlotCount(layout))
-}
-
 /**
  * The photo for one slot: the page's own, or the homepage's when unset.
  *

@@ -63,10 +63,6 @@ export const rootsOf = <T extends TreeRow>(rows: readonly T[]): T[] =>
 export const childrenOf = <T extends TreeRow>(rows: readonly T[], id: string): T[] =>
   rows.filter((r) => parentIdOf(rows, r) === id)
 
-/** Whether anything sits inside this row. */
-export const hasChildren = <T extends TreeRow>(rows: readonly T[], id: string): boolean =>
-  rows.some((r) => parentIdOf(rows, r) === id)
-
 /**
  * The walk from the top down to `id`, not including `id` itself.
  *
@@ -173,17 +169,4 @@ export function canReparent<T extends TreeRow>(
     return { ok: false, reason: 'a module cannot sit inside one of its own descendants' }
   }
   return { ok: true }
-}
-
-/**
- * Every row that could become `id`'s parent, in the order it was given.
- *
- * The complement of `canReparent`, for the picker in the CMS: rather than
- * offering every module and refusing four of them after the click, offer the
- * ones that would be accepted. Itself and everything already inside it are
- * what drop out — a module cannot be filed inside its own contents.
- */
-export function possibleParents<T extends TreeRow>(rows: readonly T[], id: string): T[] {
-  const inside = new Set(descendantIds(rows, id))
-  return rows.filter((r) => !inside.has(r.id))
 }

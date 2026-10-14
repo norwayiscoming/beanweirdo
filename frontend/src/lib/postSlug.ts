@@ -73,19 +73,6 @@ export function uniqueSlug(parts: SlugParts, taken: Iterable<string>, w: RouteWo
   return `${base}-${Date.now().toString(36).slice(-4)}${suffix}`
 }
 
-/**
- * What a post's slug should be after a status change.
- *
- * Publishing drops `.draft` and nothing else moves: the day it was written
- * stays the day it was written. Returns null when nothing needs rewriting.
- */
-export function slugAfterStatus(current: string, status: string, w: RouteWords = activeWords()): string | null {
-  const mark = `.${w.draftMark}`
-  const isDraft = current.endsWith(mark)
-  if (status === 'draft') return isDraft ? null : `${current}${mark}`
-  return isDraft ? current.slice(0, -mark.length) : null
-}
-
 /** A post as far as its address is concerned. */
 export type Addressable = {
   id: string
@@ -130,10 +117,4 @@ export function slugsFor(posts: readonly Addressable[], w: RouteWords = activeWo
     taken.add(slug)
   }
   return out
-}
-
-/** The post an address points at, or null. */
-export function findBySlug<T extends Addressable>(posts: readonly T[], slug: string): T | null {
-  const slugs = slugsFor(posts)
-  return posts.find((p) => slugs.get(p.id) === slug) ?? null
 }

@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Area } from './area'
-import type { CmsTab, PortTab } from './routes'
+import type { CmsTab } from './routes'
 
 export type Screen =
   | 'landing'
@@ -11,21 +11,14 @@ export type Screen =
   | 'hours'
   | 'notes'
   | 'cms'
-  /** Admin › Portfolio — port pages and the design system. */
-  | 'portfolio'
   /** Public port page, /<slug>. */
   | 'portfolioPage'
   /** / — the main page, and /about. */
   | 'portfolioHome'
   | 'portfolioAbout'
-  | 'cards'
-  | 'report'
   // The post-authoring flow, reached from Content management's first tab.
   | 'postEdit'
   | 'postPreview'
-  /** Admin › Templates — the stored blueprints. */
-  /** A template with sample content in it, under Admin › Templates. */
-  | 'template'
 
 /** Two shapes for the index screen — a ledger (A) and three columns (B). */
 export type Variant = 'A' | 'B'
@@ -55,11 +48,8 @@ export type Nav = {
   /** The post currently open on the article screen — null until one is picked. */
   postId: string | null
   articleFrom: Origin
-  /** The template open under Admin › Templates — null on the list itself. */
   /** Which tab of Content management is open. */
   cmsTab: CmsTab
-  /** Which tab of Portfolio is open. */
-  portTab: PortTab
   /** Slug of the public port page currently open. */
   slug: string | null
   goLanding(): void
@@ -68,14 +58,6 @@ export type Nav = {
   goHours(): void
   goNotes(): void
   goCms(tab?: CmsTab): void
-  goPortfolio(tab?: PortTab): void
-  /**
-   * Open one template, or `null` for the list.
-   *
-   * The open template is a place, not a mode: the trail names it and the back
-   * button returns from it. That only works if the address says which one is
-   * open, so the screen asks to be moved rather than moving itself.
-   */
   openModule(id: string): void
   /**
    * Optional id: some call sites (the sidebar's Templates links) don't have a

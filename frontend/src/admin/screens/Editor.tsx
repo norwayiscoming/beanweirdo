@@ -693,7 +693,6 @@ function EditorStyles() {
     <style>{`
       .awc-editable{ transition: border-color .12s, background-color .12s; }
       .awc-editable:hover, .awc-editable:focus{ border-color: rgba(0,0,0,.3); background: rgba(255,255,255,.4); outline: none; }
-      .awc-hero-drop:hover{ border-color: rgba(0,0,0,.45); }
       .awc-insert-menu{ display: flex; flex-direction: column; gap: 10px; }
       .awc-insert-group{ display: flex; flex-direction: column; gap: 1px; }
       .awc-insert-glyph{ flex: 0 0 26px; height: 26px; display: flex; align-items: center; justify-content: center; border: 1px solid #EBE5D3; border-radius: 6px; color: #5C5647; background: #FDFBF2; }

@@ -110,12 +110,6 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
 
   // Supabase reads (published posts for the port blocks): an empty table.
   if (url.includes('/rest/v1/')) return json([])
-  if (url.includes('/api/modules') && method === 'PUT') {
-    const order = body.order as string[]
-    MODULES = order.map((id, i) => ({ ...MODULES.find((m) => m.id === id)!, sort_order: i + 1 }))
-    console.log('PUT /api/modules', order.join(' → '))
-    return json({ modules: MODULES })
-  }
   if (url.includes('/api/modules/') && method === 'PATCH') {
     const id = url.split('/api/modules/')[1].split('?')[0]
     MODULES = MODULES.map((m) => (m.id === id ? { ...m, ...body } : m))

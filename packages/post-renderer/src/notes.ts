@@ -45,8 +45,6 @@ export type PostNotes = {
   fieldNotes: FieldNote[]
 }
 
-export const EMPTY_NOTES: PostNotes = { explorations: [], fieldNotes: [] }
-
 /** Written-in entries only — a bullet holding nothing but spaces is not content. */
 const written = <T extends { text: string }>(items: T[]): T[] =>
   items.filter((i) => i.text.trim().length > 0)
@@ -55,7 +53,7 @@ export function liveExplorations(notes: PostNotes | undefined): Exploration[] {
   return written(notes?.explorations ?? [])
 }
 
-export function liveFieldNotes(notes: PostNotes | undefined): FieldNote[] {
+function liveFieldNotes(notes: PostNotes | undefined): FieldNote[] {
   return written(notes?.fieldNotes ?? [])
 }
 

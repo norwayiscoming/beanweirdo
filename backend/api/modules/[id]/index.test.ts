@@ -100,23 +100,6 @@ describe('PATCH /api/modules/:id', () => {
   })
 })
 
-describe('DELETE /api/modules/:id', () => {
-  it('returns 204 once the row is gone', async () => {
-    fromMock.mockReturnValue(queryBuilder({ data: { id: 'sensory' }, error: null }))
-    const res = mockRes()
-    await handler(mockReq({ method: 'DELETE', query: q(), headers: authHeaders(signToken()) }), res)
-    expect(res.statusCode).toBe(204)
-    expect(res.ended).toBe(true)
-  })
-
-  it('404s when the module does not exist', async () => {
-    fromMock.mockReturnValue(queryBuilder({ data: null, error: null }))
-    const res = mockRes()
-    await handler(mockReq({ method: 'DELETE', query: q('nope'), headers: authHeaders(signToken()) }), res)
-    expect(res.statusCode).toBe(404)
-  })
-})
-
 describe('/api/modules/:id — other methods', () => {
   it('rejects GET with 405', async () => {
     const res = mockRes()
@@ -126,39 +109,11 @@ describe('/api/modules/:id — other methods', () => {
 })
 
 /*
- * Số lượt đi tới database cho một lần bấm nút. Ba bài dưới đây khoá lại thiết
- * kế chứ không chỉ khoá kết quả — nếu ai đó thêm một lượt đọc "cho chắc" vào
- * đường thường, chúng đỏ.
+ * Số lượt đi tới database cho một lần bấm nút. Bài dưới đây khoá lại thiết kế
+ * chứ không chỉ khoá kết quả — nếu ai đó thêm một lượt đọc "cho chắc" vào
+ * đường thường, nó đỏ.
  */
 describe('/api/modules/:id — số câu lệnh', () => {
-  it('xoá một module không có con là MỘT câu', async () => {
-    const builder = queryBuilder({ data: { id: 'sensory' }, error: null })
-    fromMock.mockReturnValue(builder)
-
-    const res = mockRes()
-    await handler(mockReq({ method: 'DELETE', query: q(), headers: authHeaders(signToken()) }), res)
-
-    expect(res.statusCode).toBe(204)
-    // Phép chặn "còn module con" là của khoá ngoại, không phải của route —
-    // nên đường thường không trả tiền cho nó.
-    expect(fromMock).toHaveBeenCalledTimes(1)
-    expect(builder.delete).toHaveBeenCalled()
-  })
-
-  it('khoá ngoại chặn thì mới đọc, và nói rõ còn mấy cái', async () => {
-    fromMock
-      // 23503 = còn hàng khác trỏ vào. Với `modules` thì chỉ có thể là module con.
-      .mockReturnValueOnce(queryBuilder({ data: null, error: { code: '23503', message: 'fk' } }))
-      .mockReturnValueOnce(queryBuilder({ data: [{ id: 'con-1' }, { id: 'con-2' }], error: null }))
-
-    const res = mockRes()
-    await handler(mockReq({ method: 'DELETE', query: q(), headers: authHeaders(signToken()) }), res)
-
-    expect(res.statusCode).toBe(409)
-    expect(res.body.error).toMatch(/2 module/)
-    expect(fromMock).toHaveBeenCalledTimes(2)
-  })
-
   it('sửa module thôi trả về cả bản ghi', async () => {
     const builder = queryBuilder({ data: { id: 'sensory', title: 'tên mới' }, error: null })
     fromMock.mockReturnValue(builder)
