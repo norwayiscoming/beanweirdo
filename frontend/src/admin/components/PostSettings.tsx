@@ -61,9 +61,10 @@ export function topicPath(topics: readonly Node[], id: string | null | undefined
   return t ? [...ancestorsOf(topics, t.id), t].map((n) => n.title).join(' › ') : null
 }
 
+/** One flat group under a rule: the owner wants one ground for the whole panel, no boxed cards on it (2026-10-14). */
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section aria-label={title} style={{ background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: 6, padding: '4px 14px' }}>
+    <section aria-label={title} style={{ borderTop: `1px solid ${desk.line}`, paddingTop: 4 }}>
       <h3 style={{ margin: 0, padding: '10px 0 6px', fontSize: 12, fontWeight: 600, color: ink.soft }}>{title}</h3>
       {children}
     </section>
@@ -160,7 +161,7 @@ export function PostSettings({
         bottom: 0,
         width: `min(${SETTINGS_WIDTH}px, 100vw)`,
         boxSizing: 'border-box',
-        background: desk.ground,
+        background: desk.panel,
         borderLeft: `1px solid ${desk.line}`,
         boxShadow: open ? '-8px 0 24px rgba(0,0,0,.06)' : 'none',
         transform: open ? 'none' : 'translateX(100%)',
@@ -169,7 +170,7 @@ export function PostSettings({
         padding: '14px 16px 32px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 12,
+        gap: 8,
         fontFamily: sans,
         color: ink.base,
         zIndex: 20,

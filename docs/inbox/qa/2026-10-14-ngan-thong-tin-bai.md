@@ -12,7 +12,7 @@ như Notion. Sau đó dặn thêm: Xem trước / Lưu nháp lên trên cùng, �
   xem, Địa chỉ, Địa chỉ cũ và Màu bài chuyển vào ngăn `PostSettings`
   (`admin/components/PostSettings.tsx`), mở bằng nút "Thông tin bài". Trước: dải
   ngang trên đầu (`PostPlacement.tsx`, đã xoá). Sau: bốn nhóm Vị trí · Người
-  viết · Hiển thị · Địa chỉ & quyền xem. Esc trong ngăn thì đóng; mở hay đóng
+  viết · Hiển thị · Địa chỉ & quyền xem. Ngăn một nền trắng, các nhóm chỉ ngăn bằng đường kẻ, không khung bo (chủ site dặn). Esc trong ngăn thì đóng; mở hay đóng
   được nhớ trong `localStorage` (`SETTINGS_KEY` trong `Editor.tsx`). Màn rộng
   ≥1100px thì ngăn đẩy trang sang trái, hẹp hơn thì nằm đè lên.
 - **[ĐỔI HÀNH VI]** Xem trước, Lưu nháp, Publish/Đăng thay đổi chuyển từ cuối
