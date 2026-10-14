@@ -206,6 +206,7 @@ export function toLongformData(post: RenderablePost, mod: RenderableModule | und
   return {
     title: postTitle(post),
     subtitle: postDescription(post),
+    cover: post.hero_image_url,
     blocks: Array.isArray(post.body) ? (post.body as LongformBlock[]) : [],
     band: bandOf(post, mod),
   }

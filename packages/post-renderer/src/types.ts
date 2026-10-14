@@ -254,6 +254,8 @@ export type LongformPostData = {
   title: string
   /** Italic line under the title; empty on the standalone sample. */
   subtitle?: string
+  /** The post's cover image, drawn across the top of the reading column; none, nothing drawn. */
+  cover?: string | null
   blocks: LongformBlock[]
 }
 
