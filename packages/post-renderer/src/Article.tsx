@@ -111,8 +111,12 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
           position: 'relative',
         }}
       >
-        {/* `measure` counts the band's 56px side margins; the frame is what sits between them. */}
-        <div style={frame(layout.measure - 112)}>
+        {/*
+          * `measure` counts the band's 56px side margins; the frame is what sits
+          * between them. The colour runs edge to edge, while the words and the
+          * hero plate keep to the frame, so both line up with the body below.
+          */}
+        <div style={{ ...frame(layout.measure - 112), position: 'relative' }}>
         {breadcrumb}
         <div style={{ ...label, opacity: 0.7, marginBottom: 24 }}>
           {overrides.renderEyebrow ? overrides.renderEyebrow(post.moduleTitle) : `← ${post.moduleTitle}`}
@@ -163,7 +167,6 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             {overrides.renderLead ? overrides.renderLead(post.lead) : post.lead}
           </div>
         )}
-        </div>
 
         <div
           data-testid="article-hero-plate"
@@ -173,8 +176,10 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             // chữ chỉ còn 90px.
             position: mobile ? 'relative' : 'absolute',
             right: 0,
-            top: 0,
-            bottom: 0,
+            // Reaches through the band's own top and bottom padding, so the
+            // plate still fills the band's full height from inside the frame.
+            top: mobile ? 0 : -46,
+            bottom: mobile ? 0 : -72,
             width: mobile ? '100%' : 300,
             height: mobile ? 200 : undefined,
             ...fillStyle(post.heroPlate.imageUrl, post.heroPlate.tint),
@@ -194,6 +199,7 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             action={overrides.renderPlateAction}
             slot={{ key: 'hero', imageUrl: post.heroPlate.imageUrl ?? null }}
           />
+        </div>
         </div>
       </div>
 

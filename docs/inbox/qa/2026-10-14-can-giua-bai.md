@@ -36,3 +36,8 @@ Chủ site (2026-10-14, ảnh bài "Detachment, 2011, Tony Kaye"): nội dung d�
 ## Kiểm tra
 - `npx vitest run packages/post-renderer`, typecheck, eslint xanh.
 - Chromium (vite ở máy, dữ liệu mẫu, không dùng Supabase): sáu khuôn ở 1600px và 1180px, trang soạn bitesize/report/memo ở 1600px, chụp trước/sau.
+
+## [ĐỔI HÀNH VI] Article: dải màu chạy hết bề ngang, ảnh hero vào khung
+- Chủ site duyệt ảnh trước/sau (2026-10-14): dải màu đầu bài phải chạy từ trái sang phải, tiêu đề thẳng lề cột giữa bên dưới.
+- Trước: tấm ảnh hero dính mép phải trang, che phần cuối dải màu (`Article`, `data-testid="article-hero-plate"`).
+- Sau: dải màu chạy hết bề ngang; ảnh hero nằm trong khung căn giữa, mép phải thẳng với cột phụ bên dưới, vẫn cao bằng dải màu. Mobile không đổi.
