@@ -228,9 +228,9 @@ export const PRESET_CHOICES: { value: PresetKey; label: string }[] = [
 ]
 
 /** A new port page from a preset, named by the owner; it starts as a draft at the end of the list. */
-export async function createFromPreset(key: PresetKey, title: string, pages: Node[], moduleIds: string[]): Promise<Node> {
+export async function createFromPreset(key: PresetKey, title: string, pages: Node[], moduleIds: string[], parentId: string | null = null): Promise<Node> {
   const slug = uniqueSlug(toSlug(title) || (key === 'blank' ? 'trang' : key), pages)
-  return createNode({ site: 'port', slug, title, blocks: preset(key, moduleIds), look: key === 'bibe' ? 'baen' : 'biz', status: 'draft' })
+  return createNode({ site: 'port', slug, title, parent_id: parentId, blocks: preset(key, moduleIds), look: key === 'bibe' ? 'baen' : 'biz', status: 'draft' })
 }
 
 type Sources = ReturnType<typeof usePortSources>
