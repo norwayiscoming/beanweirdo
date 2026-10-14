@@ -1,7 +1,7 @@
 import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import { ElementList, Inline } from './elements'
 import { paletteFrom } from './palette'
-import { garden, ink, layout, paper, sans, serif, wrapTitle } from './tokens'
+import { frame, garden, ink, layout, paper, sans, serif, wrapTitle } from './tokens'
 import { fillStyle } from './focus'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
 import type { ArticlePlateData, ArticlePostData, FigureData } from './types'
@@ -111,6 +111,12 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
           position: 'relative',
         }}
       >
+        {/*
+          * `measure` counts the band's 56px side margins; the frame is what sits
+          * between them. The colour runs edge to edge, while the words and the
+          * hero plate keep to the frame, so both line up with the body below.
+          */}
+        <div style={{ ...frame(layout.measure - 112), position: 'relative' }}>
         {breadcrumb}
         <div style={{ ...label, opacity: 0.7, marginBottom: 24 }}>
           {overrides.renderEyebrow ? overrides.renderEyebrow(post.moduleTitle) : `← ${post.moduleTitle}`}
@@ -170,8 +176,10 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             // chữ chỉ còn 90px.
             position: mobile ? 'relative' : 'absolute',
             right: 0,
-            top: 0,
-            bottom: 0,
+            // Reaches through the band's own top and bottom padding, so the
+            // plate still fills the band's full height from inside the frame.
+            top: mobile ? 0 : -46,
+            bottom: mobile ? 0 : -72,
             width: mobile ? '100%' : 300,
             height: mobile ? 200 : undefined,
             ...fillStyle(post.heroPlate.imageUrl, post.heroPlate.tint),
@@ -192,9 +200,10 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             slot={{ key: 'hero', imageUrl: post.heroPlate.imageUrl ?? null }}
           />
         </div>
+        </div>
       </div>
 
-      <div style={{ padding: '56px 56px 140px', maxWidth: layout.measure }}>
+      <div style={{ padding: '56px 56px 140px', maxWidth: layout.measure, margin: '0 auto' }}>
         <div
           style={{
             display: 'grid',

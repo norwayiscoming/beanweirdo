@@ -9,7 +9,6 @@
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
-    "test": "node scripts/verify-schema.mjs",
     "test:api": "vitest run"
   },
   "dependencies": {

@@ -2,8 +2,7 @@
 //
 // Schema source of truth: backend/supabase/migrations/0001_initial_schema.sql,
 // 0002_templates_and_post_status.sql, 0005_fixed_post_templates.sql.
-// Transition table source of truth:
-// docs/superpowers/specs/2026-08-13-post-authoring-admin-design.md, "## Status lifecycle".
+// The transition table below is its own source of truth; the spec it came from is gone.
 
 export type PostKind = 'note' | 'essay' | 'ref' | 'log'
 export type PostTemplate = 'article' | 'cards' | 'report' | 'longform' | 'memo' | 'bitesize'
@@ -319,7 +318,7 @@ export const STATUS_ACTIONS: StatusAction[] = [
   'permanently-delete',
 ]
 
-/** The single statuses each action is valid from, per the spec's transition table. */
+/** The single statuses each action is valid from. */
 export const ALLOWED_FROM: Record<StatusAction, PostStatus[]> = {
   publish: ['draft'],
   unpublish: ['published'],

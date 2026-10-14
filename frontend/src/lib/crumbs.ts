@@ -126,8 +126,6 @@ export function buildCrumbs(
       return [admin, { label: 'Notes', go: nav.goCms }, { label: navLabel('archive') }]
     case 'cms':
       return [admin, backend, { label: navLabel('cms') }]
-    case 'portfolio':
-      return [admin, backend, { label: navLabel('portfolio') }]
     default:
       return [landing]
   }
@@ -164,13 +162,6 @@ export function crumbBack(
   const out = nav.area === 'public' ? nav.goLanding : () => goToArea('public')
 
   switch (nav.screen) {
-    /*
-     * Inside admin the step back is to admin's own front door. It used to leave
-     * the area entirely, so `←` from Templates landed on the public journal —
-     * a long way from one step back.
-     */
-    case 'portfolio':
-      return nav.goCms
     case 'module': {
       // One step back out of Roasting is bean weirdo, not the index. The arrow
       // used to skip every branch in between, because it only knew about a

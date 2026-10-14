@@ -93,66 +93,6 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
   res.status(200).json({ module: data })
 }
 
-/**
- * DELETE removes the module outright. `posts.module_id` is ON DELETE CASCADE
- * (migration 0001), so its posts go with it — the CMS only offers this on
- * modules the reader can't see yet, and the site's undo story is the ✕ being
- * one click away from a re-add, not a trash can.
- *
- * Modules filed inside it are the exception: `parent_id` is ON DELETE RESTRICT
- * (migration 0025), because a branch holds whole sub-sections of published
- * writing and one ✕ must not take them all.
- *
- * **Phép chặn ấy là của database, không phải của route này.** Trước đây route
- * đọc một lượt để đếm module con rồi mới xoá — nhưng dù không đọc thì khoá
- * ngoại vẫn từ chối y như vậy. Lượt đọc ấy không quyết định gì; nó chỉ để dịch
- * lời từ chối thành một câu nói rõ phải làm gì. Nên nay nó chạy ở **nhánh
- * hỏng**: xoá một module không có con — tức gần như mọi lần — là một câu lệnh.
- */
-async function handleDelete(res: VercelResponse, id: string): Promise<void> {
-  const supabase = getSupabase()
-
-  const { data, error } = await supabase.from('modules').delete().eq('id', id).select('id').maybeSingle()
-
-  if (error) {
-    // `23503` là Postgres nói "còn thứ khác đang trỏ vào hàng này". Với bảng
-    // `modules` thì chỉ có một khoá ngoại tự trỏ vào chính nó, nên nguyên nhân
-    // là module con. Giờ mới đáng trả tiền cho một lượt đọc, để nói ra là mấy.
-    if (error.code === '23503') {
-      await explainStillHeld(res, id)
-      return
-    }
-    res.status(500).json({ error: error.message })
-    return
-  }
-  if (!data) {
-    res.status(404).json({ error: `Module '${id}' not found` })
-    return
-  }
-  res.status(204).end()
-}
-
-/**
- * Câu xoá bị khoá ngoại chặn. Đếm module con để câu trả lời nói được là mấy
- * cái, đúng như trước. Chỉ chạy ở nhánh hỏng.
- *
- * Guard `42703` ("no such column") của bản cũ không còn cần: nếu database chưa
- * chạy 0025 thì không có cột `parent_id`, không có khoá ngoại nào để vi phạm,
- * nên câu xoá thành công và không bao giờ vào tới đây. Vẫn đỡ lấy phòng khi
- * đếm hỏng vì lý do khác — không đếm được thì vẫn nói ra lý do chính.
- */
-async function explainStillHeld(res: VercelResponse, id: string): Promise<void> {
-  const supabase = getSupabase()
-  const { data: children } = await supabase.from('modules').select('id').eq('parent_id', id)
-
-  const count = children?.length ?? 0
-  res.status(409).json({
-    error: count > 0
-      ? `Module '${id}' still holds ${count} module(s). Move or delete them first.`
-      : `Module '${id}' still holds other modules. Move or delete them first.`,
-  })
-}
-
 async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   if (!requireAuth(req, res)) return
 
@@ -163,7 +103,6 @@ async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   }
 
   if (req.method === 'PATCH') return handlePatch(req, res, id)
-  if (req.method === 'DELETE') return handleDelete(res, id)
 
   res.status(405).json({ error: 'Method not allowed' })
 }

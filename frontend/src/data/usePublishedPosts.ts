@@ -177,8 +177,8 @@ export function usePublishedPosts(options: UsePostsOptions = {}): UsePostsResult
        * trong chuỗi truyền cho `.select()`, và nó không theo nổi một chuỗi
        * chọn lúc chạy. `PostRow` ở file này vốn viết tay chứ không sinh ra từ
        * schema, nên phép ép này không làm mất thứ gì đang được kiểm — thứ giữ
-       * cho `LIST_COLUMNS` khớp với bảng là comment trên nó và
-       * `backend/scripts/verify-schema.mjs`, không phải chỗ này.
+       * cho `LIST_COLUMNS` khớp với bảng là comment trên nó, không phải chỗ
+       * này.
        */
       setData((data ?? []) as unknown as PostRow[])
     })

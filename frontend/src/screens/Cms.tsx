@@ -11,6 +11,7 @@ import {
   type PostSummary,
 } from '../admin/lib/apiClient'
 import { getSite } from '../admin/lib/apiClient'
+import { forgetModules } from '../admin/lib/lists'
 import { RoutesPanel } from '../admin/components/RoutesPanel'
 import type { SystemPage } from '../admin/components/PageSettings'
 import { ModuleImages } from '../admin/components/ModuleImages'
@@ -472,6 +473,9 @@ export function Cms() {
     setModules((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch } : m)))
     try {
       await updateModule(id, patch)
+      // The sidebar and home read modules straight from Supabase; without this
+      // they keep the old title/colour until a full reload.
+      forgetModules()
     } catch (e) {
       setError((e as Error).message)
     }

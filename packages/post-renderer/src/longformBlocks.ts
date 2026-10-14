@@ -18,7 +18,7 @@ import { runsToText, textToRuns } from './longformText'
 import type { LongformBlock, LongformRun } from './types'
 
 /** Số bậc lùi sâu nhất. Bậc 4 thì lề đã ăn hết bề rộng cột chữ. */
-export const MAX_INDENT = 3
+const MAX_INDENT = 3
 
 /** Bậc lùi của một khối, nhận cả `ind: true` của dữ liệu cũ. */
 export function indentOf(b: { ind?: number | boolean }): number {

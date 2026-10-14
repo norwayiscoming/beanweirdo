@@ -169,46 +169,6 @@ export const MODULE_PATCHABLE: Array<{ jsonKey: string; column: keyof ModuleRow 
   { jsonKey: 'parent_id', column: 'parent_id' },
 ]
 
-/**
- * Defaults for a module created from the CMS's "+ module mới". The reader never
- * sees it until it has a post, so the placeholder copy only has to be legible
- * in the editor.
- */
-export function newModuleRow(
-  id: string,
-  sort_order: number,
-): Omit<ModuleRow, 'img1' | 'img2' | 'img3' | 'page_img1' | 'page_img2' | 'page_img3' | 'page_img4'> {
-  return {
-    id,
-    title: 'module mới',
-    accent: '#6FA8C0',
-    on_color: '#0E2C38',
-    tint: '#DDEBF0',
-    tint2: '#C6DDE5',
-    layout: 'band',
-    concept: 'chưa đặt',
-    blurb: 'Một dòng giới thiệu ngắn.',
-    long_desc: '',
-    treatment: '',
-    layout_note: '',
-    feature_cells: [],
-    page_shot1: '',
-    page_shot2: '',
-    page_shot3: '',
-    page_shot4: '',
-
-    shot1: 'ảnh chính',
-    shot2: 'ảnh phụ',
-    shot3: 'ảnh phụ',
-    sort_order: sort_order,
-    // A new module starts at the top of the table of contents. Filing it
-    // inside another one is a second, deliberate step.
-    parent_id: null,
-    // Created from the CMS means a reading module; the journals are seeded.
-    kind: 'normal',
-  }
-}
-
 /** The little the one tree rule needs to know about a module. */
 export type ParentedRow = { id: string; parent_id?: string | null }
 

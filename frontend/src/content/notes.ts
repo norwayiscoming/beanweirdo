@@ -114,6 +114,3 @@ export function patchOverride(
   const current = list.find((o) => o.n === n) ?? { n }
   return [...list.filter((o) => o.n !== n), { ...current, ...patch, n }].sort((a, b) => a.n - b.n)
 }
-
-/** The page's one quotation cell — the line the owner calls the page's pin. */
-export const QUOTE_CELL = featureCells.find((c) => c.kind === 'quote')!

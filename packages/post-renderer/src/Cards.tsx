@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from 'react'
 import { useMemo, useState } from 'react'
 import { ElementList } from './elements'
 import { paletteFrom } from './palette'
-import { ink, paper, sans, serif, wrapTitle } from './tokens'
+import { frame, ink, paper, sans, serif, wrapTitle } from './tokens'
 import type { CardData, CardPart, CardsPostData } from './types'
 
 export type CardsOverrides = {
@@ -141,6 +141,9 @@ function groupsOf(cards: CardData[], hues: Record<string, string> = {}): Group[]
  * filter bar and a sticky table of contents. Modeled on the "isCards"
  * section of the design source.
  */
+/** What sits between the side margins: the card list and its contents column. */
+const CONTENT_W = 1208
+
 export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }: CardsProps) {
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(() => new Set())
   const [activeGroup, setActiveGroup] = useState<string | null>(null)
@@ -182,6 +185,7 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
           padding: mobile ? '28px 20px 26px' : '40px 56px 32px',
         }}
       >
+        <div style={frame(CONTENT_W)}>
         {breadcrumb}
         <div
           style={{
@@ -215,6 +219,7 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
             ))}
           </div>
         </div>
+        </div>
       </div>
 
       <div
@@ -223,6 +228,11 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
           borderBottom: `1px solid ${paper.rule}`,
           // B54 — thanh chip đã tự xuống dòng sẵn; chỉ cần lề hẹp lại.
           padding: mobile ? '14px 20px' : '16px 56px 17px',
+        }}
+      >
+      <div
+        style={{
+          ...frame(CONTENT_W),
           display: 'flex',
           alignItems: 'center',
           gap: 9,
@@ -297,6 +307,7 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
           </div>
         )}
       </div>
+      </div>
 
       <div
         style={{
@@ -305,7 +316,8 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
           gridTemplateColumns: mobile ? 'minmax(0,1fr)' : 'minmax(0,1fr) minmax(220px,272px)',
           gap: 52,
           padding: '32px 56px 140px',
-          maxWidth: 1320,
+          maxWidth: CONTENT_W + 112, // plus its 56px side margins
+          margin: '0 auto',
           alignItems: 'start',
         }}
       >

@@ -1,7 +1,6 @@
 /**
- * Content shapes for the site's 3 real post templates.
+ * Content shapes for the post templates (`POST_TEMPLATES` in backend/lib/posts.ts).
  *
- * `posts.template` in the database is a fixed enum: 'article' | 'cards' | 'report'.
  * These are structurally distinct layouts, not a color-mix on one shape — each
  * gets its own body-content type below, matching what `posts.body` (jsonb)
  * holds for a post of that template.
@@ -12,8 +11,6 @@ import type { ChartAttrs, MetricsAttrs, TableAttrs } from './elements/data'
 import type { ImageAttrs } from './elements/media'
 import type { ListAttrs } from './elements/list'
 import type { CalloutAttrs, HeadingAttrs, MetaAttrs, ParagraphAttrs, QuoteAttrs } from './elements/text'
-
-export type Template = 'article' | 'cards' | 'report'
 
 // ---------------------------------------------------------------------------
 // article — ported 1:1 from frontend/src/screens/Article.tsx
