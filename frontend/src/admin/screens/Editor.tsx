@@ -471,7 +471,8 @@ function EditorContent({ postId }: { postId: string }) {
   }
 
   return (
-    <div style={{ padding: '32px 40px' }}>
+    // The canvas stops at 1320px; on a wider screen the whole page centres instead of hugging the left.
+    <div style={{ padding: '32px 40px', maxWidth: 1320 + 80, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: ink.muted, marginBottom: 12 }}>
         Template:
         {/*

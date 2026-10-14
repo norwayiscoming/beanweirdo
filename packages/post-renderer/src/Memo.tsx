@@ -7,7 +7,7 @@ import { paletteFrom, type Palette } from './palette'
 import { Fragment } from 'react'
 import type { ReactNode } from 'react'
 import type { CSSProperties } from 'react'
-import { sans, serif, wrapTitle } from './tokens'
+import { frame, layout, sans, serif, wrapTitle } from './tokens'
 import type { MemoPostData } from './types'
 
 /**
@@ -223,16 +223,20 @@ export function Memo({
           padding: mobile ? '18px 20px 16px' : '22px 56px 20px',
         }}
       >
-        {breadcrumb}
+        <div style={frame(layout.reading)}>{breadcrumb}</div>
       </div>
       <div style={{ padding: '40px 56px 0' }}>
         <div
           style={{
+            ...frame(layout.reading),
             display: 'grid',
-            // B49 — tiêu đề và bảng thông số xếp dọc; 300px cạnh cột chữ trên
-            // màn 390 thì cả hai đều không còn chỗ.
-            gridTemplateColumns: mobile ? 'minmax(0,1fr)' : 'minmax(0,1fr) 300px',
-            gap: 56,
+            /*
+             * Title over specs at every width. The specs used to stand in a
+             * 300px column right of the title, which left the 760px body under
+             * it with a white field of that size; now the page is one column.
+             */
+            gridTemplateColumns: 'minmax(0,1fr)',
+            gap: 28,
             alignItems: 'end',
             borderBottom: `1px solid ${palette.ink}`,
             paddingBottom: 26,
@@ -297,6 +301,7 @@ export function Memo({
 
       {(post.img || renderPlateAction) && (
         <div style={{ padding: '30px 56px 0' }}>
+          <div style={frame(layout.reading)}>
           {/*
             Nền chứ không phải `<img>`: thẻ ảnh bỏ qua cả điểm căn lẫn khung cắt
             ghi trên địa chỉ, nên ô này là ô duy nhất cắt đâu cũng ra giữa ảnh.
@@ -309,14 +314,15 @@ export function Memo({
             <div style={{ width: 22, height: 1, background: palette.accent, transform: 'translateY(-4px)' }} />
             <div>{post.imgCaption ?? 'ảnh features'}</div>
           </div>
+          </div>
         </div>
       )}
 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0,760px)',
-          justifyContent: 'start',
+          gridTemplateColumns: `minmax(0,${layout.reading}px)`,
+          justifyContent: 'center',
           padding: '56px 56px 130px',
         }}
       >

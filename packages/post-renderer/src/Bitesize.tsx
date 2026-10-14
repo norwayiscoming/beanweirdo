@@ -3,7 +3,7 @@ import { fillStyle } from './focus'
 import { getElement, type StoredElement } from './elements'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
 import { paletteFrom } from './palette'
-import { paper, sans, serif, wrapTitle } from './tokens'
+import { layout, paper, sans, serif, wrapTitle } from './tokens'
 
 /**
  * Bitesize note — dạng ghi ngắn của Ghi 01.
@@ -578,6 +578,12 @@ export function Bitesize({
         display: 'flow-root',
         backgroundColor: '#FFFFFF',
         padding: mobile ? '24px 20px 28px' : '36px 40px 40px',
+        /*
+         * The sheet is one reading column wide, centred. It used to span the
+         * whole page while the words stopped at 660px, so on a wide screen its
+         * right half was bare paper. A sub plate widens it by its own gutter.
+         */
+        ...(mobile ? null : { maxWidth: layout.reading + 80 + (subBox ? SUB_GUTTER : 0), marginLeft: 'auto', marginRight: 'auto' }),
         boxShadow: '0 40px 80px -50px rgba(18,18,15,.55), 0 2px 0 rgba(18,18,15,.06)',
       }}
     >
@@ -630,7 +636,8 @@ export function Bitesize({
             style={{
               display: 'flow-root',
               position: 'relative',
-              paddingRight: mobile ? 0 : SUB_GUTTER,
+              // No sub plate, nothing to keep clear: the gutter would only be a white strip.
+              paddingRight: mobile || !subBox ? 0 : SUB_GUTTER,
               minHeight: mobile || !subBox ? undefined : SUB_MIN_H,
             }}
           >
