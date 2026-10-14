@@ -656,17 +656,9 @@ export async function updateRule(id: string, patch: Partial<ListingRule>): Promi
   return r.rule
 }
 
-export async function createPage(id: string, title: string): Promise<{ page: LayoutPage; rule: { id: string } }> {
-  return request('/api/tags?vocab=pages', { method: 'POST', body: JSON.stringify({ id, title }) })
-}
-
 export async function updatePage(id: string, patch: Partial<Omit<LayoutPage, 'id' | 'kind'>>): Promise<LayoutPage> {
   const r = await request<{ page: LayoutPage }>(`/api/tags?vocab=pages&id=${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(patch) })
   return r.page
-}
-
-export async function deletePage(id: string): Promise<void> {
-  await request(`/api/tags?vocab=pages&id=${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export async function saveOverride(row: Pick<LayoutOverride, 'node_type' | 'node_id'> & Partial<LayoutOverride>): Promise<LayoutOverride> {

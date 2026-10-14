@@ -147,8 +147,9 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
     const rule = { id: 'r1', tier: 'topic', nodes: [], exclude: [], kinds: [], templates: [], sort: 'newest', group_by: 'none', limit_n: null, include_children: true, match: 'any', pinned: [], manual_order: [], new_first: true, from_page: true }
     const page = (id: string, kind: string, title = '', presentation: Record<string, unknown> = {}) => ({ id, kind, title, blocks: ['r1'], presentation, aliases: [], visibility: 'public' })
     return json({
-      pages: [page('nav', 'nav'), page('ghi', 'curated', 'Ghi', { screen: 'notes' }), page('tpl-subject', 'template_subject'), page('tpl-topic', 'template_topic'), page('tpl-keyword', 'template_keyword')],
-      overrides: [],
+      pages: [page('nav', 'nav'), page('tpl-subject', 'template_subject'), page('tpl-topic', 'template_topic'), page('tpl-keyword', 'template_keyword')],
+      // Ghi is a subject with a rule and a screen of its own (0036).
+      overrides: [{ node_type: 'topic', node_id: 'ghi', rule_id: 'r1', presentation: { screen: 'notes' }, aliases: [] }],
       rules: [rule],
     })
   }

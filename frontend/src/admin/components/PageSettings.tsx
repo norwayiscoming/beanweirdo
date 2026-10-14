@@ -18,10 +18,9 @@ import { findPage, type PageRow } from '../../data/useModules'
 import { ancestorsOf } from '../../lib/contentTree'
 import { treeOrder, type ListingRule, type RuleGroup, type RuleSort, type RuleTier } from '../../lib/listingRule'
 import { toPath } from '../../lib/routes'
-import { Choice, Row, Section, Switch } from './Detail'
+import { Row, Section, Switch } from './Detail'
 import { Button } from '../../design/Button'
 import { IconGrip } from '../../design/icons'
-import { VISIBILITY } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 
 /**
@@ -37,7 +36,6 @@ export type SystemPage = 'landing' | 'index' | 'notes'
 /** What PageEditor opens: the blog's own pages. */
 export type BlogSelected =
   | { kind: 'system'; key: SystemPage }
-  | { kind: 'curated'; id: string }
   | { kind: 'override'; type: 'topic' | 'keyword'; node: string }
 
 export type Layout = { pages: LayoutPage[]; overrides: LayoutOverride[]; rules: StoredRule[] }
@@ -386,6 +384,10 @@ export function NodePage({
   )
 }
 
+/** A blog page's public address: Ghi has a screen of its own, every other page is drawn by the module screen. */
+export const pagePath = (page: PageRow) =>
+  page.screen === 'notes' ? toPath({ area: 'public', screen: 'notes' }) : toPath({ area: 'public', screen: 'module', moduleId: page.id })
+
 /** Where a blog page lives and what it is made of — read once, by the editor and by the preview beside it. */
 export function describePage(selected: BlogSelected, layout: Layout, pages: PageRow[]) {
   const ruleOf = ruleIn(layout)
@@ -393,7 +395,6 @@ export function describePage(selected: BlogSelected, layout: Layout, pages: Page
   let rule: StoredRule | undefined
   let preview = ''
   let page: PageRow | undefined
-  let record: LayoutPage | undefined
   let override: LayoutOverride | undefined
   let copyKey: SystemPage | null = null
 
@@ -402,35 +403,16 @@ export function describePage(selected: BlogSelected, layout: Layout, pages: Page
     title = s.title
     preview = s.path
     copyKey = s.key
-  } else if (selected.kind === 'curated') {
-    record = layout.pages.find((p) => p.id === selected.id)
-    rule = ruleOf(record?.blocks[0])
-    page = findPage(pages, selected.id)
-    title = record?.title || selected.id
-    if (page) preview = page.screen === 'notes' ? toPath({ area: 'public', screen: 'notes' }) : toPath({ area: 'public', screen: 'module', moduleId: page.id })
-    if (page?.screen === 'notes') copyKey = 'notes'
   } else {
     override = layout.overrides.find((o) => o.node_type === selected.type && o.node_id === selected.node)
     rule = ruleOf(override?.rule_id)
     page = findPage(pages, selected.type === 'keyword' ? `tag-${selected.node}` : selected.node)
     title = page?.title ?? selected.node
-    if (page) preview = toPath({ area: 'public', screen: 'module', moduleId: page.id })
+    if (page) preview = pagePath(page)
+    // Ghi was a hand-picked page with a screen of its own until 0036 made it a topic; its copy came along.
+    if (page?.screen === 'notes') copyKey = 'notes'
   }
-  return { title, rule, preview, page, record, override, copyKey }
-}
-
-/**
- * Why a hand-picked page cannot be deleted, if it cannot: old addresses still
- * land on it, or it wears a module's looks. The ⋮ shows this under a greyed
- * Xoá rather than the line vanishing, which left the owner guessing.
- */
-export function pageDeleteBlocker(selected: BlogSelected, layout: Layout, pages: PageRow[]): string | undefined {
-  if (selected.kind !== 'curated') return 'trang hệ thống, không xoá được'
-  const { record } = describePage(selected, layout, pages)
-  if (!record) return undefined
-  if (record.aliases.length) return 'còn địa chỉ cũ trỏ về trang này'
-  if ((record.presentation as { module?: string }).module) return 'trang đang mượn một hình trang'
-  return undefined
+  return { title, rule, preview, page, override, copyKey }
 }
 
 export function PageEditor({
@@ -454,23 +436,14 @@ export function PageEditor({
   renderCopy: (key: SystemPage) => ReactNode
   renderModule: (moduleId: string) => ReactNode
 }) {
-  const { rule, page, record, override, copyKey } = describePage(selected, layout, pages)
-  const linked = ((override?.presentation ?? record?.presentation ?? {}) as { module?: string }).module
+  const { rule, page, override, copyKey } = describePage(selected, layout, pages)
+  const linked = ((override?.presentation ?? {}) as { module?: string }).module
   const posts = page ? postsOf(page.id) : []
   const saveRule = (patch: Partial<ListingRule>) => rule && run(() => updateRule(rule.id, patch))
 
   return (
     <div>
       {error}
-
-      {record && selected.kind === 'curated' && (
-        <Section title="Thông tin">
-          <Row label="Trạng thái">
-            <Choice label="Trạng thái" options={VISIBILITY} value={record.visibility} onChange={(visibility) => run(() => updatePage(record.id, { visibility }))} />
-          </Row>
-          <NavFlags layout={layout} navRef={`page:${record.id}`} defaults={{ sidebar: false, home: false }} run={run} />
-        </Section>
-      )}
 
       {rule && (
         <Section title="Quy chế" note="trang này liệt kê bài nào">
