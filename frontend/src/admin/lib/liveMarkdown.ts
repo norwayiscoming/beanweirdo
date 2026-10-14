@@ -20,9 +20,11 @@
 import {
   CODE,
   HEADING,
+  INLINE_CODE,
   LINK,
   ORDERED_LIST,
   QUOTE,
+  STRIKETHROUGH,
   UNORDERED_LIST,
   type TextFormatTransformer,
   type Transformer,
@@ -66,13 +68,14 @@ const DO_SCORE: TextFormatTransformer = {
 }
 
 /**
- * Không có gạch ngang, không có tô sáng.
+ * Không có tô sáng.
  *
- * `~~x~~` và `==x==` thì site không có gì để vẽ, nên để chúng nằm nguyên làm
- * chữ thường là đúng cái người viết nhìn thấy. Bỏ đi thì an toàn hơn giữ lại:
- * một ký hiệu không có transformer nằm nguyên là chữ thường, còn một
- * transformer không có chỗ ghi thì ăn mất chữ — đúng chuyện đã xảy ra với
- * italic hồi nó chưa có chỗ ghi ra.
+ * `==x==` thì site không có gì để vẽ, nên để nó nằm nguyên làm chữ thường là
+ * đúng cái người viết nhìn thấy. Bỏ đi thì an toàn hơn giữ lại: một ký hiệu
+ * không có transformer nằm nguyên là chữ thường, còn một transformer không có
+ * chỗ ghi thì ăn mất chữ — đúng chuyện đã xảy ra với italic hồi nó chưa có chỗ
+ * ghi ra. `` `code` `` và `~~gạch ngang~~` có từ 2026-10-14, khi trang đọc biết
+ * vẽ chúng (`elements/codeStrike.ts`).
  */
 export const SITE_TRANSFORMERS: Transformer[] = [
   HEADING,
@@ -85,6 +88,8 @@ export const SITE_TRANSFORMERS: Transformer[] = [
   EM_DOUBLE_SCORE,
   EM_STAR,
   DO_SCORE,
+  INLINE_CODE,
+  STRIKETHROUGH,
   LINK,
 ]
 
