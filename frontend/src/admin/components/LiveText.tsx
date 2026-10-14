@@ -29,6 +29,8 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import {
   $getRoot,
+  $isElementNode,
+  $isLineBreakNode,
   BLUR_COMMAND,
   CLEAR_HISTORY_COMMAND,
   COMMAND_PRIORITY_LOW,
@@ -210,9 +212,23 @@ export function liveMarkdown(input: HTMLElement | null | undefined): string | nu
  * Dùng cho `/`: dòng `/bảng` người viết vừa gõ là lời gọi menu, không phải
  * chữ của bài — chèn xong mà nó còn nằm đó là phải xoá tay thêm một lần.
  */
-export function takeBlock(input: HTMLElement | null | undefined, block: number): string | null {
+export function takeBlock(input: HTMLElement | null | undefined, block: number, tail = false): string | null {
   const editor = editorOf(input)
   if (!editor) return null
-  editor.update(() => $getRoot().getChildAtIndex(block)?.remove(), { discrete: true })
+  editor.update(
+    () => {
+      const node = $getRoot().getChildAtIndex(block)
+      if (!tail || !$isElementNode(node)) return node?.remove()
+      // `tail`: the call sits on the last soft line, after a Shift+Enter — cut
+      // that line and its break, and leave the lines above it standing.
+      const kids = node.getChildren()
+      let cut = 0
+      kids.forEach((k, i) => {
+        if ($isLineBreakNode(k)) cut = i
+      })
+      kids.slice(cut).forEach((k) => k.remove())
+    },
+    { discrete: true },
+  )
   return liveMarkdown(input)
 }

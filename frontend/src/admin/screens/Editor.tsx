@@ -100,7 +100,7 @@ import { duplicateAt, insertAt, move, removeAt } from '../lib/listOps'
 import { withPastedBlocks } from '../lib/pasteBlocks'
 import { insertThing, moveIntoRun, toRuns, writeRun } from '../lib/flow'
 import { linesThrough } from '../lib/mdBlocks'
-import { focusThingLater, lineOfPoint } from '../lib/flowFocus'
+import { focusThingLater, lineOfPoint, linesOf } from '../lib/flowFocus'
 import { emptyHistory, historyKey, inverseOf, record, redo, undo, type History } from '../lib/editHistory'
 import { spaceBlock, type BlockFocus } from '../lib/blockKeys'
 import { insertLongformThing, runAtIndex, toLongformRuns, writeLongformRun } from '../lib/longformFlow'
@@ -1943,7 +1943,7 @@ function LiveRun({
   /** Chỗ khối đang kéo sẽ rơi xuống; `null` là không có ai đang kéo. */
   const [over, setOver] = useState<{ lines: number; top: number } | null>(null)
   /** Menu `/`: khối đang gõ lệnh, chữ sau dấu `/`, và mục đang sáng. */
-  const [slash, setSlash] = useState<{ block: number; query: string; active: number } | null>(null)
+  const [slash, setSlash] = useState<{ block: number; line: number; query: string; active: number } | null>(null)
   /** Lệnh `/` vừa bị Esc — đừng mở lại chừng nào chữ ấy còn nguyên. */
   const dismissed = useRef<string | null>(null)
 
@@ -2031,12 +2031,17 @@ function LiveRun({
      * câu là một dấu gạch chéo, không phải một lời gọi.
      */
     const block = input.children[hit.block] as HTMLElement | undefined
-    const said = block?.tagName === 'P' ? (block.textContent ?? '') : ''
+    // A soft break (Shift+Enter) starts a fresh line inside the same <p>; a `/`
+    // there is as much a call as one at the head of a paragraph, so read only
+    // the line the caret is on — and only the last one, where a tail can be cut.
+    const lines = block?.tagName === 'P' ? linesOf(block) : []
+    const said = hit.line === lines.length - 1 ? lines[hit.line] : ''
     const m = /^\/([^\s/]{0,24})$/.exec(said)
-    const key = `${hit.block}:${said}`
+    const key = `${hit.block}:${hit.line}:${said}`
     if (m && dismissed.current !== key && sel.isCollapsed) {
       setSlash((was) => ({
         block: hit.block,
+        line: hit.line,
         query: m[1],
         active: was && was.query === m[1] ? was.active : 0,
       }))
@@ -2065,10 +2070,12 @@ function LiveRun({
 
   const chooseSlash = (type: string) => {
     if (!slash) return
-    const markdown = takeBlock(inputEl(), slash.block)
+    const markdown = takeBlock(inputEl(), slash.block, slash.line > 0)
     setSlash(null)
     if (markdown === null) return
-    insert(slash.block <= 0 ? 0 : linesThrough(markdown, slash.block - 1, Number.MAX_SAFE_INTEGER - 1), type, markdown)
+    // A cut tail leaves the paragraph standing, so the block goes after it.
+    const above = slash.line > 0 ? slash.block : slash.block - 1
+    insert(above < 0 ? 0 : linesThrough(markdown, above, Number.MAX_SAFE_INTEGER - 1), type, markdown)
   }
 
   const slashNames = slash ? menuNames(slash.query, 'things') : []
@@ -2087,7 +2094,7 @@ function LiveRun({
               else if (e.key === 'ArrowUp') setSlash({ ...slash, active: (slash.active - 1 + n) % n })
               else if (e.key === 'Enter' || e.key === 'Tab') chooseSlash(slashNames[Math.min(slash.active, n - 1)])
               else if (e.key === 'Escape') {
-                dismissed.current = `${slash.block}:/${slash.query}`
+                dismissed.current = `${slash.block}:${slash.line}:/${slash.query}`
                 setSlash(null)
               } else return
               e.preventDefault()
@@ -2142,7 +2149,7 @@ function LiveRun({
           }}
           onInsert={chooseSlash}
           onClose={() => {
-            dismissed.current = `${slash.block}:/${slash.query}`
+            dismissed.current = `${slash.block}:${slash.line}:/${slash.query}`
             setSlash(null)
           }}
         />

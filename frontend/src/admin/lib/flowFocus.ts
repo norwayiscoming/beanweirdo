@@ -428,3 +428,21 @@ export function lineOfPoint(
   })
   return { block, line: items > 0 ? items - 1 + breaks : breaks, el }
 }
+
+/**
+ * The text of each line of a paragraph, split where `lineOfPoint` counts a
+ * line: at every `<br>` except the one Lexical parks in an empty paragraph.
+ */
+export function linesOf(el: HTMLElement): string[] {
+  const lines = ['']
+  const walk = (node: Node) => {
+    node.childNodes.forEach((child) => {
+      if (child instanceof HTMLBRElement) {
+        if (!child.hasAttribute('data-lexical-managed-linebreak')) lines.push('')
+      } else if (child.nodeType === Node.TEXT_NODE) lines[lines.length - 1] += child.textContent ?? ''
+      else walk(child)
+    })
+  }
+  walk(el)
+  return lines
+}
