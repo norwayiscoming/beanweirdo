@@ -36,10 +36,10 @@ vi.mock('../../data/useModules', () => ({
   findPage: () => undefined,
 }))
 vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], moduleTitles: {}, moduleIds: [], loading: false }) }))
-const portPage = (id: string, status: string, sort_order: number) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id: null, sort_order })
+const portPage = (id: string, status: string, sort_order: number) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id: null, sort_order, home_of: id === 'Biz-hkd' ? 'biz' : id === 'Been-hkd' ? 'bean' : null })
 vi.mock('./PortEditors', () => ({
   usePortAdmin: () => ({
-    pages: [portPage('Biz-hkd', 'draft', 0), portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3)],
+    pages: [portPage('Biz-hkd', 'draft', 0), portPage('Been-hkd', 'draft', 0), portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3)],
     // Beta was put first on the top bar and given its own label; home sits second.
     content: { header: { brand: '', right: '', links: [{ key: 'page:Beta', label: 'Bê' }] }, home: { title: 'port', intro: '', features: [] }, footer: {}, about: {} },
     setContentStored: () => {},
@@ -129,9 +129,11 @@ const dropOn = (row: HTMLElement, clientY: number, types: ('dragOver' | 'drop')[
 const li = (el: HTMLElement) => el.closest('li') as HTMLElement
 
 describe('Cấu hình', () => {
-  it('opens on bean’s home, with its fields on the right and its public page previewed', async () => {
+  it('opens on bean’s home, the block page the owner named; the blog’s front page is its "details" card', async () => {
     await renderScreen()
-    expect(heading()).toBe('Trang chủ bean')
+    expect(card('Trang chủ bean').getAttribute('aria-current')).toBe('true')
+    await userEvent.click(card('details'))
+    expect(heading()).toBe('details')
     expect(screen.getByText('copy:landing')).toBeTruthy()
     expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/details')
   })
@@ -241,7 +243,7 @@ describe('Cấu hình', () => {
     expect(screen.getByText('authors-panel')).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'beanweirdo' }).getAttribute('aria-selected')).toBe('true')
     await userEvent.click(screen.getByRole('tab', { name: 'bean' }))
-    expect(heading()).toBe('Trang chủ bean')
+    expect(card('Trang chủ bean').getAttribute('aria-current')).toBe('true')
   })
 
   it('drags beanweirdo’s Mục lục into the top bar order, keeping labels and home in place', async () => {
@@ -265,6 +267,7 @@ describe('Cấu hình', () => {
 
   it('drags biz’s Mục lục the way bean’s drags, inside another page too', async () => {
     await renderScreen('biz')
+    await userEvent.click(card('Mục lục'))
     fireEvent.dragStart(screen.getByRole('img', { name: 'Kéo Draft' }))
     dropOn(li(listRow('Các mục', 'Alpha')), 20)
     await waitFor(() => expect(api.reorderNodes).toHaveBeenCalledWith(['Alpha', 'Draft', 'Beta']))
@@ -319,6 +322,7 @@ describe('Cấu hình', () => {
 
   it('keeps Xoá in the same place on a page that cannot be deleted, greyed with the reason', async () => {
     await renderScreen()
+    await userEvent.click(card('details'))
     await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
     const del = screen.getByRole('menuitem', { name: /Xoá/ })
     expect(del).toHaveProperty('disabled', true)
@@ -329,6 +333,7 @@ describe('Cấu hình', () => {
     const { createFromPreset } = await import('./PortEditors')
     vi.mocked(createFromPreset).mockResolvedValue({ id: 'n1', title: 'reading room', slug: 'reading-room', status: 'draft' } as never)
     await renderScreen('biz')
+    await userEvent.click(card('Mục lục'))
     // A page is deleted from its row.
     expect(screen.getByRole('button', { name: 'Thao tác Beta' })).toBeTruthy()
     await userEvent.click(screen.getByRole('button', { name: 'Thêm trang' }))
