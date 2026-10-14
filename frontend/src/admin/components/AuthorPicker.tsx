@@ -47,7 +47,6 @@ export function AuthorPicker({ postId, initial }: { postId: string; initial: Aut
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 12, color: ink.muted }}>
-      Tác giả:
       {value.length === 0 && <span style={{ color: ink.faint }}>chưa ai đứng tên</span>}
       {value.map((a, i) => (
         <span

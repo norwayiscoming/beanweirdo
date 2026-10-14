@@ -160,6 +160,14 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
   if (url.includes('/api/portfolio'))
     return json({ design: {} })
   if (url.includes('/api/modules')) return json({ modules: MODULES })
+  // One post, for the editor (`?screen=edit`).
+  const one = /\/api\/posts\/([^/?]+)/.exec(url)
+  if (one) {
+    const i = POSTS.findIndex((p) => p.id === one[1])
+    if (method === 'PATCH') POSTS[i] = { ...POSTS[i], ...body }
+    const authors = AUTHORS.filter((a) => (POSTS[i].authors as string[]).includes(a.id as string))
+    return json({ post: { ...POSTS[i], body: [], plate_images: {}, old_slugs: [], authors }, authors })
+  }
   if (url.includes('/api/posts')) return json({ posts: POSTS })
   if (url.includes('/api/tags')) return json({ tags: [] })
   if (url.includes('/api/templates')) return json({ templates: [] })
@@ -168,6 +176,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
 }
 
 const { Cms } = await import('./screens/Cms')
+const { Editor } = await import('./admin/screens/Editor')
 const { NavContext } = await import('./lib/nav')
 const { ToastProvider } = await import('./design/Toaster')
 
@@ -184,7 +193,8 @@ const nav = {
 createRoot(document.getElementById('root')!).render(
   <NavContext.Provider value={nav}>
     <ToastProvider>
-      <Cms />
+      {/* `?screen=edit` opens the post editor on the first post instead. */}
+      {new URLSearchParams(location.search).get('screen') === 'edit' ? <Editor postId="p-a" /> : <Cms />}
     </ToastProvider>
   </NavContext.Provider>,
 )

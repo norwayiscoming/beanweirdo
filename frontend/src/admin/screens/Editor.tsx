@@ -34,10 +34,12 @@ import type {
 } from 'post-renderer'
 import {
   getPost,
+  listNodes,
   transitionStatus,
   updatePost,
   uploadImage,
   type Module,
+  type Node as TopicNode,
   type PostDetail,
   type PostTemplate,
 } from '../lib/apiClient'
@@ -48,16 +50,14 @@ import { toPath } from '../../lib/routes'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { radius } from '../../design/controls'
 import { ink, paper, sans, serif } from '../../design/tokens'
-import { IconExternal, IconLink, IconPlus } from '../../design/icons'
+import { IconExternal, IconInfo, IconLink, IconPlus } from '../../design/icons'
 import { Button, ButtonLink } from '../../design/Button'
 import { useToast } from '../../design/Toaster'
-import { ThemePicker } from '../components/ThemePicker'
-import { AuthorPicker } from '../components/AuthorPicker'
 import type { AuthorRef } from 'api-contract'
 import { CoverBand } from '../components/CoverBand'
 import { FramingProvider, useCropping, useFraming } from '../components/framing'
 import { PlateImageUpload, PlateUpload } from '../components/PlateUpload'
-import { PostPlacement, type PlacementPatch } from '../components/PostPlacement'
+import { PostSettings, SETTINGS_WIDTH, topicPath, type SettingsPatch } from '../components/PostSettings'
 import { blankReportBlock, getBody, ORDERED_LIST, resolveTemplate } from '../lib/postData'
 import {
   addColumn,
@@ -145,7 +145,7 @@ type EditPatch = Partial<{
   /** Màu riêng của bài; null trả nó về theo màu module. */
   theme_color: string | null
 }> &
-  PlacementPatch
+  SettingsPatch
 
 /**
  * Những việc chỉ ảnh bìa mới làm được, gom một chỗ.
@@ -193,6 +193,9 @@ const REPORT_BLUE = '#6FA8C0'
  * app/posts/[id]/edit/page.tsx, adapted to take `postId` as a prop (no
  * next/navigation `useParams`) and to navigate via the admin nav context.
  */
+/** Whether the post-info panel was left open, so the next post opens the same way. */
+const SETTINGS_KEY = 'beanweirdo.editor.settingsOpen'
+
 export function Editor({ postId }: { postId: string }) {
   return (
     /*
@@ -213,6 +216,15 @@ function EditorContent({ postId }: { postId: string }) {
   /** Dòng tác giả lúc tải bài; `AuthorPicker` tự giữ và tự ghi từ đó. */
   const [byline, setByline] = useState<AuthorRef[]>([])
   const [modules, setModules] = useState<Module[]>([])
+  /** The blog's topic tree: the panel picks from it, the bar names the post's place in it. */
+  const [topics, setTopics] = useState<TopicNode[]>([])
+  const [settingsOpen, setSettingsOpen] = useState(() => {
+    try {
+      return localStorage.getItem(SETTINGS_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   /*
    * Phải đứng TRÊN chỗ `return` sớm bên dưới. State của khung căn ảnh từng
    * đứng dưới, cạnh hàm dùng nó — đọc thì gọn, chạy thì vỡ: lượt vẽ đầu `post`
@@ -283,6 +295,7 @@ function EditorContent({ postId }: { postId: string }) {
       setPost(p)
       setModules(mods)
     })
+    void listNodes('blog').then(setTopics, () => setTopics([]))
   }, [postId])
 
   /*
@@ -470,63 +483,118 @@ function EditorContent({ postId }: { postId: string }) {
     },
   }
 
+  const topicLabel = topicPath(topics, post.topic_id)
+  const toggleSettings = () => {
+    const next = !settingsOpen
+    setSettingsOpen(next)
+    try {
+      localStorage.setItem(SETTINGS_KEY, next ? '1' : '')
+    } catch {
+      // Private window: the panel just opens closed next time.
+    }
+  }
+
   return (
     // The canvas stops at 1320px; on a wider screen the whole page centres instead of hugging the left.
-    <div style={{ padding: '32px 40px', maxWidth: 1320 + 80, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: ink.muted, marginBottom: 12 }}>
-        Template:
-        {/*
-          Changing it here rather than by going back: the post already exists,
-          so there is nowhere to go back to. Only while it is still empty — the
-          templates hold structurally different bodies, and switching one that
-          has been written into would drop the writing on the floor.
+    <div className={settingsOpen ? 'pe-page pe-open' : 'pe-page'} style={{ padding: '0 40px 32px', maxWidth: 1320 + 80, margin: '0 auto' }}>
+      {/*
+        * On a wide screen the open panel pushes the page over instead of
+        * covering its right edge, so the page beside it stays whole; on a
+        * narrow one there is no room for both and the panel lies on top.
         */}
-        {hasContent ? (
-          <b style={{ color: ink.strong, fontWeight: 500 }}>{TEMPLATE_LABEL[template]}</b>
-        ) : (
-          <select
-            aria-label="Template"
-            value={template}
-            onChange={(e) => applyPatch({ template: e.target.value } as EditPatch)}
-            style={{
-              fontFamily: 'inherit',
-              fontSize: 12,
-              color: ink.strong,
-              background: paper.white,
-              border: `1px solid ${paper.rule}`,
-              padding: '3px 8px',
-            }}
-          >
-            {Object.entries(TEMPLATE_LABEL).map(([id, label]) => (
-              <option key={id} value={id}>
-                {label}
-              </option>
-            ))}
-          </select>
-        )}
+      <style>{`.pe-page { transition: padding-right .2s ease; } @media (min-width: 1100px) { .pe-page.pe-open { padding-right: ${SETTINGS_WIDTH + 40}px !important; } } @media (prefers-reduced-motion: reduce) { .pe-page { transition: none; } }`}</style>
+      {/*
+        * Every action of the screen on one bar at the top (owner, 2026-10-14:
+        * "đẩy lên top, đừng để dưới"), and one line saying where the post
+        * stands, so the panel need not be opened just to check.
+        */}
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '8px 12px',
+          padding: '12px 0',
+          marginBottom: 12,
+          maxWidth: 1320,
+          background: paper.cream,
+          borderBottom: `1px solid ${paper.rule}`,
+          fontFamily: sans,
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: '1 1 260px' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13, color: ink.soft }}>
+            <span aria-hidden style={{ width: 10, height: 10, borderRadius: '50%', background: post.theme_color ?? activeModule?.accent ?? '#6FA8C0', flex: 'none' }} />
+            <b style={{ color: ink.base, fontWeight: 500 }}>{TEMPLATE_LABEL[template]}</b>
+            {[topicLabel, post.visibility === 'private' ? 'riêng tư' : 'công khai']
+              .filter(Boolean)
+              .map((part) => (
+                <span key={part}>· {part}</span>
+              ))}
+          </span>
+          <span style={{ fontSize: 11, color: ink.muted }}>{saveNote}</span>
+        </div>
+        <Button icon={<IconInfo />} aria-pressed={settingsOpen} aria-expanded={settingsOpen} onClick={toggleSettings}>
+          Thông tin bài
+        </Button>
+        {/* A real link because it opens a second tab, where a nav() call
+            cannot reach. Every screen has an address of its own now, so this
+            is the address of the preview screen and nothing special. */}
+        <ButtonLink
+          href={toPath({ area: 'admin', screen: 'postPreview', slug: addresses.slugOf(postId) })}
+          target="_blank"
+          rel="noreferrer"
+          icon={<IconExternal />}
+        >
+          Xem trước
+        </ButtonLink>
+        <Button onClick={() => nav.goCms()}>Lưu nháp</Button>
         {/*
-          * The colour a post wears stays changeable after it exists — it is
-          * decided when the post is made, and the first draft is exactly when
-          * somebody discovers the colour was wrong.
+          * Publish là việc duy nhất đưa chữ lên trang (migration 0028).
+          *
+          * Bài đã đăng thì mọi ô soạn chỉ lưu vào bản nháp của nó; nút này
+          * chép bản nháp ấy lên. Nên nó đợi các lượt lưu đang chạy trước —
+          * xem `save` — rồi mới đăng, và luôn nói ra kết quả: một lần bấm
+          * không có hồi âm từng là lý do chủ site không biết bài đã lên chưa.
           */}
-        <span style={{ marginLeft: 'auto' }}>
-          <ThemePicker
-            value={post.theme_color}
-            moduleColor={activeModule?.accent}
-            moduleLabel={activeModule?.title}
-            themes={modules.map((m) => ({ id: m.id, label: m.title, color: m.accent }))}
-            onChange={(theme_color) => applyPatch({ theme_color })}
-          />
-        </span>
+        <Button
+          level="primary"
+          onClick={async () => {
+            if (published && !pending) {
+              toast.info('Không có thay đổi nào chưa đăng')
+              return
+            }
+            if (publishing) return
+            setPublishing(true)
+            const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
+            try {
+              await Promise.allSettled([...inFlight.current])
+              await transitionStatus(postId, 'publish', addresses.slugToPublish(postId))
+              card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
+              nav.goCms()
+            } catch (e) {
+              card.fail(e)
+              setPublishing(false)
+            }
+          }}
+          disabled={publishing}
+        >
+          {publishing ? 'Đang đăng…' : published ? (pending ? 'Đăng thay đổi' : 'Đã đăng') : 'Publish'}
+        </Button>
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <AuthorPicker key={postId} postId={postId} initial={byline} />
-      </div>
-
-      <PostPlacement
+      <PostSettings
+        open={settingsOpen}
+        onClose={toggleSettings}
         post={post}
+        byline={byline}
         modules={modules}
+        topics={topics}
+        template={template}
+        canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(postId)}
         onPatch={applyPatch}
         onSlug={async (slug) => {
@@ -555,58 +623,6 @@ function EditorContent({ postId }: { postId: string }) {
           hero={heroActions}
         />
       </CanvasFailure>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 20, maxWidth: 1320 }}>
-        <span style={{ fontSize: 11, color: ink.muted }}>{saveNote}</span>
-        <div>
-          {/* A real link because it opens a second tab, where a nav() call
-              cannot reach. Every screen has an address of its own now, so this
-              is the address of the preview screen and nothing special. */}
-          <ButtonLink
-            href={toPath({ area: 'admin', screen: 'postPreview', slug: addresses.slugOf(postId) })}
-            target="_blank"
-            rel="noreferrer"
-            icon={<IconExternal />}
-          >
-            Xem trước
-          </ButtonLink>
-          <Button onClick={() => nav.goCms()} style={{ marginLeft: 8 }}>
-            Lưu nháp
-          </Button>
-          {/*
-            * Publish là việc duy nhất đưa chữ lên trang (migration 0028).
-            *
-            * Bài đã đăng thì mọi ô soạn chỉ lưu vào bản nháp của nó; nút này
-            * chép bản nháp ấy lên. Nên nó đợi các lượt lưu đang chạy trước —
-            * xem `save` — rồi mới đăng, và luôn nói ra kết quả: một lần bấm
-            * không có hồi âm từng là lý do chủ site không biết bài đã lên chưa.
-            */}
-          <Button
-            level="primary"
-            onClick={async () => {
-              if (published && !pending) {
-                toast.info('Không có thay đổi nào chưa đăng')
-                return
-              }
-              if (publishing) return
-              setPublishing(true)
-              const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
-              try {
-                await Promise.allSettled([...inFlight.current])
-                await transitionStatus(postId, 'publish', addresses.slugToPublish(postId))
-                card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
-                nav.goCms()
-              } catch (e) {
-                card.fail(e)
-                setPublishing(false)
-              }
-            }}
-            disabled={publishing}
-            style={{ marginLeft: 8 }}
-          >
-            {publishing ? 'Đang đăng…' : published ? (pending ? 'Đăng thay đổi' : 'Đã đăng') : 'Publish'}
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }
