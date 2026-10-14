@@ -13,11 +13,12 @@ import {
   type StatusAction,
   type Node,
 } from '../lib/apiClient'
-import { garden, ink, paper, sans, serif } from '../../design/tokens'
+import { ink, paper, sans, serif } from '../../design/tokens'
 import { useNav } from '../../lib/nav'
 import { TEMPLATE_KEYS, templateName } from '../../lib/templateNames'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { Avatar } from '../../components/Byline'
+import { tagBadge } from '../../components/TagBadges'
 import { postDescription } from '../../lib/postText'
 import { MovePostDialog } from './MovePostDialog'
 import { PostAuthorsDialog } from './PostAuthorsDialog'
@@ -29,7 +30,7 @@ import type { Author } from 'api-contract'
 import { PostSearch, fold, freeWords, type Facet, type Suggestion, type Token } from './PostSearch'
 import { desk, Menu } from './Detail'
 import { Button, IconButton } from '../../design/Button'
-import { IconClose, IconPlus } from '../../design/icons'
+import { IconCalendar, IconClock, IconClose, IconPage, IconPlus } from '../../design/icons'
 import { radius } from '../../design/controls'
 
 /**
@@ -101,13 +102,19 @@ const TABS: { id: PostStatus | null; label: string }[] = [
   { id: 'archived', label: 'Lưu trữ' },
   { id: 'deleted', label: 'Thùng rác' },
 ]
-/** A published post needs no word; the others say what they are in the facts line. */
-const STATUS_NOTE: Record<PostStatus, { text: string; color: string } | null> = {
-  draft: { text: 'Nháp', color: ink.strong },
+type Pill = { text: string; bg: string; fg: string }
+/**
+ * A published post needs no word. The others wear a pill beside the title,
+ * where the eye already is, each in its own colour (owner, 2026-10-14: a status
+ * lost among the grey facts at the end of the line was hard to see).
+ */
+const STATUS_PILL: Record<PostStatus, Pill | null> = {
+  draft: { text: 'Nháp', bg: '#E6E8EC', fg: '#384150' },
   published: null,
-  archived: { text: 'Lưu trữ', color: garden.cinnamon },
-  deleted: { text: 'Trong thùng rác', color: '#8E1E42' },
+  archived: { text: 'Lưu trữ', bg: '#ECE7DF', fg: '#62584A' },
+  deleted: { text: 'Thùng rác', bg: '#FBE7E5', fg: '#8E1E42' },
 }
+const PENDING_PILL: Pill = { text: 'Có sửa chưa đăng', bg: '#FCE3B0', fg: '#73450A' }
 
 const CSS = `
 .cw-r:hover{background:${paper.hover}}
@@ -117,8 +124,9 @@ const CSS = `
 .cw-story:hover .cw-title{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
 .cw-story:focus-within{background:#FAF9F6}
 .cw-title:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
-.cw-fact{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
-.cw-fact:hover{color:${ink.base};text-decoration:underline}
+.cw-fact{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border-radius:4px}
+.cw-fact:hover{text-decoration:underline;text-underline-offset:3px}
+.cw-fact:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
 .cw-tab{all:unset;cursor:pointer;padding:12px 0 11px;font-family:${sans};font-size:14px;color:${ink.soft};white-space:nowrap}
 .cw-tab[aria-selected=true]{color:${ink.base};box-shadow:inset 0 -2px 0 ${ink.base}}
 .cw-tab:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
@@ -467,94 +475,83 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   // Checkbox, menu and the filter links in a post sit inside the clickable
   // post; their clicks must not also open it.
   const own = (e: { stopPropagation: () => void }) => e.stopPropagation()
-  const sep = <span aria-hidden>·</span>
 
   const story = (p: PostSummary) => {
     const t = p.topic_id ? topicById.get(p.topic_id) : undefined
     const by = (p.authors ?? []).map((id) => authorById.get(id)).filter((a): a is Author => !!a)
-    const note = p.status === 'published' && p.has_draft ? { text: 'Có sửa chưa đăng', color: WARN } : STATUS_NOTE[p.status]
+    const pill = p.status === 'published' && p.has_draft ? PENDING_PILL : STATUS_PILL[p.status]
     const preview = p.excerpt || postDescription(p)
-    const facts = [p.date_label, p.read_minutes ? `${p.read_minutes} phút đọc` : null].filter(Boolean).join(' · ')
+    const fact: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }
+    const icon: CSSProperties = { color: ink.muted, flex: 'none' }
     return (
       <div
         key={p.id}
         className="cw-story"
         onClick={() => nav.editPost(p.id)}
-        style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr) auto', gap: 14, alignItems: 'start', padding: '18px 20px', borderBottom: `1px solid ${desk.line}`, background: sel.has(p.id) ? SEL : undefined }}
+        style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr) auto auto', gap: 16, alignItems: 'start', padding: '18px 16px 18px 20px', borderBottom: `1px solid ${desk.line}`, background: sel.has(p.id) ? SEL : undefined }}
       >
         <input type="checkbox" aria-label={`Chọn ${p.en}`} checked={sel.has(p.id)} onClick={own} onChange={() => flip(p.id)} style={{ marginTop: 5 }} />
         <div style={{ minWidth: 0 }}>
-          <button type="button" className="cw-title" onClick={(e) => (own(e), nav.editPost(p.id))} style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: ink.base }}>
-            {p.en}
-          </button>
-          {p.pinned && (
-            <span aria-label="đã ghim" style={{ marginLeft: 6, fontSize: 13 }}>
-              📌
-            </span>
-          )}
-          {preview && (
-            <p style={{ margin: '4px 0 0', fontFamily: sans, fontSize: 14.5, lineHeight: 1.5, color: ink.soft, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{preview}</p>
-          )}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 8px', marginTop: 10, fontFamily: sans, fontSize: 13, color: ink.soft }}>
-            {by.length > 0 && (
-              <>
-                <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'author', id: by[0].id }))} style={{ color: ink.base }}>
-                  <span style={{ display: 'flex' }}>
-                    {by.map((a, i) => (
-                      <span key={a.id} style={{ marginLeft: i === 0 ? 0 : -6, display: 'flex' }}>
-                        <Avatar author={a} size={20} ring={by.length > 1} />
-                      </span>
-                    ))}
-                  </span>
-                  {by.map((a) => a.name).join(' và ')}
-                </button>
-                {sep}
-              </>
-            )}
-            <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'topic', id: t?.id ?? UNPLACED }))}>
-              {t && <Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
-              {t ? t.title : 'chưa xếp'}
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px 10px' }}>
+            <button type="button" className="cw-title" onClick={(e) => (own(e), nav.editPost(p.id))} style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: ink.base }}>
+              {p.en}
             </button>
-            {sep}
-            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{facts}</span>
-            {sep}
+            {p.pinned && <span aria-label="đã ghim" style={{ fontSize: 13 }}>📌</span>}
+            {pill && (
+              <span
+                title={pill === PENDING_PILL ? 'Bản trên trang vẫn là bản cũ — mở bài và bấm "Đăng thay đổi"' : undefined}
+                style={{ alignSelf: 'center', fontFamily: sans, fontSize: 12.5, fontWeight: 600, lineHeight: '20px', padding: '0 9px', borderRadius: 999, background: pill.bg, color: pill.fg, whiteSpace: 'nowrap' }}
+              >
+                {pill.text}
+              </span>
+            )}
+          </div>
+          {preview && (
+            <p style={{ margin: '5px 0 0', fontFamily: sans, fontSize: 14.5, lineHeight: 1.5, color: ink.mid, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{preview}</p>
+          )}
+          {/* Facts are grouped by gaps and icons, not "·": a row of dots made
+              every fact look like the next one (owner, 2026-10-14). */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 18px', marginTop: 12, fontFamily: sans, fontSize: 13.5, color: ink.strong }}>
+            {by.length > 0 && (
+              <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'author', id: by[0].id }))} style={{ fontWeight: 500, color: ink.base }}>
+                <span style={{ display: 'flex' }}>
+                  {by.map((a, i) => (
+                    <span key={a.id} style={{ marginLeft: i === 0 ? 0 : -6, display: 'flex' }}>
+                      <Avatar author={a} size={22} ring={by.length > 1} />
+                    </span>
+                  ))}
+                </span>
+                {by.map((a) => a.name).join(' và ')}
+              </button>
+            )}
+            <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'topic', id: t?.id ?? UNPLACED }))} style={t ? { fontWeight: 500, color: ink.base } : { fontStyle: 'italic', color: ink.soft }}>
+              {t && <Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
+              {t ? t.title : 'Chưa xếp chủ đề'}
+            </button>
+            {p.date_label && (
+              <span style={{ ...fact, fontVariantNumeric: 'tabular-nums' }}>
+                <IconCalendar size={14} style={icon} />
+                {p.date_label}
+              </span>
+            )}
+            {p.read_minutes && (
+              <span style={fact}>
+                <IconClock size={14} style={icon} />
+                {p.read_minutes} phút đọc
+              </span>
+            )}
             <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'tpl', id: p.template ?? '' }))}>
+              <IconPage size={14} style={icon} />
               {templateName(p.template)}
             </button>
-            {kwOf(p).map((k) => (
-              <button key={k} type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'kw', id: k }))}>
-                #{nameOf('kw', k)}
-              </button>
-            ))}
-            {note && (
-              <>
-                {sep}
-                <span
-                  title={p.has_draft && p.status === 'published' ? 'Bản trên trang vẫn là bản cũ — mở bài và bấm "Đăng thay đổi"' : undefined}
-                  style={{ color: note.color, fontWeight: 600 }}
-                >
-                  {note.text}
-                </span>
-              </>
-            )}
-            <span onClick={own} style={{ display: 'flex' }}>
-              <Menu
-                small
-                label={`Thao tác ${p.en}`}
-                actions={[
-                  { label: 'Nhân bản', onPick: () => copy(p.id) },
-                  // A pinned post leads every page that lists it (listingRule sortPosts).
-                  { label: p.pinned ? 'Bỏ ghim' : 'Ghim', onPick: () => run(() => updatePost(p.id, { pinned: !p.pinned })) },
-                  { label: 'Chuyển module', onPick: () => setMoving(p) },
-                  { label: 'Tác giả', onPick: () => setNaming(p) },
-                  ...ACTIONS_BY_STATUS[p.status].map((a) => ({
-                    label: a.label,
-                    onPick: () => act(p.id, a.action),
-                    ...(a.action === 'delete' || a.action === 'permanently-delete' ? { danger: true as const } : {}),
-                  })),
-                ]}
-              />
-            </span>
+            {kwOf(p).map((k) => {
+              const kw = keywords.find((x) => x.id === k)
+              return (
+                <button key={k} type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'kw', id: k }))} style={{ ...tagBadge(tagColor(k, kw?.color)), fontSize: 12.5 }}>
+                  #{nameOf('kw', k)}
+                </button>
+              )
+            })}
           </div>
         </div>
         {p.thumbnail_url ? (
@@ -562,6 +559,24 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         ) : (
           <span className="cw-cover" aria-hidden style={{ width: 112, height: 75, borderRadius: 2, background: '#F4F2EC' }} />
         )}
+        <span onClick={own} style={{ display: 'flex' }}>
+          <Menu
+            small
+            label={`Thao tác ${p.en}`}
+            actions={[
+              { label: 'Nhân bản', onPick: () => copy(p.id) },
+              // A pinned post leads every page that lists it (listingRule sortPosts).
+              { label: p.pinned ? 'Bỏ ghim' : 'Ghim', onPick: () => run(() => updatePost(p.id, { pinned: !p.pinned })) },
+              { label: 'Chuyển module', onPick: () => setMoving(p) },
+              { label: 'Tác giả', onPick: () => setNaming(p) },
+              ...ACTIONS_BY_STATUS[p.status].map((a) => ({
+                label: a.label,
+                onPick: () => act(p.id, a.action),
+                ...(a.action === 'delete' || a.action === 'permanently-delete' ? { danger: true as const } : {}),
+              })),
+            ]}
+          />
+        </span>
       </div>
     )
   }
