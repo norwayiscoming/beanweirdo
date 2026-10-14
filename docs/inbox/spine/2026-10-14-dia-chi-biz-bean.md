@@ -1,6 +1,6 @@
 # Địa chỉ của hai site con: /biz và /bean
 
-- **PR:** (số PR điền khi mở) · nhánh `claude/config-one-tree-539wvd`
+- **PR:** #93 · nhánh `claude/config-one-tree-539wvd`
 - **Migration:** không có. Dùng cột `nodes.home_of` của 0035.
 
 ## Đã đổi
