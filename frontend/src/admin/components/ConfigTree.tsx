@@ -92,7 +92,7 @@ import {
  * Mục lục. So the tabs are beanweirdo | biz | bean, the Tác giả tab moved in
  * here, and "Phần chung" — which meant the frame on the port and the borrowed
  * looks on the blog — is gone as a name. Until the data moves, biz's pages are
- * `nodes` with site 'port'; its home is the one flagged `is_home` (0034).
+ * `nodes` with site 'port'; each child site's home is the block page flagged `home_of` (0035).
  */
 
 type Group = 'root-toc' | 'biz-pages' | 'frame' | 'topics' | 'tags' | 'authors' | 'modules'
@@ -210,7 +210,8 @@ export function ConfigTree({
 }) {
   const { data: pages, postsOf, reload: reloadPages } = useModules()
   const port = usePortAdmin()
-  const bizHome = port.pages.find((p) => p.is_home)
+  const bizHome = port.pages.find((p) => p.home_of === 'biz')
+  const beanHome = port.pages.find((p) => p.home_of === 'bean')
   const src = usePortSources()
   const [layout, setLayout] = useState<Layout | null>(null)
   const [vocab, setVocab] = useState<Vocab>({ topics: [], keywords: [], kinds: [] })
@@ -218,13 +219,18 @@ export function ConfigTree({
   // Landing from /ad-authors shows the root tab until another tab is picked.
   const [landed, setLanded] = useState(openAuthors)
   const site = landed ? 'root' : remembered
-  // Without its home page (renamed, or not loaded yet) the biz tab opens on its Mục lục.
-  const homeOf = (id: SiteId): Picked => (id === 'bean' ? { kind: 'system', key: 'landing' } : id === 'root' ? { kind: 'port-part', part: 'home' } : { kind: 'group', id: 'biz-pages' })
+  // Without its home page (not loaded yet) biz opens on its Mục lục, bean on its blog page.
+  const homeOf = (id: SiteId): Picked => {
+    if (id === 'root') return { kind: 'port-part', part: 'home' }
+    const home = id === 'biz' ? bizHome : beanHome
+    if (home) return { kind: 'port-page', id: home.id }
+    return id === 'bean' ? { kind: 'system', key: 'landing' } : { kind: 'group', id: 'biz-pages' }
+  }
   const [picked, setPicked] = useState<Picked>(() => (openAuthors ? { kind: 'group', id: 'authors' } : homeOf(site)))
   const openSite = (id: SiteId) => {
     setLanded(false)
     setSiteTab(id)
-    setPicked(id === 'biz' && bizHome ? { kind: 'port-page', id: bizHome.id } : homeOf(id))
+    setPicked(homeOf(id))
     setDragging(null)
     setDropAt(null)
   }
@@ -457,15 +463,19 @@ export function ConfigTree({
     note: `${shownBiz.filter((p) => p.parent_id === null).length} mục · cây trang của biz`,
     nest: true,
     move: moveBizPage,
-    items: shownBiz.filter((pg) => pg.id !== bizHome?.id).map((pg): TocItem => ({ id: pg.id, parent_id: pg.parent_id, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: true })),
+    items: shownBiz.filter((pg) => !pg.home_of).map((pg): TocItem => ({ id: pg.id, parent_id: pg.parent_id, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: true })),
   }
 
   const beanSite: SiteSpec = {
     id: 'bean',
     path: `${blog}/…`,
-    home: { title: 'Trang chủ bean', note: `${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`, picked: { kind: 'system', key: 'landing' } },
+    home: beanHome && { title: 'Trang chủ bean', note: `/${beanHome.slug} · ${beanHome.title}`, picked: { kind: 'port-page', id: beanHome.id } },
     toc: topicToc,
-    cards: [{ title: 'Hình trang', note: 'dàn trang, ảnh và chữ mà một trang mượn', picked: { kind: 'group', id: 'modules' } }],
+    cards: [
+      // The blog's own front page; the owner named it "details" (2026-10-14).
+      { title: 'details', note: `${toPath({ area: 'public', screen: 'landing' })} · nhãn trên cùng, tên lớn, hai đoạn dẫn`, picked: { kind: 'system', key: 'landing' } },
+      { title: 'Hình trang', note: 'dàn trang, ảnh và chữ mà một trang mượn', picked: { kind: 'group', id: 'modules' } },
+    ],
   }
 
   const bizSite: SiteSpec = {
@@ -518,7 +528,7 @@ export function ConfigTree({
       case 'module':
         return 'modules'
       case 'port-page':
-        return site === 'root' ? 'root-toc' : p.id === bizHome?.id ? null : 'biz-pages'
+        return site === 'root' ? 'root-toc' : port.pages.find((x) => x.id === p.id)?.home_of ? null : 'biz-pages'
       case 'port-part':
         return p.part === 'about' ? 'root-toc' : p.part === 'home' ? null : 'frame'
       default:
@@ -765,7 +775,7 @@ export function ConfigTree({
       const p = port.pages.find((x) => x.id === picked.id)
       if (!p) break
       const bizKids = port.pages.filter((x) => x.parent_id === p.id)
-      crumbs = p.id === bizHome?.id ? [siteCrumb('biz')] : [siteCrumb('biz'), groupCrumb('biz-pages', 'Mục lục'), ...ancestorsOf(shownBiz, p.id).map((x): Crumb => ({ label: x.title, open: pick({ kind: 'port-page', id: x.id }) }))]
+      crumbs = p.home_of ? [siteCrumb(p.home_of)] : [siteCrumb('biz'), groupCrumb('biz-pages', 'Mục lục'), ...ancestorsOf(shownBiz, p.id).map((x): Crumb => ({ label: x.title, open: pick({ kind: 'port-page', id: x.id }) }))]
       title = p.title
       rename = (v) => run(async () => {
         const next = await updateNode(p.id, { title: v })
@@ -801,7 +811,7 @@ export function ConfigTree({
       const d = describePage(picked, layout, pages)
       const blocker = pageDeleteBlocker(picked, layout, pages)
       crumbs = [siteCrumb('bean'), ...(picked.kind === 'curated' ? [groupCrumb('topics', 'Mục lục')] : [])]
-      title = picked.kind === 'system' && picked.key === 'landing' ? 'Trang chủ bean' : d.title
+      title = picked.kind === 'system' && picked.key === 'landing' ? 'details' : d.title
       preview = d.preview
       address = d.preview
       if (picked.kind === 'curated' && d.record) {

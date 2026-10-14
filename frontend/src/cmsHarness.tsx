@@ -71,7 +71,7 @@ let AUTHORS: Row[] = [
 ]
 
 const topic = (id: string, title: string, sort_order: number, parent_id: string | null, accent: string | null, posts: number, site = 'blog', extra: Row = {}): Row => ({
-  id, site, slug: id, parent_id, title, intro: '', look: null, blocks: [], status: 'published', is_home: false, accent, on_color: null, tint: null, tint2: null, image_url: null, sort_order, posts, updated_at: '', ...extra,
+  id, site, slug: id, parent_id, title, intro: '', look: null, blocks: [], status: 'published', home_of: null, accent, on_color: null, tint: null, tint2: null, image_url: null, sort_order, posts, updated_at: '', ...extra,
 })
 let TOPICS: Row[] = [
   topic('tu-duy', 'tư duy', 1, null, '#F2A0A5', 4),
@@ -82,8 +82,8 @@ let TOPICS: Row[] = [
   topic('maillard', 'phản ứng Maillard', 6, 'roasting', null, 2),
   topic('ghi', 'ghi', 6, null, '#F0B45C', 12),
   // The blocks of the real strat & ops page, so the block list can be looked at.
-  topic('p1', 'strat & ops', 1, null, null, 0, 'port', { slug: 'biz-hkd', is_home: true, look: 'biz', blocks: (['head', 'slider', 'series', 'slider', 'story', 'slider', 'about', 'cards'] as const).map((t) => newBlock(t, 'bean')) }),
-  topic('p2', 'bean', 2, null, null, 0, 'port', { slug: 'bean', look: 'baen', status: 'draft' }),
+  topic('p1', 'strat & ops', 1, null, null, 0, 'port', { slug: 'biz-hkd', home_of: 'biz', look: 'biz', blocks: (['head', 'slider', 'series', 'slider', 'story', 'slider', 'about', 'cards'] as const).map((t) => newBlock(t, 'bean')) }),
+  topic('p2', 'bean', 2, null, null, 0, 'port', { slug: 'been-hkd', home_of: 'bean', look: 'baen', status: 'draft' }),
 ]
 // A few posts so the Nội dung table has rows to look at.
 const post = (id: string, vi: string, topic_id: string, status: string, template: string, date_label: string, keywords: string[] = [], authors: string[] = ['a1']): Row => ({
