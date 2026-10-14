@@ -174,14 +174,3 @@ export function formShapeOf(m: ModuleIdentity): ModuleFormShape {
   if (m.kind !== 'special') return normalShape(m.layout ?? 'band')
   return m.id === 'ghi01' ? NOTES : HOURS
 }
-
-/**
- * A slot with no photo is not an empty slot — it is a colour box, and it does
- * not count as an image. That is what the public screens already do, and it is
- * why the editor never reflows: the layout keeps its shape, each cell just
- * switches between a photo and its tint.
- */
-export function imageCount(m: ModuleImageFields, group: ImageGroup): number {
-  const row = m as unknown as Record<string, unknown>
-  return group.slots.filter((s) => row[imageColumn(group, s)]).length
-}

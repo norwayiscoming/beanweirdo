@@ -11,7 +11,7 @@ import { useIsMobile } from './lib/useIsMobile'
 import { AREA_HOME, isPrivate, screenAllowed } from './lib/area'
 import { useRoute } from './lib/useRoute'
 import { adoptWords } from './lib/routeWords'
-import { toPath, type CmsTab, type PortTab, type Where } from './lib/routes'
+import { toPath, type CmsTab, type Where } from './lib/routes'
 import {
   NavContext,
   SettingsContext,
@@ -176,9 +176,7 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       moduleId,
       postId,
       articleFrom,
-      templateId: where.templateId ?? null,
       cmsTab: where.tab ?? 'posts',
-      portTab: where.portTab ?? 'pages',
       slug: where.slug ?? null,
       goLanding: () => at({ screen: 'landing' }),
       goHome: () => at({ screen: 'home' }),
@@ -186,7 +184,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       goHours: () => at({ screen: 'hours' }),
       goNotes: () => at({ screen: 'notes' }),
       goCms: (tab?: CmsTab) => at({ screen: 'cms', tab }),
-      goPortfolio: (portTab?: PortTab) => at({ screen: 'portfolio', portTab }),
       openModule,
       openArticle,
       newPost: () => setNewPostOpen(true),
