@@ -91,10 +91,12 @@ import {
  * independent sites cut from one pattern, each with its own home and its own
  * Mục lục. So the tabs are beanweirdo | biz | bean, the Tác giả tab moved in
  * here, and "Phần chung" — which meant the frame on the port and the borrowed
- * looks on the blog — is gone as a name. Until the data moves (biz pages are
- * still `nodes` with site 'port', bean's are site 'blog'), biz has no home of
- * its own yet: it is drawn when it exists, not as an empty card.
+ * looks on the blog — is gone as a name. Until the data moves, biz's pages are
+ * `nodes` with site 'port' and its home is the one the owner named.
  */
+
+/** The port page that is biz's home (owner, 2026-10-14: "/biz-hkd là trang chủ của bizops"). */
+const BIZ_HOME_SLUG = 'biz-hkd'
 
 type Group = 'root-toc' | 'biz-pages' | 'frame' | 'topics' | 'tags' | 'authors' | 'modules'
 
@@ -211,6 +213,7 @@ export function ConfigTree({
 }) {
   const { data: pages, postsOf, reload: reloadPages } = useModules()
   const port = usePortAdmin()
+  const bizHome = port.pages.find((p) => p.slug === BIZ_HOME_SLUG)
   const src = usePortSources()
   const [layout, setLayout] = useState<Layout | null>(null)
   const [vocab, setVocab] = useState<Vocab>({ topics: [], keywords: [], kinds: [] })
@@ -218,13 +221,13 @@ export function ConfigTree({
   // Landing from /ad-authors shows the root tab until another tab is picked.
   const [landed, setLanded] = useState(openAuthors)
   const site = landed ? 'root' : remembered
-  // biz has no home of its own until its data moves, so its tab opens on its Mục lục.
+  // Without its home page (renamed, or not loaded yet) the biz tab opens on its Mục lục.
   const homeOf = (id: SiteId): Picked => (id === 'bean' ? { kind: 'system', key: 'landing' } : id === 'root' ? { kind: 'port-part', part: 'home' } : { kind: 'group', id: 'biz-pages' })
   const [picked, setPicked] = useState<Picked>(() => (openAuthors ? { kind: 'group', id: 'authors' } : homeOf(site)))
   const openSite = (id: SiteId) => {
     setLanded(false)
     setSiteTab(id)
-    setPicked(homeOf(id))
+    setPicked(id === 'biz' && bizHome ? { kind: 'port-page', id: bizHome.id } : homeOf(id))
     setDragging(null)
     setDropAt(null)
   }
@@ -457,7 +460,7 @@ export function ConfigTree({
     note: `${shownBiz.filter((p) => p.parent_id === null).length} mục · cây trang của biz`,
     nest: true,
     move: moveBizPage,
-    items: shownBiz.map((pg): TocItem => ({ id: pg.id, parent_id: pg.parent_id, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: true })),
+    items: shownBiz.filter((pg) => pg.id !== bizHome?.id).map((pg): TocItem => ({ id: pg.id, parent_id: pg.parent_id, name: pg.title, dot: portDot(pg), meta: tocMeta(pg.status, `/${pg.slug}`), picked: { kind: 'port-page', id: pg.id }, movable: true })),
   }
 
   const beanSite: SiteSpec = {
@@ -468,7 +471,12 @@ export function ConfigTree({
     cards: [{ title: 'Hình trang', note: 'dàn trang, ảnh và chữ mà một trang mượn', picked: { kind: 'group', id: 'modules' } }],
   }
 
-  const bizSite: SiteSpec = { id: 'biz', path: '/…', toc: bizToc }
+  const bizSite: SiteSpec = {
+    id: 'biz',
+    path: '/…',
+    home: bizHome && { title: 'Trang chủ biz', note: `/${bizHome.slug} · ${bizHome.title}`, picked: { kind: 'port-page', id: bizHome.id } },
+    toc: bizToc,
+  }
 
   // beanweirdo's Mục lục is its top bar: the doors to the sites, then About, in the bar's order.
   const rootToc: Toc = {
@@ -513,7 +521,7 @@ export function ConfigTree({
       case 'module':
         return 'modules'
       case 'port-page':
-        return site === 'root' ? 'root-toc' : 'biz-pages'
+        return site === 'root' ? 'root-toc' : p.id === bizHome?.id ? null : 'biz-pages'
       case 'port-part':
         return p.part === 'about' ? 'root-toc' : p.part === 'home' ? null : 'frame'
       default:
@@ -760,7 +768,7 @@ export function ConfigTree({
       const p = port.pages.find((x) => x.id === picked.id)
       if (!p) break
       const bizKids = port.pages.filter((x) => x.parent_id === p.id)
-      crumbs = [siteCrumb('biz'), groupCrumb('biz-pages', 'Mục lục'), ...ancestorsOf(shownBiz, p.id).map((x): Crumb => ({ label: x.title, open: pick({ kind: 'port-page', id: x.id }) }))]
+      crumbs = p.id === bizHome?.id ? [siteCrumb('biz')] : [siteCrumb('biz'), groupCrumb('biz-pages', 'Mục lục'), ...ancestorsOf(shownBiz, p.id).map((x): Crumb => ({ label: x.title, open: pick({ kind: 'port-page', id: x.id }) }))]
       title = p.title
       rename = (v) => run(async () => {
         const next = await updateNode(p.id, { title: v })
