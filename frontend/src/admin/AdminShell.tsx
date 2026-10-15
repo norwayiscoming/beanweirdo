@@ -48,8 +48,9 @@ const SIDE_W = 248
 /**
  * The back office's one frame: a sidebar holding every place to work
  * (Nội dung, the four sites of Cấu hình with the open one's cards, Cài đặt
- * hiển thị), and the work itself on the right. It replaces the public site's
- * rail and the old blue "Content" band.
+ * hiển thị), and the work itself on the right: those screens, the post
+ * editor and a post's preview. It replaces the public site's rail and the old
+ * blue "Content" band.
  */
 export function AdminShell({ children }: { children: ReactNode }) {
   const nav = useNav()
@@ -63,7 +64,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     setSite(s)
     if (!config) nav.goCms('pages')
   }
-  const where = tab === 'posts' ? 'Nội dung' : tab === 'display' ? 'Cài đặt hiển thị' : `Cấu hình › ${CONFIG_SITE_LABELS[site]}`
+  const where = nav.screen === 'postEdit' ? 'Nội dung › Sửa bài' : nav.screen === 'postPreview' ? 'Nội dung › Xem trước' : tab === 'posts' ? 'Nội dung' : tab === 'display' ? 'Cài đặt hiển thị' : `Cấu hình › ${CONFIG_SITE_LABELS[site]}`
 
   const side = (
     <aside
@@ -84,7 +85,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <a href="/" style={{ fontFamily: serif, fontSize: 20, color: SHELL.sideInk, textDecoration: 'none', padding: '2px 10px 16px' }}>
         bæn. <span style={{ fontFamily: sans, fontSize: 13, color: SHELL.sideMuted }}>quản trị</span>
       </a>
-      <Item on={tab === 'posts'} onClick={() => nav.goCms('posts')}>
+      <Item on={tab === 'posts' || nav.screen !== 'cms'} onClick={() => nav.goCms('posts')}>
         Nội dung
       </Item>
 

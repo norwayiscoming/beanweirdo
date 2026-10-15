@@ -200,11 +200,7 @@ createRoot(document.getElementById('root')!).render(
   <NavContext.Provider value={nav}>
     <ToastProvider>
       {/* `?screen=edit` opens the post editor on the first post instead; `?screen=new` the "Bài mới" dialog. */}
-      {new URLSearchParams(location.search).get('screen') === 'edit' ? <Editor postId="p-a" /> : (
-        <AdminShell>
-          <Cms />
-        </AdminShell>
-      )}
+      <AdminShell>{new URLSearchParams(location.search).get('screen') === 'edit' ? <Editor postId="p-a" /> : <Cms />}</AdminShell>
       <NewPostDialog open={new URLSearchParams(location.search).get('screen') === 'new'} onClose={nop} onCreated={nop} />
     </ToastProvider>
   </NavContext.Provider>,

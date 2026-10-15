@@ -210,10 +210,12 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
   }
 
   // The back office wears its own frame (AdminShell) instead of the site's rail.
-  const admin = shown === 'cms'
+  const admin = shown === 'cms' || shown === 'postEdit' || shown === 'postPreview'
   const body = admin ? (
     <AdminShell>
-      <Cms />
+      {shown === 'cms' && <Cms />}
+      {shown === 'postEdit' && postId && <Editor postId={postId} />}
+      {shown === 'postPreview' && postId && <Preview postId={postId} />}
     </AdminShell>
   ) : (
     /*
@@ -228,8 +230,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       {shown === 'home' && <IndexScreen />}
       {shown === 'module' && <ModuleScreen />}
       {shown === 'archive' && <Archive />}
-      {shown === 'postEdit' && postId && <Editor postId={postId} />}
-      {shown === 'postPreview' && postId && <Preview postId={postId} />}
     </div>
   )
 

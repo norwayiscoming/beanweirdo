@@ -17,7 +17,7 @@ Chủ site chọn kiểu B ("Thanh bên Notion") trong mock ngày 2026-10-15.
   `beanweirdo.config.tab` như trước). Các thẻ của site đang mở (Trang chủ, Mục lục, …) vẽ
   dưới site đó trong thanh bên qua `createPortal` (`ConfigTree.tsx: tree`). Hàng `SiteTabs`
   và cột thẻ bên trái của ConfigTree bị xoá, cùng thanh kéo `cfg-tree`.
-- Màn sửa bài (`postEdit`), xem trước và Archive vẫn dùng khung cũ.
+- Màn sửa bài (`postEdit`) và xem trước bài (`postPreview`) cũng vẽ trong `AdminShell` (chủ site: "đưa vào khung này"); Archive vẫn dùng khung cũ.
 
 ## [ĐỔI HÀNH VI] Nút Thêm
 
@@ -28,4 +28,4 @@ Chủ site chọn kiểu B ("Thanh bên Notion") trong mock ngày 2026-10-15.
 
 ## Đề xuất
 
-- Màn sửa bài có thể vào chung khung này ở PR sau.
+- Không có.
