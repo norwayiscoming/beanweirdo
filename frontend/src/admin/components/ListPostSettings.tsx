@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AuthorRef } from 'api-contract'
-import { getPost, updatePost, type Module, type Node, type PostDetail } from '../lib/apiClient'
+import { getPost, transitionStatus, updatePost, type Module, type Node, type PostDetail } from '../lib/apiClient'
 import { listModulesCached } from '../lib/lists'
 import { resolveTemplate } from '../lib/postData'
 import { usePostAddresses } from '../../data/usePostAddresses'
@@ -53,11 +53,14 @@ export function ListPostSettings({
   const [post, setPost] = useState<PostDetail | null>(null)
   const [byline, setByline] = useState<AuthorRef[]>([])
   const [modules, setModules] = useState<Module[]>([])
+  const writes = useRef(new Set<Promise<unknown>>())
+  const [dirty, setDirty] = useState(false)
   // Mounted closed, opened a frame later, so the panel slides in as it does in the editor.
   const [shown, setShown] = useState(false)
 
   useEffect(() => {
     setPost(null)
+    setDirty(false)
     setShown(false)
     if (!postId) return
     let alive = true
@@ -94,8 +97,12 @@ export function ListPostSettings({
   const patch = (p: SettingsPatch) => {
     // The panel's template is a free string; the editor casts the same way.
     setPost((prev) => (prev ? { ...prev, ...(p as Partial<PostDetail>) } : prev))
-    void updatePost(post.id, p as Parameters<typeof updatePost>[1]).catch((e: Error) => onError(e.message))
+    const w = updatePost(post.id, p as Parameters<typeof updatePost>[1])
+    writes.current.add(w)
+    void w.finally(() => writes.current.delete(w)).catch((e: Error) => onError(e.message))
+    setDirty(true)
   }
+  const live = post.status === 'published'
 
   return (
     <>
@@ -111,6 +118,13 @@ export function ListPostSettings({
         canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(post.id)}
         onPatch={patch}
+        onSave={async () => void (await Promise.all([...writes.current]))}
+        publishLabel={live ? (post.has_draft || dirty ? 'Đăng thay đổi' : null) : post.status === 'draft' ? 'Publish' : null}
+        onPublish={async () => {
+          await transitionStatus(post.id, 'publish')
+          // The list reloads on close and shows the post where it now lives.
+          onClose()
+        }}
         onSlug={async (slug) => {
           try {
             const saved = await updatePost(post.id, { slug })

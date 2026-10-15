@@ -103,6 +103,9 @@ export function PostSettings({
   derivedSlug,
   onPatch,
   onSlug,
+  onSave,
+  publishLabel,
+  onPublish,
 }: {
   open: boolean
   onClose: () => void
@@ -119,9 +122,27 @@ export function PostSettings({
   onPatch: (patch: SettingsPatch) => void
   /** Null goes back to the title's address. Resolves to an error message, or null when it was taken. */
   onSlug: (slug: string | null) => Promise<string | null>
+  /** Settles once every write the parent has started has landed; rejects when one failed. */
+  onSave: () => Promise<void>
+  /** The publish button's word, or null when nothing is waiting to go on the page. */
+  publishLabel: string | null
+  onPublish: () => Promise<void>
 }) {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [slugError, setSlugError] = useState<string | null>(null)
+  /*
+   * Fields write as they are left, but the owner (2026-10-15) could not tell
+   * whether a change had landed without reloading. The footer says so, and
+   * "Lưu" is the moment to find out: it leaves the field being typed in (its
+   * write starts), waits for every write, then reports.
+   */
+  const [note, setNote] = useState<'idle' | 'dirty' | 'saving' | 'publishing' | { saved: Date } | { error: string }>('idle')
+  const slugWrites = useRef(new Set<Promise<unknown>>())
+  const track = <T,>(p: Promise<T>) => {
+    slugWrites.current.add(p)
+    void p.finally(() => slugWrites.current.delete(p)).catch(() => {})
+    return p
+  }
   const panel = useRef<HTMLElement>(null)
   // Closed, the panel is only slid off screen: keep Tab and screen readers out of it.
   useEffect(() => {
@@ -158,8 +179,53 @@ export function PostSettings({
     // Typed the way a title is written, stored the way an address must be.
     const v = titleSlug(value)
     if (!v || v === address) return setSlugError(null)
-    setSlugError(await onSlug(v))
+    setSlugError(await track(onSlug(v)))
   }
+
+  /** Leave the field in hand, so its write starts, then wait for every write. */
+  async function settle() {
+    if (panel.current?.contains(document.activeElement)) (document.activeElement as HTMLElement).blur()
+    await new Promise((r) => setTimeout(r))
+    await Promise.all([...slugWrites.current])
+    await onSave()
+  }
+
+  async function save() {
+    setNote('saving')
+    try {
+      await settle()
+      setNote({ saved: new Date() })
+    } catch (e) {
+      setNote({ error: (e as Error).message })
+    }
+  }
+
+  async function publish() {
+    setNote('publishing')
+    try {
+      await settle()
+      await onPublish()
+      setNote({ saved: new Date() })
+    } catch (e) {
+      setNote({ error: (e as Error).message })
+    }
+  }
+
+  const live = post.status === 'published'
+  const noteText =
+    note === 'dirty'
+      ? 'Có thay đổi, bấm Lưu.'
+      : note === 'saving'
+        ? 'Đang lưu…'
+        : note === 'publishing'
+          ? 'Đang đăng…'
+          : note === 'idle'
+            ? live
+              ? 'Bài đã đăng: sửa gì cũng vào nháp tới khi bấm Đăng.'
+              : 'Bài nháp.'
+            : 'error' in note
+              ? `Chưa lưu được: ${note.error}`
+              : `Đã lưu lúc ${note.saved.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}${live && publishLabel ? ', chưa lên trang.' : '.'}`
 
   function commitTitle(value: string) {
     const t = value.trim()
@@ -173,6 +239,8 @@ export function PostSettings({
       aria-hidden={!open}
       className="cfg-detail"
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      onInput={() => setNote('dirty')}
+      onChange={() => setNote('dirty')}
       style={{
         position: 'fixed',
         top: 0,
@@ -186,7 +254,7 @@ export function PostSettings({
         transform: open ? 'none' : 'translateX(100%)',
         transition: 'transform .2s ease, box-shadow .2s ease',
         overflowY: 'auto',
-        padding: '14px 16px 32px',
+        padding: '14px 16px 0',
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
@@ -250,7 +318,7 @@ export function PostSettings({
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <span>{post.slug ? 'Đặt tay, không đổi theo tên. Enter để lưu, Esc để bỏ.' : 'Theo tên bài, không dấu, nối bằng "-"; đổi tên thì đổi theo. Gõ để đặt khác.'}</span>
                 {post.slug && (
-                  <Button size="sm" onClick={() => void onSlug(null).then(setSlugError)}>
+                  <Button size="sm" onClick={() => void track(onSlug(null)).then(setSlugError)}>
                     Theo tên bài
                   </Button>
                 )}
@@ -383,6 +451,34 @@ export function PostSettings({
           />
         </Prop>
       </Group>
+      <footer
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          marginTop: 'auto',
+          marginInline: -16,
+          padding: '10px 16px 14px',
+          background: desk.panel,
+          borderTop: `1px solid ${desk.line}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <span role="status" style={{ fontSize: 12, color: typeof note === 'object' && 'error' in note ? ink.danger : ink.soft }}>
+          {noteText}
+        </span>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <Button onClick={() => void save()} disabled={note === 'saving' || note === 'publishing'}>
+            Lưu
+          </Button>
+          {publishLabel && (
+            <Button level="primary" onClick={() => void publish()} disabled={note === 'saving' || note === 'publishing'}>
+              {publishLabel}
+            </Button>
+          )}
+        </div>
+      </footer>
     </aside>
   )
 }
