@@ -3,7 +3,7 @@ import { useNav } from '../lib/nav'
 import { useAuth } from '../lib/auth'
 import { goToArea } from '../lib/area'
 import { useIsMobile } from '../lib/useIsMobile'
-import { sans, serif } from '../design/tokens'
+import { serif } from '../design/tokens'
 import { useRememberedTab } from './components/SiteTabs'
 
 /** The four sites Cấu hình edits, in the order the sidebar lists them. */
@@ -12,20 +12,22 @@ export type ConfigSite = (typeof CONFIG_SITES)[number]
 export const CONFIG_SITE_LABELS: Record<ConfigSite, string> = { root: 'beanweirdo', biz: 'biz', bean: 'bean', blog: 'personal blog' }
 
 /**
- * The admin's colours, in one place so a palette is one edit (owner picked
- * frame B, a Notion sidebar, 2026-10-15). `on` is a picked row in the sidebar.
+ * The admin's colours and type, in one place so a palette is one edit. Owner
+ * picked frame B (a Notion sidebar), then on 2026-10-15 the white palette,
+ * Inter at 13px, plain indents and dashes for bullets. `on` is a picked row.
  */
 const SHELL = {
-  side: '#23262B',
-  sideInk: '#ECEAE3',
-  sideMuted: '#9A9C9F',
-  sideOn: '#363A41',
-  sideHover: '#2D3036',
-  accent: '#7FB08A',
-  main: '#FBFAF7',
-  line: '#E3DFD3',
-  ink: '#23211A',
+  side: '#FFFFFF',
+  sideLine: '#E8EAED',
+  sideInk: '#1F2328',
+  sideMuted: '#8A9099',
+  sideOn: '#EEF4EA',
+  sideHover: '#F5F6F7',
+  accent: '#3E7A4E',
+  main: '#FAFAF8',
   muted: '#8C8674',
+  font: "'Inter', system-ui, sans-serif",
+  size: 13,
 } as const
 
 type Frame = {
@@ -72,8 +74,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
       style={{
         background: SHELL.side,
         color: SHELL.sideInk,
-        fontFamily: sans,
-        fontSize: 13.5,
+        borderRight: `1px solid ${SHELL.sideLine}`,
+        fontFamily: SHELL.font,
+        fontSize: SHELL.size,
         fontWeight: 400,
         padding: '18px 12px 24px',
         display: 'flex',
@@ -83,7 +86,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       }}
     >
       <a href="/" style={{ fontFamily: serif, fontSize: 20, color: SHELL.sideInk, textDecoration: 'none', padding: '2px 10px 16px' }}>
-        bæn. <span style={{ fontFamily: sans, fontSize: 13, color: SHELL.sideMuted }}>quản trị</span>
+        bæn. <span style={{ fontFamily: SHELL.font, fontSize: SHELL.size, color: SHELL.sideMuted }}>quản trị</span>
       </a>
       <Item on={tab === 'posts' || nav.screen !== 'cms'} onClick={() => nav.goCms('posts')}>
         Nội dung
@@ -94,10 +97,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
         const open = config && s === site
         return (
           <div key={s}>
-            {/* Open, the site lights none of itself: the card picked under it does. */}
-            <Item onClick={() => openSite(s)}>
-              <span aria-hidden style={{ width: 10, color: SHELL.sideMuted }}>{open ? '▾' : '▸'}</span>
-              <span style={{ fontWeight: open ? 500 : 400 }}>{CONFIG_SITE_LABELS[s]}</span>
+            {/* Open, the site lights none of itself, only its dash and name: the card picked under it is the lit row. */}
+            <Item open={open} onClick={() => openSite(s)}>
+              {CONFIG_SITE_LABELS[s]}
             </Item>
             {open && <div ref={setSlot} />}
           </div>
@@ -110,8 +112,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
       </Item>
 
       <div style={{ marginTop: 'auto', paddingTop: 24, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <Item onClick={() => goToArea('practice', 'hours')}>Mở nhật ký Ghi 02 ↗</Item>
+        <Item bare onClick={() => goToArea('practice', 'hours')}>
+          Mở nhật ký Ghi 02 ↗
+        </Item>
         <Item
+          bare
           onClick={() => {
             signOut()
             goToArea('public')
@@ -128,7 +133,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       <div style={mobile ? undefined : { display: 'grid', gridTemplateColumns: `${SIDE_W}px minmax(0, 1fr)`, minHeight: '100vh' }}>
         {side}
         <main style={{ background: SHELL.main, minWidth: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '12px 28px', fontFamily: sans, fontSize: 12.5, color: SHELL.muted }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '12px 28px', fontFamily: SHELL.font, fontSize: 12.5, color: SHELL.muted }}>
             <span>Quản trị › {where}</span>
             <a href="/" target="_blank" rel="noreferrer" style={{ color: SHELL.muted }}>
               Xem site ↗
@@ -141,8 +146,20 @@ export function AdminShell({ children }: { children: ReactNode }) {
   )
 }
 
-/** A row of the sidebar. Cấu hình's cards use it too, so every row in it looks alike. */
-export function Item({ on = false, onClick, depth = 0, children, ...rest }: { on?: boolean; onClick: () => void; depth?: number; children: ReactNode } & Record<`data-${string}`, string>) {
+/**
+ * A row of the sidebar, led by a dash. Cấu hình's cards use it too, so every
+ * row in it looks alike. `open` is a site whose cards hang under it; `bare`
+ * rows (the way out) carry no dash.
+ */
+export function Item({
+  on = false,
+  open = false,
+  bare = false,
+  onClick,
+  depth = 0,
+  children,
+  ...rest
+}: { on?: boolean; open?: boolean; bare?: boolean; onClick: () => void; depth?: number; children: ReactNode } & Record<`data-${string}`, string>) {
   const [hover, setHover] = useState(false)
   return (
     <button
@@ -154,19 +171,24 @@ export function Item({ on = false, onClick, depth = 0, children, ...rest }: { on
       onMouseLeave={() => setHover(false)}
       style={{
         ...row,
-        paddingLeft: 10 + depth * 18,
+        paddingLeft: 10 + depth * 16,
         background: on ? SHELL.sideOn : hover ? SHELL.sideHover : 'transparent',
-        boxShadow: on ? `inset 2px 0 0 ${SHELL.accent}` : 'none',
-        fontWeight: on ? 500 : 400,
+        fontWeight: on || open ? 500 : 400,
+        color: bare ? SHELL.sideMuted : SHELL.sideInk,
       }}
     >
+      {!bare && (
+        <span aria-hidden style={{ width: 10, flex: 'none', color: on || open ? SHELL.accent : SHELL.sideMuted }}>
+          –
+        </span>
+      )}
       {children}
     </button>
   )
 }
 
 function Heading({ children }: { children: ReactNode }) {
-  return <div style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: SHELL.sideMuted, margin: '16px 10px 4px' }}>{children}</div>
+  return <div style={{ fontSize: 10.5, fontWeight: 500, letterSpacing: '.07em', textTransform: 'uppercase', color: SHELL.sideMuted, margin: '18px 10px 4px' }}>{children}</div>
 }
 
 const row: CSSProperties = {
@@ -175,12 +197,13 @@ const row: CSSProperties = {
   width: '100%',
   display: 'flex',
   alignItems: 'center',
-  gap: 6,
-  padding: '6px 10px',
+  gap: 8,
+  minHeight: 28,
+  padding: '0 10px',
   borderRadius: 6,
   cursor: 'pointer',
   color: SHELL.sideInk,
-  fontFamily: sans,
-  fontSize: 13.5,
+  fontFamily: SHELL.font,
+  fontSize: SHELL.size,
   lineHeight: 1.35,
 }
