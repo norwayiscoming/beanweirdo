@@ -21,11 +21,12 @@ export type RouteWords = {
   notes: string
   practice: string
   /**
-   * The bean site's prefix: `/bean` alone is bean's home (the port page
-   * flagged `home_of` bean), every blog page lives under `/bean/…`, and the
-   * blog's own front page is `/bean/details`.
+   * The bean site's prefix: `/bean` is bean's home (the port page flagged
+   * `home_of` bean), `/bean/<slug>` its pages. The blog lived under it until
+   * 2026-10-15 (`/bean/details`, `/bean/post/…`); those still read.
    */
   bean: string
+  /** The blog's old front page, `/bean/details`, still read; and the label of bean home's button to the blog. */
   details: string
   /** Bảy trang con của khu quản trị — phần đứng sau `ad-`. */
   adPost: string
@@ -103,7 +104,7 @@ export const WORD_LABELS: Record<Exclude<keyof RouteWords, 'dateOrder' | 'module
   notes: 'Ghi 01',
   practice: 'Nhật ký',
   bean: 'Khu bean',
-  details: 'Trang chủ blog',
+  details: 'Nút sang blog ở trang chủ bean',
   adPost: 'Nội dung',
   adConfig: 'Cấu hình (địa chỉ cũ)',
   adTree: 'Cấu hình',
@@ -144,7 +145,7 @@ const SHAPE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 const MUST_DIFFER: (keyof RouteWords)[][] = [
   // Đoạn đầu địa chỉ: khu bean, nhật ký và khu quản trị nằm cùng một chỗ.
   ['admin', 'practice', 'bean'],
-  // Các trang của blog đứng cùng một chỗ, ngay sau `/bean/`.
+  // Các trang của blog đứng cùng một chỗ, ngay sau `/personal-blog/`.
   ['post', 'module', 'tag', 'index', 'notes', 'details'],
   // Bảy trang con đứng cùng một chỗ, ngay sau `ad-`.
   ['adPost', 'adConfig', 'adTree', 'adAuthors', 'adSitemap', 'adPageContent', 'adTaxonomy', 'adDisplay', 'adArchive', 'adPortfolio', 'adPortContent', 'adPortDesign'],

@@ -168,7 +168,7 @@ export function RoutesPanel({
           Đường dẫn
           {!open && (
             <code style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: ink.soft }}>
-              {toPath({ area: 'admin', screen: 'cms' }, live)} · {`/${live.bean}/${live.post}/…`}
+              {toPath({ area: 'admin', screen: 'cms' }, live)} · {`${toPath({ area: 'public', screen: 'landing' }, live)}/${live.post}/…`}
             </code>
           )}
         </h2>
