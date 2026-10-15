@@ -110,6 +110,7 @@ export function ListPostSettings({
         template={resolveTemplate(post)}
         canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(post.id)}
+        slugFromTitle={(t) => addresses.slugFromTitle(post.id, t)}
         onPatch={patch}
         onSlug={async (slug) => {
           try {

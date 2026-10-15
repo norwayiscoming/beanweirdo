@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { listPosts } from '../admin/lib/apiClient'
 import { useAuth } from '../lib/auth'
-import { slugsFor, uniqueSlug, type Addressable } from '../lib/postSlug'
+import { freeSlug, slugsFor, titleSlug, uniqueSlug, type Addressable } from '../lib/postSlug'
 import { supabase } from '../lib/supabaseClient'
 import type { Area } from '../lib/area'
 
@@ -13,11 +13,18 @@ type PostAddresses = {
   /** True when the address is one a post used to have and now forwards from. */
   forwards(slug: string): boolean
   /**
-   * The address to fix a post at when it is published, or undefined when it
-   * already has one. Worked out by the same rules as every derived address,
-   * against every address in use or still forwarding.
+   * The address a title makes for this post — `ca-phe-dac`, or `ca-phe-dac-2`
+   * when another post holds or still forwards from it. Undefined for a title
+   * with no letter or digit in it.
    */
-  slugToPublish(id: string): string | undefined
+  slugFromTitle(id: string, title: string): string | undefined
+  /**
+   * The address to fix a post at when it is published, or undefined when it
+   * already has one. Made from the title (`title`, else the one the book
+   * loaded with); a post whose title makes no address falls back to the
+   * module-and-day rule every derived address uses.
+   */
+  slugToPublish(id: string, title?: string): string | undefined
 }
 
 /** An address a post used to have (post_slugs, migration 0027). */
@@ -41,6 +48,13 @@ export function addressBook(rows: readonly Addressable[], past: readonly PastSlu
   for (const [id, slug] of byId) bySlug.set(slug, id)
   // A current address always wins over an old one that happens to match it.
   const forwarded = new Map(past.filter((p) => !bySlug.has(p.slug)).map((p) => [p.slug, p.post_id]))
+  /** Every address in use or still forwarding, but this post's own. */
+  const takenBy = (id: string) =>
+    new Set([...[...forwarded].filter(([, owner]) => owner !== id).map(([s]) => s), ...[...byId].filter(([other]) => other !== id).map(([, s]) => s)])
+  const slugFromTitle = (id: string, title: string) => {
+    const base = titleSlug(title)
+    return base ? freeSlug(base, takenBy(id)) : undefined
+  }
   return {
     slugOf: (id) => byId.get(id) ?? id,
     // A slug the book does not know is a stale address and resolves to
@@ -49,11 +63,11 @@ export function addressBook(rows: readonly Addressable[], past: readonly PastSlu
     // post used to have still reaches it.
     idOf: (slug) => bySlug.get(slug) ?? forwarded.get(slug) ?? (UUID.test(slug) ? slug : null),
     forwards: (slug) => forwarded.has(slug),
-    slugToPublish: (id) => {
+    slugFromTitle,
+    slugToPublish: (id, title) => {
       const row = rows.find((r) => r.id === id)
       if (!row || (row.slug ?? '').trim()) return undefined
-      const taken = new Set([...forwarded.keys(), ...[...byId].filter(([other]) => other !== id).map(([, s]) => s)])
-      return uniqueSlug({ moduleId: row.module_id, createdAt: row.created_at, status: 'published' }, taken)
+      return slugFromTitle(id, title ?? row.en ?? '') ?? uniqueSlug({ moduleId: row.module_id, createdAt: row.created_at, status: 'published' }, takenBy(id))
     },
   }
 }

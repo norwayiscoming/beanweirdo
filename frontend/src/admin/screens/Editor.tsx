@@ -572,7 +572,7 @@ function EditorContent({ postId }: { postId: string }) {
             const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
             try {
               await Promise.allSettled([...inFlight.current])
-              await transitionStatus(postId, 'publish', addresses.slugToPublish(postId))
+              await transitionStatus(postId, 'publish', addresses.slugToPublish(postId, post.en))
               card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
               nav.goCms()
             } catch (e) {
@@ -596,6 +596,7 @@ function EditorContent({ postId }: { postId: string }) {
         template={template}
         canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(postId)}
+        slugFromTitle={(t) => addresses.slugFromTitle(postId, t)}
         onPatch={applyPatch}
         onSlug={async (slug) => {
           try {

@@ -54,7 +54,7 @@ vi.mock('../lib/apiClient', async (orig) => ({
 
 vi.mock('../../lib/nav', () => ({ useNav: () => ({ go: vi.fn() }) }))
 vi.mock('../../data/usePostAddresses', () => ({
-  usePostAddresses: () => ({ slugOf: (id: string) => id, idOf: (slug: string) => slug }),
+  usePostAddresses: () => ({ slugOf: (id: string) => id, slugFromTitle: () => undefined, idOf: (slug: string) => slug }),
 }))
 
 beforeEach(() => saved.mockClear())
