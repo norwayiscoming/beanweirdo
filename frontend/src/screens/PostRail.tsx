@@ -44,14 +44,16 @@ function backOf(from: Origin, nav: Nav, module: PageRow | undefined, homes: Home
 type Head = { id: string; text: string }
 
 const RAIL_W = 200
-const RAIL_GAP = 48
+const RAIL_EDGE = 32
+const RAIL_GAP = 32
 
 /**
  * The post page's left rail (mock "B + cột trái của C"): the way back, then
- * the post's own headings, standing just left of the text column. The
- * templates' text columns differ in width, so where that column starts is
- * measured, not assumed. With no room beside it (a phone, a wide template on
- * a narrow screen) the rail gives way to one back link above the post.
+ * the post's own headings, held against the screen's left edge and centred
+ * top to bottom while reading (owner, 2026-10-15). The templates' text
+ * columns differ in width, so whether it fits beside the column is measured,
+ * not assumed. With no room (a phone, a wide template on a narrow screen) the
+ * rail gives way to one back link above the post.
  */
 export function PostRail({
   from,
@@ -71,10 +73,10 @@ export function PostRail({
   const box = useRef<HTMLDivElement>(null)
   const [heads, setHeads] = useState<Head[]>([])
   const [on, setOn] = useState<string | null>(null)
-  // Where the rail stands: left edge and top, inside `box`. Null: no room;
-  // undefined: not measured yet, when neither the rail nor the back line shows,
-  // so the measuring is not thrown off by a line that is about to go.
-  const [spot, setSpot] = useState<{ left: number; top: number } | null>()
+  // Whether the rail fits left of the text column. Undefined: not measured
+  // yet, when neither the rail nor the back line shows, so the measuring is
+  // not thrown off by a line that is about to go.
+  const [room, setRoom] = useState<boolean>()
 
   // The headings are read off the rendered post rather than its data: six
   // templates store sections six ways, but all of them draw h1–h3. The page's
@@ -94,11 +96,7 @@ export function PostRail({
 
     const place = () => {
       const head = root.querySelector<HTMLElement>('[data-post-head]')
-      if (!head) return setSpot(null)
-      const outer = root.getBoundingClientRect()
-      const at = head.getBoundingClientRect()
-      const left = at.left - outer.left - RAIL_GAP - RAIL_W
-      setSpot(left >= 16 ? { left, top: at.top - outer.top } : null)
+      setRoom(!!head && head.getBoundingClientRect().left >= RAIL_EDGE + RAIL_W + RAIL_GAP)
     }
     const light = () => {
       let at: string | null = null
@@ -125,42 +123,39 @@ export function PostRail({
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  const beside = !mobile && spot
+  const beside = !mobile && room
   return (
-    <div ref={box} style={{ position: 'relative' }}>
-      {(mobile || spot === null) && (
+    <div ref={box}>
+      {(mobile || room === false) && (
         <a href={back.href} onClick={goBack} style={{ ...backLine, padding: mobile ? '12px 20px' : '16px 56px 0' }}>
           <i style={{ ...dot, background: back.color }} />← Quay lại <b style={{ fontWeight: 500, color: 'var(--ink)' }}>{back.site}</b>
         </a>
       )}
       {children}
       {beside && (
-        // Absolute, the full height of the post, so the inner box can stick while reading.
-        <div style={{ position: 'absolute', left: spot.left, top: spot.top, bottom: 0, width: RAIL_W }}>
-          <aside aria-label="Trong bài này" style={rail}>
-            <a href={back.href} onClick={goBack} style={{ ...backBlock, borderLeftColor: back.color }}>
-              <small style={{ fontSize: 12 }}>← Quay lại</small>
-              <b style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{back.site}</b>
-              <small style={{ fontSize: 12 }}>{back.home}</small>
-            </a>
-            {heads.length > 0 && (
-              <>
-                <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 8 }}>Trong bài này</span>
-                {heads.map((h) => (
-                  <a
-                    key={h.id}
-                    href={`#${h.id}`}
-                    onClick={jump(h.id)}
-                    aria-current={on === h.id ? 'location' : undefined}
-                    style={{ ...tocLink, color: on === h.id ? 'var(--ink)' : 'var(--ink-2)', borderLeftColor: on === h.id ? back.color : LINE }}
-                  >
-                    {h.text}
-                  </a>
-                ))}
-              </>
-            )}
-          </aside>
-        </div>
+        <aside aria-label="Trong bài này" style={rail}>
+          <a href={back.href} onClick={goBack} style={{ ...backBlock, borderLeftColor: back.color }}>
+            <small style={{ fontSize: 12 }}>← Quay lại</small>
+            <b style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{back.site}</b>
+            <small style={{ fontSize: 12 }}>{back.home}</small>
+          </a>
+          {heads.length > 0 && (
+            <>
+              <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 8 }}>Trong bài này</span>
+              {heads.map((h) => (
+                <a
+                  key={h.id}
+                  href={`#${h.id}`}
+                  onClick={jump(h.id)}
+                  aria-current={on === h.id ? 'location' : undefined}
+                  style={{ ...tocLink, color: on === h.id ? 'var(--ink)' : 'var(--ink-2)', borderLeftColor: on === h.id ? back.color : LINE }}
+                >
+                  {h.text}
+                </a>
+              ))}
+            </>
+          )}
+        </aside>
       )}
     </div>
   )
@@ -172,10 +167,13 @@ const clean = (text: string | null) => (text ?? '').replace(/[▾▸]/g, '').tri
 const LINE = 'rgba(127,127,127,.3)'
 
 const rail: CSSProperties = {
-  position: 'sticky',
-  top: 24,
-  alignSelf: 'start',
-  maxHeight: 'calc(100vh - 48px)',
+  position: 'fixed',
+  left: RAIL_EDGE,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: RAIL_W,
+  // Clear of the site header above and the footer below.
+  maxHeight: 'calc(100vh - 160px)',
   overflowY: 'auto',
   display: 'flex',
   flexDirection: 'column',
