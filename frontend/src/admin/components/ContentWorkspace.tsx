@@ -421,7 +421,11 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   // ── left column ──────────────────────────────────────────────────────────
   const unplaced = live.filter((p) => !p.topic_id).length
   const rail = (
-    <nav aria-label="Phân loại" className="cw-rail" style={{ background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, paddingBottom: 18 }}>
+    // No box of its own: one surface with the list, split by a rule, so the two
+    // columns can't end at different heights (owner, 2026-10-15). The inner
+    // part sticks, so the filters stay in reach down a long list.
+    <nav aria-label="Phân loại" className="cw-rail" style={{ borderRight: `1px solid ${desk.line}` }}>
+      <div style={{ position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingBottom: 18 }}>
       <SectionHead id="content.topics" title="Chủ đề">
         {shown.map(({ row: t, depth }) => (
             <div key={t.id}>
@@ -456,6 +460,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           />
         ))}
       </SectionHead>
+      </div>
     </nav>
   )
 
@@ -597,7 +602,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   }
 
   const list = (
-    <div style={{ minWidth: 0, display: 'grid', alignContent: 'start', background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, overflow: 'hidden' }}>
+    <div style={{ minWidth: 0, display: 'grid', alignContent: 'start' }}>
       {undo && (
         <div role="status" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', background: '#E7EFE3', padding: '8px 16px', fontFamily: sans, fontSize: 13, color: ink.base }}>
           <span>{undo.msg}</span>
@@ -684,9 +689,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0,240px) minmax(0,1fr)',
-          gap: 14,
           minHeight: 560,
-          alignItems: 'start',
+          background: desk.panel,
+          border: `1px solid ${desk.line}`,
+          borderRadius: radius,
+          // clip, not hidden: hidden would make this a scroll box and stop the rail sticking.
+          overflow: 'clip',
         }}
       >
         {rail}
