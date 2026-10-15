@@ -21,7 +21,7 @@ import { Avatar } from '../../components/Byline'
 import { tagBadge } from '../../components/TagBadges'
 import { postDescription } from '../../lib/postText'
 import { MovePostDialog } from './MovePostDialog'
-import { PostAuthorsDialog } from './PostAuthorsDialog'
+import { ListPostSettings } from './ListPostSettings'
 import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
@@ -30,7 +30,7 @@ import type { Author } from 'api-contract'
 import { PostSearch, fold, freeWords, type Facet, type Suggestion, type Token } from './PostSearch'
 import { desk, Menu } from './Detail'
 import { Button, IconButton } from '../../design/Button'
-import { IconCalendar, IconClock, IconClose, IconPage, IconPlus } from '../../design/icons'
+import { IconCalendar, IconClock, IconClose, IconPage, IconPencil, IconPlus } from '../../design/icons'
 import { radius } from '../../design/controls'
 
 /**
@@ -124,9 +124,12 @@ const CSS = `
 .cw-story:hover .cw-title{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
 .cw-story:focus-within{background:#FAF9F6}
 .cw-title:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
-.cw-fact{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;border-radius:4px}
-.cw-fact:hover{text-decoration:underline;text-underline-offset:3px}
-.cw-fact:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
+.cw-meta{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:8px 0 0 -8px;padding:4px 8px;border-radius:6px;border:1px solid transparent}
+.cw-meta:hover{background:#fff;border-color:${desk.line}}
+.cw-meta:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
+.cw-meta-edit{display:inline-flex;align-items:center;gap:4px;color:${ink.soft};opacity:0}
+.cw-meta:hover .cw-meta-edit,.cw-meta:focus-visible .cw-meta-edit{opacity:1}
+.cw-fact{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .cw-tab{all:unset;cursor:pointer;padding:12px 0 11px;font-family:${sans};font-size:14px;color:${ink.soft};white-space:nowrap}
 .cw-tab[aria-selected=true]{color:${ink.base};box-shadow:inset 0 -2px 0 ${ink.base}}
 .cw-tab:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
@@ -206,7 +209,8 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const [undo, setUndo] = useState<Undo | null>(null)
   const [busy, setBusy] = useState(false)
   const [moving, setMoving] = useState<PostSummary | null>(null)
-  const [naming, setNaming] = useState<PostSummary | null>(null)
+  /** The post whose info panel is open. */
+  const [info, setInfo] = useState<string | null>(null)
 
   const load = useCallback(
     () =>
@@ -223,6 +227,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   useEffect(() => {
     void load()
   }, [load])
+  const closeInfo = useCallback(() => {
+    setInfo(null)
+    void load()
+    onChanged?.()
+  }, [load, onChanged])
+  const showError = useCallback((m: string) => setErr(m), [])
 
   /** Every write goes through here: one error line, one reload, the other tabs told. */
   const run = (fn: () => Promise<unknown>, then?: () => void) => {
@@ -481,7 +491,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     const by = (p.authors ?? []).map((id) => authorById.get(id)).filter((a): a is Author => !!a)
     const pill = p.status === 'published' && p.has_draft ? PENDING_PILL : STATUS_PILL[p.status]
     const preview = p.excerpt || postDescription(p)
-    const fact: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }
     const icon: CSSProperties = { color: ink.muted, flex: 'none' }
     return (
       <div
@@ -510,10 +519,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
             <p style={{ margin: '5px 0 0', fontFamily: sans, fontSize: 14.5, lineHeight: 1.5, color: ink.mid, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{preview}</p>
           )}
           {/* Facts are grouped by gaps and icons, not "·": a row of dots made
-              every fact look like the next one (owner, 2026-10-14). */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px 18px', marginTop: 12, fontFamily: sans, fontSize: 13.5, color: ink.strong }}>
+              every fact look like the next one (owner, 2026-10-14). The whole
+              line opens the post's info panel (owner, 2026-10-15); filtering by
+              a fact lives in the left column and the search bar. */}
+          <button type="button" className="cw-meta" aria-label={`Sửa thông tin bài ${p.en}`} onClick={(e) => (own(e), setInfo(p.id))} style={{ fontFamily: sans, fontSize: 13.5, color: ink.strong }}>
             {by.length > 0 && (
-              <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'author', id: by[0].id }))} style={{ fontWeight: 500, color: ink.base }}>
+              <span className="cw-fact" style={{ fontWeight: 500, color: ink.base }}>
                 <span style={{ display: 'flex' }}>
                   {by.map((a, i) => (
                     <span key={a.id} style={{ marginLeft: i === 0 ? 0 : -6, display: 'flex' }}>
@@ -522,37 +533,41 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                   ))}
                 </span>
                 {by.map((a) => a.name).join(' và ')}
-              </button>
+              </span>
             )}
-            <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'topic', id: t?.id ?? UNPLACED }))} style={t ? { fontWeight: 500, color: ink.base } : { fontStyle: 'italic', color: ink.soft }}>
+            <span className="cw-fact" style={t ? { fontWeight: 500, color: ink.base } : { fontStyle: 'italic', color: ink.soft }}>
               {t && <Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
               {t ? t.title : 'Chưa xếp chủ đề'}
-            </button>
+            </span>
             {p.date_label && (
-              <span style={{ ...fact, fontVariantNumeric: 'tabular-nums' }}>
+              <span className="cw-fact" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <IconCalendar size={14} style={icon} />
                 {p.date_label}
               </span>
             )}
             {p.read_minutes && (
-              <span style={fact}>
+              <span className="cw-fact">
                 <IconClock size={14} style={icon} />
                 {p.read_minutes} phút đọc
               </span>
             )}
-            <button type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'tpl', id: p.template ?? '' }))}>
+            <span className="cw-fact">
               <IconPage size={14} style={icon} />
               {templateName(p.template)}
-            </button>
+            </span>
             {kwOf(p).map((k) => {
               const kw = keywords.find((x) => x.id === k)
               return (
-                <button key={k} type="button" className="cw-fact" onClick={(e) => (own(e), add({ kind: 'kw', id: k }))} style={{ ...tagBadge(tagColor(k, kw?.color)), fontSize: 12.5 }}>
+                <span key={k} className="cw-fact" style={{ ...tagBadge(tagColor(k, kw?.color)), fontSize: 12.5 }}>
                   #{nameOf('kw', k)}
-                </button>
+                </span>
               )
             })}
-          </div>
+            <span className="cw-meta-edit" aria-hidden>
+              <IconPencil size={13} />
+              Sửa
+            </span>
+          </button>
         </div>
         {p.thumbnail_url ? (
           <img className="cw-cover" src={p.thumbnail_url} alt="" style={{ width: 112, height: 75, objectFit: 'cover', borderRadius: 2, background: paper.rule }} />
@@ -568,7 +583,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
               // A pinned post leads every page that lists it (listingRule sortPosts).
               { label: p.pinned ? 'Bỏ ghim' : 'Ghim', onPick: () => run(() => updatePost(p.id, { pinned: !p.pinned })) },
               { label: 'Chuyển module', onPick: () => setMoving(p) },
-              { label: 'Tác giả', onPick: () => setNaming(p) },
+              { label: 'Thông tin bài', onPick: () => setInfo(p.id) },
               ...ACTIONS_BY_STATUS[p.status].map((a) => ({
                 label: a.label,
                 onPick: () => act(p.id, a.action),
@@ -651,7 +666,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         // order (sort_order is 1..N within a module) — see handlePatch.
         onMoved={(module_id) => (moving ? updatePost(moving.id, { module_id }).then(() => (setMoving(null), void load(), onChanged?.())) : undefined)}
       />
-      <PostAuthorsDialog post={naming} onClose={() => setNaming(null)} />
+      <ListPostSettings postId={info} topics={topics} onClose={closeInfo} onError={showError} />
     </div>
   )
 
