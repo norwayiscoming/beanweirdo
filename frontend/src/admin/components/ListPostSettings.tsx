@@ -110,20 +110,16 @@ export function ListPostSettings({
         template={resolveTemplate(post)}
         canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(post.id)}
-        slugFromTitle={(t) => addresses.slugFromTitle(post.id, t)}
         onPatch={patch}
         onSlug={async (slug) => {
           try {
             const saved = await updatePost(post.id, { slug })
-            setPost((prev) => (prev ? { ...prev, slug: saved.slug ?? null, old_slugs: saved.old_slugs } : prev))
+            setPost((prev) => (prev ? { ...prev, slug: saved.slug ?? null } : prev))
             return null
           } catch (e) {
             return (e as Error).message
           }
         }}
-        onForget={(slug) =>
-          void updatePost(post.id, { forget_slugs: [slug] }).then((saved) => setPost((prev) => (prev ? { ...prev, old_slugs: saved.old_slugs } : prev)))
-        }
       />
     </>
   )

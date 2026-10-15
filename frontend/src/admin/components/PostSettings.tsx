@@ -101,10 +101,8 @@ export function PostSettings({
   template,
   canChangeTemplate,
   derivedSlug,
-  slugFromTitle,
   onPatch,
   onSlug,
-  onForget,
 }: {
   open: boolean
   onClose: () => void
@@ -118,13 +116,9 @@ export function PostSettings({
   canChangeTemplate: boolean
   /** The address the post is reached at while nothing is stored. */
   derivedSlug: string
-  /** The address a title makes for this post, kept clear of every other post's. */
-  slugFromTitle: (title: string) => string | undefined
   onPatch: (patch: SettingsPatch) => void
-  /** Resolves to an error message, or null when the address was taken. */
-  onSlug: (slug: string) => Promise<string | null>
-  /** Stop an old address forwarding to this post. */
-  onForget?: (slug: string) => void
+  /** Null goes back to the title's address. Resolves to an error message, or null when it was taken. */
+  onSlug: (slug: string | null) => Promise<string | null>
 }) {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [slugError, setSlugError] = useState<string | null>(null)
@@ -152,14 +146,12 @@ export function PostSettings({
   }
 
   /*
-   * A draft with no stored address takes its title's at its first publish
-   * (`slugToPublish`), so its address already "is" the title's. A post on the
-   * page with no stored address keeps the dated one its readers have: nothing
-   * would forward from it, so only an explicit choice replaces it.
+   * With nothing typed, the address is the title's (`slugsFor`) and moves when
+   * the title does. The book behind `derivedSlug` was read when the screen
+   * opened, so a rename made here shows through the title itself.
    */
-  const draft = post.status === 'draft'
-  const fromTitle = slugFromTitle(post.en)
-  const address = post.slug ?? (draft ? (fromTitle ?? derivedSlug) : derivedSlug)
+  const fromTitle = titleSlug(post.en)
+  const address = post.slug ?? (fromTitle || derivedSlug)
   const firstHeading = proseOf(post.body).find((p) => p.h)?.text
 
   async function commitSlug(value: string) {
@@ -171,13 +163,7 @@ export function PostSettings({
 
   function commitTitle(value: string) {
     const t = value.trim()
-    if (!t || t === post.en) return
-    // An address made from the old title follows the new one; the server
-    // keeps the old address forwarding here. One typed by hand stays.
-    const follows = post.slug != null && post.slug === fromTitle
-    onPatch({ en: t })
-    const next = slugFromTitle(t)
-    if (follows && next && next !== post.slug) void commitSlug(next)
+    if (t && t !== post.en) onPatch({ en: t })
   }
 
   return (
@@ -262,18 +248,10 @@ export function PostSettings({
               </span>
             ) : (
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span>
-                  {!post.slug && draft
-                    ? 'Tự lấy theo tên bài, không dấu, nối bằng "-". Gõ để đặt khác.'
-                    : !post.slug
-                      ? 'Đang dùng địa chỉ tự sinh theo ngày.'
-                      : post.slug === fromTitle
-                        ? 'Theo tên bài: đổi tên thì slug đổi theo, địa chỉ cũ vẫn dẫn về bài.'
-                        : 'Đặt tay. Enter để lưu, Esc để bỏ.'}
-                </span>
-                {fromTitle && fromTitle !== address && (
-                  <Button size="sm" onClick={() => void commitSlug(fromTitle)}>
-                    Lấy theo tên
+                <span>{post.slug ? 'Đặt tay, không đổi theo tên. Enter để lưu, Esc để bỏ.' : 'Theo tên bài, không dấu, nối bằng "-"; đổi tên thì đổi theo. Gõ để đặt khác.'}</span>
+                {post.slug && (
+                  <Button size="sm" onClick={() => void onSlug(null).then(setSlugError)}>
+                    Theo tên bài
                   </Button>
                 )}
               </span>
@@ -298,22 +276,6 @@ export function PostSettings({
             style={{ width: '100%' }}
           />
         </Prop>
-        {(post.old_slugs ?? []).length > 0 && (
-          <Prop label="Địa chỉ cũ" hint="Vẫn chuyển về bài này. Bỏ đi thì địa chỉ ấy trống lại.">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {(post.old_slugs ?? []).map((s) => (
-                <span key={s} style={{ ...chip, border: `1px solid ${desk.field}`, background: desk.panel, borderRadius: 6 }}>
-                  {s}
-                  {onForget && (
-                    <IconButton size="sm" label={`bỏ địa chỉ cũ ${s}`} onClick={() => onForget(s)} style={{ width: 20, height: 20 }}>
-                      <IconClose size={12} />
-                    </IconButton>
-                  )}
-                </span>
-              ))}
-            </div>
-          </Prop>
-        )}
         <Prop label="Tác giả" hint="Thứ tự ở đây là thứ tự trên dòng tác giả.">
           <AuthorPicker key={post.id} postId={post.id} initial={byline} />
         </Prop>
@@ -322,10 +284,10 @@ export function PostSettings({
       <Group title="Vị trí">
         {/*
           * Named for what it still does. Where a post shows on the blog is the
-          * topic's job now; the module only lends its colour, the address a post
-          * gets until one is typed, and the list of an old page with no rule.
+          * topic's job now; the module only lends its colour, and the list of
+          * an old page with no rule.
           */}
-        <Prop label="Màu mượn từ" hint="Màu mặc định và địa chỉ tự sinh theo ngày lấy từ module này. Bài hiện ở đâu là do Chủ đề.">
+        <Prop label="Màu mượn từ" hint="Màu mặc định lấy từ module này. Bài hiện ở đâu là do Chủ đề.">
           <select aria-label="Module" value={post.module_id} onChange={(e) => onPatch({ module_id: e.target.value })} style={{ width: '100%' }}>
             {modules.map((m) => (
               <option key={m.id} value={m.id}>

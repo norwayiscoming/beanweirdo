@@ -59,11 +59,11 @@ export function buildSlug({ moduleId, createdAt, status }: SlugParts, w: RouteWo
  * before the suffix, so the day and the status still read straight off.
  */
 export function uniqueSlug(parts: SlugParts, taken: Iterable<string>, w: RouteWords = activeWords()): string {
-  const used = new Set(taken)
-  const wanted = buildSlug(parts, w)
-  if (!used.has(wanted)) return wanted
+  return dedupe(buildSlug(parts, w), parts.status === 'draft' ? `.${w.draftMark}` : '', new Set(taken))
+}
 
-  const suffix = parts.status === 'draft' ? `.${w.draftMark}` : ''
+function dedupe(wanted: string, suffix: string, used: ReadonlySet<string>): string {
+  if (!used.has(wanted)) return wanted
   const base = wanted.slice(0, wanted.length - suffix.length)
   for (let i = 1; i < 26; i++) {
     const candidate = `${base}-${String.fromCharCode(98 + i - 1)}${suffix}`
@@ -87,7 +87,7 @@ export function titleSlug(title: string): string {
     .replace(/^-|-$/g, '')
 }
 
-/** `base`, or `base-2`, `base-3`… — the first one nobody holds. */
+/** `base`, or `base-2`, `base-3`… — the first one nobody holds. Port pages' rule. */
 export function freeSlug(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base
   for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`
@@ -99,7 +99,7 @@ export type Addressable = {
   module_id: string
   created_at: string
   status?: string
-  /** The title; only the back office's rows carry it, to name a post at its first publish. */
+  /** The title, which the address is made from. */
   en?: string
   /** Set by hand in the CMS; wins over the generated one. */
   slug?: string | null
@@ -108,9 +108,11 @@ export type Addressable = {
 /**
  * Slugs for a whole list, in one pass.
  *
- * Worked out rather than stored. A slug is a function of three columns the post
- * already has, so deriving it means it can never drift from them — and nothing
- * has to be backfilled for the addresses to start working.
+ * Worked out rather than stored: the title made into an address word
+ * (`ca-phe-dac`, a draft `ca-phe-dac.draft`), so renaming a post moves its
+ * address with it. Owner (2026-10-15): the address follows the name, and an
+ * old address no post answers to is simply gone, not forwarded. A title with
+ * no letter or digit falls back to module and day (`ghi-p260824`).
  *
  * The pass is ordered by creation so the letters that break ties land the same
  * way every time: the older post keeps the plain address, the newer one takes
@@ -134,7 +136,9 @@ export function slugsFor(posts: readonly Addressable[], w: RouteWords = activeWo
   }
   for (const p of byAge) {
     if (out.has(p.id)) continue
-    const slug = uniqueSlug({ moduleId: p.module_id, createdAt: p.created_at, status: p.status }, taken, w)
+    const named = titleSlug(p.en ?? '')
+    const suffix = p.status === 'draft' ? `.${w.draftMark}` : ''
+    const slug = named ? dedupe(named + suffix, suffix, taken) : uniqueSlug({ moduleId: p.module_id, createdAt: p.created_at, status: p.status }, taken, w)
     out.set(p.id, slug)
     taken.add(slug)
   }
