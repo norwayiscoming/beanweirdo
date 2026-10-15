@@ -18,6 +18,7 @@
  * One notation for typing and for pasting means there is no import step to
  * forget.
  */
+import { markText, protect, restore } from './codeStrike'
 import { parseStars, writeStars } from './stars'
 
 export type Run = {
@@ -50,6 +51,10 @@ export type Run = {
    * round-trip through the field would grow the line.
    */
   href?: string
+  /** Chữ máy, nguyên văn. Viết `` `x` ``; dấu sao bên trong không phải dấu nhấn. */
+  code?: boolean
+  /** Gạch ngang. Viết `~~x~~`. */
+  del?: boolean
 }
 
 /**
@@ -83,7 +88,7 @@ export function runsToText(runs: Run[] | undefined): string {
       let t = r.t
       if (r.href) t = r.href === r.t ? t : `[${t}](${r.href})`
       if (r.u) t = `_${t}_`
-      return { t, b: !!r.b, i: !!r.em }
+      return { t: markText(r, t), b: !!r.b, i: !!r.em }
     }),
   )
 }
@@ -128,7 +133,8 @@ export function rawIndexFor(text: string, drawnIndex: number): number {
  * An unclosed asterisk is left as a plain character rather than swallowing the
  * rest of the line — half-typed emphasis should look like what it is.
  */
-export function textToRuns(text: string): Run[] {
+export function textToRuns(markdown: string): Run[] {
+  const { text, codes } = protect(markdown)
   const out: Run[] = []
 
   const push = (run: Run) => out.push(run)
@@ -191,5 +197,5 @@ export function textToRuns(text: string): Run[] {
       if (!marked(part, base)) pushPlain(part, base)
     }
   }
-  return out.length > 0 ? out : [{ t: '' }]
+  return out.length > 0 ? restore(out, codes) : [{ t: '' }]
 }

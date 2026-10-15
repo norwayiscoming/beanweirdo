@@ -57,7 +57,13 @@ const THEME = {
     nested: { listitem: 'awc-live-li-nested' },
   },
   link: 'awc-live-link',
-  text: { bold: 'awc-live-bold', italic: 'awc-live-em', underline: 'awc-live-u' },
+  text: {
+    bold: 'awc-live-bold',
+    italic: 'awc-live-em',
+    underline: 'awc-live-u',
+    code: 'awc-live-code',
+    strikethrough: 'awc-live-del',
+  },
 }
 
 const NODES = [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, CodeNode, CodeHighlightNode]

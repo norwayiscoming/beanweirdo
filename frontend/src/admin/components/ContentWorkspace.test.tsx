@@ -8,7 +8,7 @@ const editPost = vi.fn()
 vi.mock('../../lib/nav', () => ({
   useNav: () => ({ screen: 'cms', area: 'admin', postId: null, newPost: vi.fn(), editPost, previewPost: vi.fn(), goCms: vi.fn() }),
 }))
-vi.mock('../../data/usePostAddresses', () => ({ usePostAddresses: () => ({ slugToPublish: () => undefined }) }))
+vi.mock('../../data/usePostAddresses', () => ({ usePostAddresses: () => ({ slugToPublish: () => undefined, slugOf: (id: string) => id }) }))
 
 const post = (id: string, over: Record<string, unknown>) => ({
   id,
@@ -53,6 +53,7 @@ const api = vi.hoisted(() => ({
   deleteTag: vi.fn(),
   createTag: vi.fn(),
   listModules: vi.fn(),
+  getPost: vi.fn(),
 }))
 vi.mock('../lib/apiClient', () => api)
 
@@ -60,6 +61,7 @@ const { ContentWorkspace } = await import('./ContentWorkspace')
 
 beforeEach(() => {
   Object.values(api).forEach((f) => f.mockReset())
+  editPost.mockReset()
   api.listPosts.mockImplementation(() => Promise.resolve(posts))
   api.listNodes.mockResolvedValue(topics)
   api.listKeywords.mockResolvedValue([])
@@ -68,17 +70,19 @@ beforeEach(() => {
   api.transitionStatus.mockResolvedValue({})
   api.updatePost.mockResolvedValue({})
   api.listModules.mockResolvedValue([])
+  api.getPost.mockImplementation((id: string) => Promise.resolve({ ...posts.find((p) => p.id === id), body: [], old_slugs: [], authors: [] }))
+  api.listModules.mockResolvedValue([])
   api.deleteTag.mockResolvedValue({ deleted: 'book-film', moved: { posts: [], notes: [] } })
   api.createTag.mockImplementation((label: string) => Promise.resolve({ id: label, label }))
   posts = [
     post('Senses of Flavors', { status: 'draft' }),
-    post('Detachment', { kind: 'book-film', topic_id: 'book-film', date_label: '2025.02' }),
+    post('Detachment', { kind: 'book-film', topic_id: 'book-film', date_label: '2025.02', excerpt: 'Một dòng xem trước' }),
     post('Wings of Desire', { kind: 'book-film', topic_id: 'book-film', date_label: '2021.10' }),
     post('Chlorogenic Acids', { status: 'deleted' }),
   ]
 })
 
-// Everything but Sửa sits behind the row's ⋮.
+// Every action sits behind the post's ⋮; a click on the post itself opens it.
 const pick = async (title: string, action: string) => {
   await userEvent.click(screen.getByRole('button', { name: `Thao tác ${title}` }))
   await userEvent.click(screen.getByRole('menuitem', { name: action }))
@@ -92,12 +96,26 @@ describe('ContentWorkspace', () => {
     expect(screen.queryByRole('button', { name: 'Chlorogenic Acids' })).not.toBeInTheDocument()
     await pick('Senses of Flavors', 'Đăng')
     expect(api.transitionStatus).toHaveBeenCalledWith('Senses of Flavors', 'publish')
+    // Choosing a menu line or ticking the box must not also open the post.
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Chọn Detachment' }))
+    expect(editPost).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByText('Một dòng xem trước'))
+    expect(editPost).toHaveBeenCalledWith('Detachment')
+  })
+
+  it('edits a post\'s info from its info line without opening the post', async () => {
+    render(<ContentWorkspace />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Sửa thông tin bài Detachment' }))
+    const panel = await screen.findByRole('complementary', { name: 'Thông tin bài' })
+    await userEvent.selectOptions(within(panel).getByLabelText('Chủ đề'), 'book-film')
+    expect(api.updatePost).toHaveBeenCalledWith('Detachment', { topic_id: 'book-film' })
+    expect(editPost).not.toHaveBeenCalled()
   })
 
   it('shows the trash on its own, with restore and permanent delete', async () => {
     render(<ContentWorkspace />)
     await screen.findByRole('button', { name: 'Senses of Flavors' })
-    await userEvent.click(screen.getByRole('button', { name: /^Thùng rác/ }))
+    await userEvent.click(screen.getByRole('tab', { name: /^Thùng rác/ }))
     expect(screen.queryByRole('button', { name: 'Senses of Flavors' })).not.toBeInTheDocument()
     await pick('Chlorogenic Acids', 'Khôi phục')
     expect(api.transitionStatus).toHaveBeenCalledWith('Chlorogenic Acids', 'restore-trash')

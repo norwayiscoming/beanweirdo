@@ -11,6 +11,7 @@
  * changes: the notation *is* the storage, the way it already was for memo.
  */
 import type { ReactNode } from 'react'
+import { markStyle } from './codeStrike'
 import { textToRuns, type Run } from './runs'
 
 /**
@@ -28,6 +29,7 @@ import { textToRuns, type Run } from './runs'
  * duy nhất bản tách này đổi hình dạng bài đã đăng.
  */
 function mark(run: Run, key: number, accentInk: string): ReactNode {
+  const words = run.code ? <code style={markStyle(run)}>{run.t}</code> : run.del ? <s>{run.t}</s> : run.t
   const inner =
     run.em || run.b ? (
       <em
@@ -37,12 +39,12 @@ function mark(run: Run, key: number, accentInk: string): ReactNode {
           color: accentInk,
         }}
       >
-        {run.t}
+        {words}
       </em>
     ) : run.u ? (
-      <span style={{ borderBottom: '1px solid #CFCFC4' }}>{run.t}</span>
+      <span style={{ borderBottom: '1px solid #CFCFC4' }}>{words}</span>
     ) : (
-      run.t
+      words
     )
 
   if (run.href) {

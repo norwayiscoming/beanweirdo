@@ -17,6 +17,7 @@
  * chúng phải đọc ra đúng `FD*`.
  */
 
+import { markText, protect, restore } from './elements/codeStrike'
 import { parseStars, writeStars } from './elements/stars'
 import type { LongformRun } from './types'
 
@@ -25,7 +26,7 @@ const PLAIN = '300'
 
 /** Runs thành một dòng chữ. */
 export function runsToText(runs: LongformRun[] | undefined): string {
-  return writeStars((runs ?? []).map((r) => ({ t: r.t, b: r.w === BOLD, i: r.s === 'italic' })))
+  return writeStars((runs ?? []).map((r) => ({ t: markText(r), b: r.w === BOLD, i: r.s === 'italic' })))
 }
 
 /**
@@ -40,7 +41,8 @@ const SCORED = /((?<![\p{L}\p{N}])__[^_\n]+__(?![\p{L}\p{N}])|(?<![\p{L}\p{N}])_
  * `w` và `s` luôn được ghi ra, kể cả giá trị thường — dữ liệu trong kho đang
  * như vậy ở cả 572 span, và một nửa ghi một nửa không thì khó đọc hơn là dài.
  */
-export function textToRuns(text: string): LongformRun[] {
+export function textToRuns(markdown: string): LongformRun[] {
+  const { text, codes } = protect(markdown)
   const out: LongformRun[] = []
   const push = (t: string, bold: boolean, italic: boolean) => {
     if (!t) return
@@ -59,5 +61,5 @@ export function textToRuns(text: string): LongformRun[] {
       else push(part, seg.b, seg.i)
     }
   }
-  return out.length > 0 ? out : [{ t: '', w: PLAIN, s: 'normal' }]
+  return out.length > 0 ? restore(out, codes) : [{ t: '', w: PLAIN, s: 'normal' }]
 }

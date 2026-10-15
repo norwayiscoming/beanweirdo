@@ -167,6 +167,47 @@ export function firstImageIn(value: unknown, depth = 0): string | null {
   return null
 }
 
+/**
+ * Keys whose strings are addresses, ids or styling, never words a reader reads.
+ * Same list as `readMinutes` in frontend/src/lib/postText.ts, so the admin list
+ * and the public byline count the same minutes for one post.
+ */
+const NOT_PROSE = new Set(['type', 'k', 'key', 'id', 'url', 'src', 'href', 'imageUrl', 'image_url', 'tint', 'color', 'w', 's', 'h_px', 'margin', 'align', 'variant', 'kind', 'len', 'media', 'mediaHint', 'hue', 'n'])
+/** Headings, captions and quote credits: counted as reading time, left out of the preview. */
+const ASIDE_KEYS = new Set(['h', 'heading', 'title', 'caption', 'attribution'])
+const HEADING_KINDS = new Set(['h1', 'h2', 'h3', 'h4', 'heading'])
+const EXCERPT_CHARS = 180
+
+/**
+ * The opening words of a post and how long it takes to read, for the admin list.
+ *
+ * Computed on the server so the list still never ships `body` to the browser
+ * (see `POST_SUMMARY_COLUMNS`). Bodies come in several shapes per template, so
+ * this walks every string rather than knowing each shape. Headings are skipped
+ * for the preview: long-form opens with an h1 that repeats the title.
+ */
+export function bodyPreview(body: unknown): { excerpt: string; read_minutes: number | null } {
+  const prose: string[] = []
+  let words = 0
+  const walk = (v: unknown, key: string, heading: boolean, depth: number) => {
+    if (depth > 12) return
+    if (typeof v === 'string') {
+      if (NOT_PROSE.has(key) || /^(https?:|data:|#)/.test(v)) return
+      words += v.split(/\s+/).filter(Boolean).length
+      if (!heading) prose.push(v)
+    } else if (Array.isArray(v)) v.forEach((x) => walk(x, key, heading, depth + 1))
+    else if (v && typeof v === 'object') {
+      const o = v as Record<string, unknown>
+      const isHeading = heading || HEADING_KINDS.has(String(o.k ?? o.type ?? ''))
+      for (const [k, x] of Object.entries(o)) walk(x, k, isHeading || ASIDE_KEYS.has(k), depth + 1)
+    }
+  }
+  walk(body, '', false, 0)
+  const text = prose.join(' ').replace(/\*/g, '').replace(/\s+/g, ' ').trim()
+  const cut = text.length <= EXCERPT_CHARS ? text : `${text.slice(0, EXCERPT_CHARS).replace(/\s+\S*$/, '')}…`
+  return { excerpt: cut, read_minutes: words === 0 ? null : Math.max(1, Math.ceil(words / 200)) }
+}
+
 /** Keys a template stores a picture under — see `firstImageIn` and bitesize's `poster`. */
 const IMAGE_KEYS = new Set(['src', 'imageUrl', 'poster'])
 

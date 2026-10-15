@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeStatusTransition, firstImageIn, InvalidStatusTransitionError, toPostDetail, toPostSummary, withoutImages, type PostRow } from './posts.js'
+import { bodyPreview, computeStatusTransition, firstImageIn, InvalidStatusTransitionError, toPostDetail, toPostSummary, withoutImages, type PostRow } from './posts.js'
 
 function row(overrides: Partial<PostRow> = {}): PostRow {
   return {
@@ -177,5 +177,22 @@ describe('toPostSummary — thumbnail', () => {
 
   it('is null when the post has no picture at all', () => {
     expect(summaryOf(null, null).thumbnail_url).toBeNull()
+  })
+})
+
+describe('bodyPreview', () => {
+  it('opens on the first prose, skips headings and styling, and cuts long text with an ellipsis', () => {
+    const body = [
+      { k: 'h1', runs: [{ s: 'normal', t: 'Tiêu đề lặp lại', w: '300' }] },
+      { k: 'p', runs: [{ s: 'normal', t: 'Câu mở đầu. ' + 'chữ '.repeat(80), w: '300' }] },
+      { type: 'image', imageUrl: 'https://x/y.jpg', caption: 'chú thích' },
+    ]
+    const { excerpt, read_minutes } = bodyPreview(body)
+    expect(excerpt.startsWith('Câu mở đầu.')).toBe(true)
+    expect(excerpt.endsWith('…')).toBe(true)
+    expect(excerpt.length).toBeLessThanOrEqual(181)
+    expect(excerpt).not.toMatch(/normal|Tiêu đề|chú thích/)
+    expect(read_minutes).toBe(1)
+    expect(bodyPreview(null)).toEqual({ excerpt: '', read_minutes: null })
   })
 })

@@ -86,6 +86,10 @@ export type PostSummary = {
   published_at: string | null
   /** Bài đã đăng có chỗ sửa đang chờ bấm "Đăng thay đổi" — xem migration 0028. */
   has_draft?: boolean
+  /** The body's opening words, cut with "…"; only the list endpoint fills it. */
+  excerpt?: string
+  /** Minutes to read the body; only the list endpoint fills it. */
+  read_minutes?: number | null
 }
 
 export type PostVisibility = 'public' | 'private'

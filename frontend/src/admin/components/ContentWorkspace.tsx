@@ -17,9 +17,11 @@ import { ink, paper, sans, serif } from '../../design/tokens'
 import { useNav } from '../../lib/nav'
 import { TEMPLATE_KEYS, templateName } from '../../lib/templateNames'
 import { usePostAddresses } from '../../data/usePostAddresses'
-import { StatusBadge } from './StatusBadge'
+import { Avatar } from '../../components/Byline'
+import { tagBadge } from '../../components/TagBadges'
+import { postDescription } from '../../lib/postText'
 import { MovePostDialog } from './MovePostDialog'
-import { PostAuthorsDialog } from './PostAuthorsDialog'
+import { ListPostSettings } from './ListPostSettings'
 import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
@@ -28,7 +30,7 @@ import type { Author } from 'api-contract'
 import { PostSearch, fold, freeWords, type Facet, type Suggestion, type Token } from './PostSearch'
 import { desk, Menu } from './Detail'
 import { Button, IconButton } from '../../design/Button'
-import { IconClose, IconEdit, IconPlus } from '../../design/icons'
+import { IconCalendar, IconClock, IconClose, IconPage, IconPencil, IconPlus } from '../../design/icons'
 import { radius } from '../../design/controls'
 
 /**
@@ -39,7 +41,10 @@ import { radius } from '../../design/controls'
  * Top: one search bar over every way a post is filed (PostSearch).
  * Left: every vocabulary entry with its live count; a click adds it to the
  * search bar as a chip, so both show one filter.
- * Right: the posts themselves, bulk-editable.
+ * Right: the posts themselves, bulk-editable, listed like Medium's "Your
+ * stories" (owner's pick, 2026-10-14): status is a tab above the list rather
+ * than a badge on every row, and each post reads as title, opening lines and
+ * one quiet line of facts. A click anywhere on a post opens it.
  *
  * Naming, colouring, adding, arranging and deleting topics and tags is Cấu
  * hình's job (owner, 2026-10-08 and 2026-10-13): the tree was in three tabs
@@ -89,15 +94,47 @@ const BULK_STATUS: { action: StatusAction; label: string }[] = [
 
 const SEL = '#EEF5F8'
 const WARN = '#B4552E'
-const label: CSSProperties = { fontFamily: sans, fontSize: 13, fontWeight: 600, color: ink.strong }
-const pill: CSSProperties = { display: 'inline-block', fontFamily: sans, fontSize: 13, padding: '0 7px', lineHeight: '18px', border: `1px solid ${paper.rule}`, borderRadius: 10, color: ink.soft, whiteSpace: 'nowrap', cursor: 'pointer', background: 'none', margin: '1px 3px 1px 0' }
+/** The status tabs over the list; "Tất cả" is every post but the trash. */
+const TABS: { id: PostStatus | null; label: string }[] = [
+  { id: null, label: 'Tất cả' },
+  { id: 'draft', label: 'Nháp' },
+  { id: 'published', label: 'Đã đăng' },
+  { id: 'archived', label: 'Lưu trữ' },
+  { id: 'deleted', label: 'Thùng rác' },
+]
+type Pill = { text: string; bg: string; fg: string }
+/**
+ * A published post needs no word. The others wear a pill beside the title,
+ * where the eye already is, each in its own colour (owner, 2026-10-14: a status
+ * lost among the grey facts at the end of the line was hard to see).
+ */
+const STATUS_PILL: Record<PostStatus, Pill | null> = {
+  draft: { text: 'Nháp', bg: '#E6E8EC', fg: '#384150' },
+  published: null,
+  archived: { text: 'Lưu trữ', bg: '#ECE7DF', fg: '#62584A' },
+  deleted: { text: 'Thùng rác', bg: '#FBE7E5', fg: '#8E1E42' },
+}
+const PENDING_PILL: Pill = { text: 'Có sửa chưa đăng', bg: '#FCE3B0', fg: '#73450A' }
 
 const CSS = `
 .cw-r:hover{background:${paper.hover}}
-.cw-r:focus-visible,.cw-row:focus-within{outline:2px solid ${ink.green};outline-offset:-2px}
-.cw-row:hover td{background:${paper.hover}}
-.cw-pill:hover{border-color:${ink.green}!important;color:${ink.green}!important}
+.cw-r:focus-visible{outline:2px solid ${ink.green};outline-offset:-2px}
+.cw-story{cursor:pointer}
+.cw-story:hover{background:#FAF9F6}
+.cw-story:hover .cw-title{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px}
+.cw-story:focus-within{background:#FAF9F6}
+.cw-title:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
+.cw-meta{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:8px 0 0 -8px;padding:4px 8px;border-radius:6px;border:1px solid transparent}
+.cw-meta:hover{background:#fff;border-color:${desk.line}}
+.cw-meta:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
+.cw-meta-edit{display:inline-flex;align-items:center;gap:4px;color:${ink.soft};opacity:0}
+.cw-meta:hover .cw-meta-edit,.cw-meta:focus-visible .cw-meta-edit{opacity:1}
+.cw-fact{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.cw-tab{all:unset;cursor:pointer;padding:12px 0 11px;font-family:${sans};font-size:14px;color:${ink.soft};white-space:nowrap}
+.cw-tab[aria-selected=true]{color:${ink.base};box-shadow:inset 0 -2px 0 ${ink.base}}
+.cw-tab:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
 @media (max-width:900px){.cw-ws{grid-template-columns:1fr!important}.cw-rail{border-right:none!important;border-bottom:1px solid ${paper.rule};max-height:280px;overflow-y:auto}}
+@media (max-width:640px){.cw-cover{display:none!important}}
 `
 
 function Dot({ own, inherited }: { own: string | null; inherited?: string | null }) {
@@ -172,7 +209,8 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const [undo, setUndo] = useState<Undo | null>(null)
   const [busy, setBusy] = useState(false)
   const [moving, setMoving] = useState<PostSummary | null>(null)
-  const [naming, setNaming] = useState<PostSummary | null>(null)
+  /** The post whose info panel is open. */
+  const [info, setInfo] = useState<string | null>(null)
 
   const load = useCallback(
     () =>
@@ -189,6 +227,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   useEffect(() => {
     void load()
   }, [load])
+  const closeInfo = useCallback(() => {
+    setInfo(null)
+    void load()
+    onChanged?.()
+  }, [load, onChanged])
+  const showError = useCallback((m: string) => setErr(m), [])
 
   /** Every write goes through here: one error line, one reload, the other tabs told. */
   const run = (fn: () => Promise<unknown>, then?: () => void) => {
@@ -376,7 +420,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
 
   // ── left column ──────────────────────────────────────────────────────────
   const unplaced = live.filter((p) => !p.topic_id).length
-  const statusCount = (s: PostStatus) => posts.filter((p) => p.status === s).length
   const rail = (
     <nav aria-label="Phân loại" className="cw-rail" style={{ background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, paddingBottom: 18 }}>
       <SectionHead id="content.topics" title="Chủ đề">
@@ -413,23 +456,145 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           />
         ))}
       </SectionHead>
-      <SectionHead id="content.status" title="Trạng thái">
-        {(Object.keys(STATUS_LABEL) as PostStatus[]).map((s) => (
-          <RailRow key={s} name={STATUS_LABEL[s]} count={statusCount(s)} on={isOn('status', s)} onClick={() => toggle('status', s)} />
-        ))}
-      </SectionHead>
     </nav>
   )
 
   // ── middle column ────────────────────────────────────────────────────────
+  // The tabs are the status filter itself, so a status picked in the search
+  // bar lights its tab and a tab click shows up as the bar's chip.
+  const statusOn = tokens.filter((t) => t.kind === 'status')
+  const tabOn = statusOn.length === 0 ? null : statusOn.length === 1 ? statusOn[0].id : undefined
+  const pickTab = (id: PostStatus | null) => setTokens((o) => [...o.filter((t) => t.kind !== 'status'), ...(id ? [{ kind: 'status' as const, id }] : [])])
+  // Each tab counts what it would show under the other filters as they stand.
+  const otherKinds = kindsOn.filter((k) => k !== 'status')
+  const tabCount = (id: PostStatus | null) =>
+    posts.filter(
+      (p) =>
+        (id ? p.status === id : p.status !== 'deleted') &&
+        otherKinds.every((k) => tokens.some((t) => t.kind === k && wears(p, t))) &&
+        (!words.length || words.every((w) => haystack(p).includes(w))),
+    ).length
   const allOn = visible.length > 0 && visible.every((p) => sel.has(p.id))
-  const pillBtn = (vocab: Facet, id: string, text: string, dashed = false) => (
-    <button key={id} type="button" className="cw-pill" onClick={() => add({ kind: vocab, id })} style={{ ...pill, borderStyle: dashed ? 'dashed' : 'solid' }}>
-      {text}
-    </button>
-  )
-  const th: CSSProperties = { ...label, textAlign: 'left', padding: '10px', borderBottom: `1px solid ${ink.border}`, background: paper.hover }
-  const td: CSSProperties = { padding: '10px', borderBottom: `1px solid ${desk.line}`, verticalAlign: 'baseline', fontFamily: sans, fontSize: 13.5, color: ink.strong }
+  const flip = (id: string) =>
+    setSel((s) => {
+      const n = new Set(s)
+      if (n.has(id)) n.delete(id)
+      else n.add(id)
+      return n
+    })
+  // Checkbox, menu and the filter links in a post sit inside the clickable
+  // post; their clicks must not also open it.
+  const own = (e: { stopPropagation: () => void }) => e.stopPropagation()
+
+  const story = (p: PostSummary) => {
+    const t = p.topic_id ? topicById.get(p.topic_id) : undefined
+    const by = (p.authors ?? []).map((id) => authorById.get(id)).filter((a): a is Author => !!a)
+    const pill = p.status === 'published' && p.has_draft ? PENDING_PILL : STATUS_PILL[p.status]
+    const preview = p.excerpt || postDescription(p)
+    const icon: CSSProperties = { color: ink.muted, flex: 'none' }
+    return (
+      <div
+        key={p.id}
+        className="cw-story"
+        onClick={() => nav.editPost(p.id)}
+        style={{ display: 'grid', gridTemplateColumns: '18px minmax(0,1fr) auto auto', gap: 16, alignItems: 'start', padding: '18px 16px 18px 20px', borderBottom: `1px solid ${desk.line}`, background: sel.has(p.id) ? SEL : undefined }}
+      >
+        <input type="checkbox" aria-label={`Chọn ${p.en}`} checked={sel.has(p.id)} onClick={own} onChange={() => flip(p.id)} style={{ marginTop: 5 }} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: '4px 10px' }}>
+            <button type="button" className="cw-title" onClick={(e) => (own(e), nav.editPost(p.id))} style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 18, lineHeight: 1.3, fontWeight: 700, color: ink.base }}>
+              {p.en}
+            </button>
+            {p.pinned && <span aria-label="đã ghim" style={{ fontSize: 13 }}>📌</span>}
+            {pill && (
+              <span
+                title={pill === PENDING_PILL ? 'Bản trên trang vẫn là bản cũ — mở bài và bấm "Đăng thay đổi"' : undefined}
+                style={{ alignSelf: 'center', fontFamily: sans, fontSize: 12.5, fontWeight: 600, lineHeight: '20px', padding: '0 9px', borderRadius: 999, background: pill.bg, color: pill.fg, whiteSpace: 'nowrap' }}
+              >
+                {pill.text}
+              </span>
+            )}
+          </div>
+          {preview && (
+            <p style={{ margin: '5px 0 0', fontFamily: sans, fontSize: 14.5, lineHeight: 1.5, color: ink.mid, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{preview}</p>
+          )}
+          {/* Facts are grouped by gaps and icons, not "·": a row of dots made
+              every fact look like the next one (owner, 2026-10-14). The whole
+              line opens the post's info panel (owner, 2026-10-15); filtering by
+              a fact lives in the left column and the search bar. */}
+          <button type="button" className="cw-meta" aria-label={`Sửa thông tin bài ${p.en}`} onClick={(e) => (own(e), setInfo(p.id))} style={{ fontFamily: sans, fontSize: 13.5, color: ink.strong }}>
+            {by.length > 0 && (
+              <span className="cw-fact" style={{ fontWeight: 500, color: ink.base }}>
+                <span style={{ display: 'flex' }}>
+                  {by.map((a, i) => (
+                    <span key={a.id} style={{ marginLeft: i === 0 ? 0 : -6, display: 'flex' }}>
+                      <Avatar author={a} size={22} ring={by.length > 1} />
+                    </span>
+                  ))}
+                </span>
+                {by.map((a) => a.name).join(' và ')}
+              </span>
+            )}
+            <span className="cw-fact" style={t ? { fontWeight: 500, color: ink.base } : { fontStyle: 'italic', color: ink.soft }}>
+              {t && <Dot own={t.accent} inherited={ancestorsOf(topics, t.id).reverse().find((a) => a.accent)?.accent} />}
+              {t ? t.title : 'Chưa xếp chủ đề'}
+            </span>
+            {p.date_label && (
+              <span className="cw-fact" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                <IconCalendar size={14} style={icon} />
+                {p.date_label}
+              </span>
+            )}
+            {p.read_minutes && (
+              <span className="cw-fact">
+                <IconClock size={14} style={icon} />
+                {p.read_minutes} phút đọc
+              </span>
+            )}
+            <span className="cw-fact">
+              <IconPage size={14} style={icon} />
+              {templateName(p.template)}
+            </span>
+            {kwOf(p).map((k) => {
+              const kw = keywords.find((x) => x.id === k)
+              return (
+                <span key={k} className="cw-fact" style={{ ...tagBadge(tagColor(k, kw?.color)), fontSize: 12.5 }}>
+                  #{nameOf('kw', k)}
+                </span>
+              )
+            })}
+            <span className="cw-meta-edit" aria-hidden>
+              <IconPencil size={13} />
+              Sửa
+            </span>
+          </button>
+        </div>
+        {p.thumbnail_url ? (
+          <img className="cw-cover" src={p.thumbnail_url} alt="" style={{ width: 112, height: 75, objectFit: 'cover', borderRadius: 2, background: paper.rule }} />
+        ) : (
+          <span className="cw-cover" aria-hidden style={{ width: 112, height: 75, borderRadius: 2, background: '#F4F2EC' }} />
+        )}
+        <span onClick={own} style={{ display: 'flex' }}>
+          <Menu
+            small
+            label={`Thao tác ${p.en}`}
+            actions={[
+              { label: 'Nhân bản', onPick: () => copy(p.id) },
+              // A pinned post leads every page that lists it (listingRule sortPosts).
+              { label: p.pinned ? 'Bỏ ghim' : 'Ghim', onPick: () => run(() => updatePost(p.id, { pinned: !p.pinned })) },
+              { label: 'Chuyển module', onPick: () => setMoving(p) },
+              { label: 'Thông tin bài', onPick: () => setInfo(p.id) },
+              ...ACTIONS_BY_STATUS[p.status].map((a) => ({
+                label: a.label,
+                onPick: () => act(p.id, a.action),
+                ...(a.action === 'delete' || a.action === 'permanently-delete' ? { danger: true as const } : {}),
+              })),
+            ]}
+          />
+        </span>
+      </div>
+    )
+  }
 
   const list = (
     <div style={{ minWidth: 0, display: 'grid', alignContent: 'start', background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, overflow: 'hidden' }}>
@@ -448,103 +613,40 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           </span>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '10px 14px', borderBottom: `1px solid ${paper.rule}`, fontFamily: sans, fontSize: 12.5, color: ink.soft }}>
-        <span style={{ fontVariantNumeric: 'tabular-nums' }}>{visible.length} bài</span>
-        <span style={{ marginLeft: 'auto' }} />
-        <Button level="primary" icon={<IconPlus />} onClick={() => nav.newPost()}>
-          Bài mới
-        </Button>
+      <div style={{ display: 'flex', gap: 24, alignItems: 'center', padding: '0 20px', borderBottom: `1px solid ${desk.line}`, overflowX: 'auto' }}>
+        <div role="tablist" aria-label="Trạng thái" style={{ display: 'flex', gap: 24 }}>
+          {TABS.map((tab) => (
+            <button key={tab.label} type="button" role="tab" className="cw-tab" aria-selected={tabOn === tab.id} onClick={() => pickTab(tab.id)}>
+              {tab.label} <span style={{ fontVariantNumeric: 'tabular-nums' }}>{tabCount(tab.id)}</span>
+            </button>
+          ))}
+        </div>
+        <span style={{ marginLeft: 'auto', padding: '8px 0' }}>
+          <Button level="primary" icon={<IconPlus />} onClick={() => nav.newPost()}>
+            Bài mới
+          </Button>
+        </span>
       </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 680 }}>
-          <thead>
-            <tr>
-              <th style={{ ...th, width: 28 }}>
-                <input
-                  type="checkbox"
-                  aria-label="Chọn tất cả"
-                  checked={allOn}
-                  onChange={() => setSel((s) => {
-                    const n = new Set(s)
-                    visible.forEach((p) => (allOn ? n.delete(p.id) : n.add(p.id)))
-                    return n
-                  })}
-                />
-              </th>
-              <th style={th}>Bài</th>
-              <th style={th}>Chủ đề</th>
-              <th style={th}>Template</th>
-              <th style={th}>Tag</th>
-              <th style={th}>Trạng thái</th>
-              <th style={th}>Ngày</th>
-              <th style={th} aria-label="Thao tác" />
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((p) => {
-              const t = p.topic_id ? topicById.get(p.topic_id) : undefined
-              const on = sel.has(p.id)
-              return (
-                <tr key={p.id} className="cw-row" style={{ background: on ? SEL : undefined }}>
-                  <td style={td}>
-                    <input
-                      type="checkbox"
-                      aria-label={`Chọn ${p.en}`}
-                      checked={on}
-                      onChange={() => setSel((s) => {
-                        const n = new Set(s)
-                        if (n.has(p.id)) n.delete(p.id)
-                        else n.add(p.id)
-                        return n
-                      })}
-                    />
-                  </td>
-                  <td style={{ ...td, maxWidth: 320 }}>
-                    <button type="button" onClick={() => nav.editPost(p.id)} style={{ all: 'unset', cursor: 'pointer', fontFamily: sans, fontSize: 14.5, fontWeight: 500, color: ink.base }}>
-                      {p.en}
-                    </button>
-                    {p.pinned && (
-                      <span aria-label="đã ghim" style={{ marginLeft: 6, fontSize: 13 }}>
-                        📌
-                      </span>
-                    )}
-                  </td>
-                  <td style={td}>{t ? pillBtn('topic', t.id, t.title) : pillBtn('topic', UNPLACED, 'chưa xếp')}</td>
-                  <td style={td}>{pillBtn('tpl', p.template ?? '', templateName(p.template))}</td>
-                  <td style={td}>{kwOf(p).map((k) => pillBtn('kw', k, nameOf('kw', k), true))}</td>
-                  <td style={td}>
-                    <StatusBadge status={p.status} pending={p.has_draft} />
-                  </td>
-                  <td style={{ ...td, color: ink.soft, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{p.date_label}</td>
-                  <td style={td}>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                      <Button size="sm" icon={<IconEdit size={14} />} aria-label={`Sửa ${p.en}`} onClick={() => nav.editPost(p.id)}>
-                        Sửa
-                      </Button>
-                      <Menu
-                        small
-                        label={`Thao tác ${p.en}`}
-                        actions={[
-                          { label: 'Nhân bản', onPick: () => copy(p.id) },
-                          // A pinned post leads every page that lists it (listingRule sortPosts).
-                          { label: p.pinned ? 'Bỏ ghim' : 'Ghim', onPick: () => run(() => updatePost(p.id, { pinned: !p.pinned })) },
-                          { label: 'Chuyển module', onPick: () => setMoving(p) },
-                          { label: 'Tác giả', onPick: () => setNaming(p) },
-                          ...ACTIONS_BY_STATUS[p.status].map((a) => ({
-                            label: a.label,
-                            onPick: () => act(p.id, a.action),
-                            ...(a.action === 'delete' || a.action === 'permanently-delete' ? { danger: true as const } : {}),
-                          })),
-                        ]}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        {visible.length === 0 && <div style={{ color: ink.soft, fontFamily: sans, fontSize: 12.5, padding: '40px 0', textAlign: 'center' }}>Không có bài nào.</div>}
+      {visible.length > 0 && (
+        <label style={{ display: 'flex', gap: 14, alignItems: 'center', padding: '10px 20px', borderBottom: `1px solid ${desk.line}`, fontFamily: sans, fontSize: 13, color: ink.soft, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            aria-label="Chọn tất cả"
+            checked={allOn}
+            onChange={() =>
+              setSel((s) => {
+                const n = new Set(s)
+                visible.forEach((p) => (allOn ? n.delete(p.id) : n.add(p.id)))
+                return n
+              })
+            }
+          />
+          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{visible.length} bài</span>
+        </label>
+      )}
+      <div>
+        {visible.map(story)}
+        {visible.length === 0 && <div style={{ color: ink.soft, fontFamily: sans, fontSize: 13, padding: '40px 0', textAlign: 'center' }}>Không có bài nào.</div>}
       </div>
       {selected.length > 0 && (
         <BulkBar
@@ -564,7 +666,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         // order (sort_order is 1..N within a module) — see handlePatch.
         onMoved={(module_id) => (moving ? updatePost(moving.id, { module_id }).then(() => (setMoving(null), void load(), onChanged?.())) : undefined)}
       />
-      <PostAuthorsDialog post={naming} onClose={() => setNaming(null)} />
+      <ListPostSettings postId={info} topics={topics} onClose={closeInfo} onError={showError} />
     </div>
   )
 

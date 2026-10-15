@@ -196,6 +196,10 @@ export type LongformRun = {
   w?: string
   /** "normal" | "italic" */
   s?: string
+  /** Chữ máy, `x` trong markdown. */
+  code?: boolean
+  /** Gạch ngang, ~~x~~ trong markdown. */
+  del?: boolean
 }
 
 export type LongformBlockKind =

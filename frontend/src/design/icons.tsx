@@ -121,6 +121,27 @@ export const IconAlert = ({ size = 16, style }: IconProps) =>
 export const IconInfo = ({ size = 16, style }: IconProps) =>
   svg(size, style, <path d="M12 10v10M12 4v2" />)
 
+/** A post's date in a listing's facts line. */
+export const IconCalendar = ({ size = 16, style }: IconProps) =>
+  svg(size, style, <path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4" />)
+
+/** Reading time in a listing's facts line. */
+export const IconClock = ({ size = 16, style }: IconProps) =>
+  svg(
+    size,
+    style,
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7v5l3 2" />
+    </>,
+  )
+
+/** The template a post is written in. */
+export const IconPencil = ({ size = 16, style }: IconProps) =>
+  svg(size, style, <path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" />)
+export const IconPage = ({ size = 16, style }: IconProps) =>
+  svg(size, style, <path d="M6 3h8l4 4v14H6zM9 12h6M9 16h6" />)
+
 /** The ⋮ that opens a row's or a page's actions. */
 export const IconMore = ({ size = 16, style }: IconProps) =>
   svg(
@@ -148,16 +169,6 @@ export const IconGrip = ({ size = 16, style }: IconProps) =>
       <circle cx="15" cy="18" r="1.7" />
     </>,
     true,
-  )
-
-export const IconEdit = ({ size = 16, style }: IconProps) =>
-  svg(
-    size,
-    style,
-    <>
-      <path d="M4 20h4L19 9l-4-4L4 16z" />
-      <path d="M13.5 6.5l4 4" />
-    </>,
   )
 
 /** Opens somewhere else — a new tab. */

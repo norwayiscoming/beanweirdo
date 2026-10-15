@@ -70,6 +70,9 @@
 .awc-live-bold { font-weight: 600; }
 .awc-live-em { font-style: italic; }
 .awc-live-u { border-bottom: 1px solid #CFCFC4; }
+/* Cùng kiểu với `CODE_STYLE` của trang đọc (post-renderer, codeStrike.ts). */
+.awc-live-code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: .88em; background: rgba(0,0,0,.06); border-radius: 3px; padding: 1px 4px; }
+.awc-live-del { text-decoration: line-through; }
 .awc-live-link { color: inherit; border-bottom: 1px solid currentColor; }
 
 /* ══════════════════════════════════════════════════════════════════════════

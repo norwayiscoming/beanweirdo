@@ -89,9 +89,11 @@ let TOPICS: Row[] = [
 const post = (id: string, vi: string, topic_id: string, status: string, template: string, date_label: string, keywords: string[] = [], authors: string[] = ['a1']): Row => ({
   id, module_id: 'bean', en: vi, vi, lead: null, kind: 'note', date_label, status, template, hero_image_url: null, theme_color: null, thumbnail_url: null,
   sort_order: null, pinned: false, topic_id, keywords, authors, visibility: 'public', slug: id,
+  excerpt: `${vi} là câu hỏi mình gặp mỗi lần đứng trước máy rang: cùng một mẻ hạt, chỉ đổi vài giây cuối là vị trong tách đổi hẳn, từ chua sáng sang ngọt trầm…`,
+  read_minutes: 6,
 })
 const POSTS: Row[] = [
-  post('p-a', 'Rang nhạt hay rang đậm', 'roasting', 'published', 'article', '12.10.2026', ['heat']),
+  { ...post('p-a', 'Rang nhạt hay rang đậm', 'roasting', 'published', 'article', '12.10.2026', ['heat'], ['a1', 'a2']), has_draft: true },
   post('p-b', 'Vị chua đến từ đâu', 'sensory', 'published', 'memo', '08.10.2026', ['acid']),
   post('p-c', 'Ghi chép buổi cupping', 'ghi', 'draft', 'cards', '02.10.2026', [], ['a2']),
 ]
@@ -171,7 +173,8 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
   }
   if (url.includes('/api/posts')) return json({ posts: POSTS })
   if (url.includes('/api/tags')) return json({ tags: [] })
-  if (url.includes('/api/templates')) return json({ templates: [] })
+  if (url.includes('/api/templates'))
+    return json({ templates: [{ id: 'tpl-article', name: 'Article', description: '', renderer: 'article', sort_order: 1 }, { id: 'tpl-memo', name: 'Memo', description: '', renderer: 'memo', sort_order: 2 }] })
   if (url.includes('/api/site')) return json({ site: {} })
   return json({})
 }
@@ -180,6 +183,7 @@ const { Cms } = await import('./screens/Cms')
 const { Editor } = await import('./admin/screens/Editor')
 const { NavContext } = await import('./lib/nav')
 const { ToastProvider } = await import('./design/Toaster')
+const { NewPostDialog } = await import('./admin/components/NewPostDialog')
 
 const nop = () => {}
 const nav = {
@@ -194,8 +198,9 @@ const nav = {
 createRoot(document.getElementById('root')!).render(
   <NavContext.Provider value={nav}>
     <ToastProvider>
-      {/* `?screen=edit` opens the post editor on the first post instead. */}
+      {/* `?screen=edit` opens the post editor on the first post instead; `?screen=new` the "Bài mới" dialog. */}
       {new URLSearchParams(location.search).get('screen') === 'edit' ? <Editor postId="p-a" /> : <Cms />}
+      <NewPostDialog open={new URLSearchParams(location.search).get('screen') === 'new'} onClose={nop} onCreated={nop} />
     </ToastProvider>
   </NavContext.Provider>,
 )
