@@ -5,7 +5,8 @@ import { listModulesCached } from '../lib/lists'
 import { ink, paper } from '../../design/tokens'
 import { Hover } from '../../lib/Hover'
 import type { AuthorRef } from 'api-contract'
-import { AuthorCard, Byline } from '../../components/Byline'
+import { AuthorCard, PostProps } from '../../components/Byline'
+import { shownOn } from '../../portfolio/blocks'
 import { readMinutes } from '../../lib/postText'
 import { useNav } from '../../lib/nav'
 import { resolveTemplate } from '../lib/postData'
@@ -55,12 +56,15 @@ function PreviewContent({ postId }: { postId: string }) {
   const template = resolveTemplate(post)
   const mod = modules.find((m) => m.id === post.module_id)
   const source = post
-  // Same byline and author card as the public page, so the preview shows what readers will.
+  // Same properties and author card as the public page, so the preview shows what readers will.
   const breadcrumb = (
-    <Byline
+    <PostProps
       authors={authors}
+      topic={mod?.title}
+      shownOn={shownOn(post)}
       publishedAt={post.status === 'published' ? post.published_at : null}
       minutes={readMinutes(post.body)}
+      template={template}
     />
   )
   const footer = <AuthorCard authors={authors} />

@@ -31,13 +31,14 @@ export type Variant = 'A' | 'B'
  * which door was used.
  */
 /**
- * Which door a post was opened through — the breadcrumb reads back the way in.
+ * Which door a post was opened through — the post page's "Quay lại" leads back
+ * through it. `biz`, `bean` and `blog` are the sites' homes.
  *
  * `archive` exists because Archive is its own door: a post opened from there
  * came neither from a module nor from the template list, and saying either is
  * describing a walk the reader never took.
  */
-export type Origin = 'module' | 'admin' | 'archive'
+export type Origin = 'module' | 'admin' | 'archive' | 'biz' | 'bean' | 'blog'
 
 export type Nav = {
   screen: Screen

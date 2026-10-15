@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { PostTemplate } from '../content/templates'
+import type { PostSite } from 'api-contract'
 
 export type PostKind = 'note' | 'essay' | 'ref' | 'log'
 export type { PostTemplate }
@@ -47,6 +48,8 @@ export type PostRow = {
   deleted_at: string | null
   previous_status: PostStatus | null
   updated_at: string
+  /** The homes the post is ticked to appear on (migration 0038). */
+  shown_on?: PostSite[] | null
 }
 
 type UsePostsOptions = {
@@ -102,7 +105,7 @@ type UsePostsResult = {
  * nhận chuỗi, và không có cú pháp "tất cả trừ một cột".
  */
 const LIST_COLUMNS =
-  'id, module_id, kind, template, en, vi, slug, lead, date_label, sort_order, pinned, status, previous_status, hero_image_url, hero_caption, theme_color, thumbnail_url, pull_quote, further_reading, published_at, deleted_at, created_at, updated_at'
+  'id, module_id, kind, template, en, vi, slug, lead, date_label, sort_order, pinned, status, previous_status, hero_image_url, hero_caption, theme_color, thumbnail_url, pull_quote, further_reading, published_at, deleted_at, created_at, updated_at, shown_on'
 
 /**
  * Published posts only — `archived` rows are anon-readable at the RLS layer

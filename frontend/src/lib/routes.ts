@@ -141,6 +141,13 @@ const BIZ = 'biz'
 const BLOG = 'personal-blog'
 
 /**
+ * A post's own page, `/p/<slug>` (owner, 2026-10-15): posts are one store shown
+ * on biz, bean and the blog, so their page belongs to none of them. The blog's
+ * `/personal-blog/post/<slug>` still reads and is rewritten here.
+ */
+const POST = 'p'
+
+/**
  * Where the portfolio lived before it became the root (`/portfolio/<slug>`).
  * Only read, never written: links to it are already out there.
  */
@@ -203,6 +210,7 @@ function readPath(pathname: string, search: string, w: RouteWords): Where | null
   }
 
   // ── public ───────────────────────────────────────────────────────────────
+  if (head === POST && seg[1]) return { area: 'public', screen: 'article', slug: seg[1], from: originOf(search) }
   if (head === BIZ) return seg[1] ? { area: 'public', screen: 'portfolioPage', slug: seg[1] } : { area: 'public', screen: 'portfolioPage', site: 'biz' }
   if (head === BLOG) return seg[1] ? readBlog(seg.slice(1), search, w, false) : { area: 'public', screen: 'landing' }
   if (head === w.bean && !seg[1]) return { area: 'public', screen: 'portfolioPage', site: 'bean' }
@@ -225,13 +233,19 @@ function readBlog(seg: string[], search: string, w: RouteWords, underBean: boole
   if (head === w.module && arg) return { area: 'public', screen: 'module', moduleId: moduleFromUrl(arg, w) }
   // A tag's own page (migration 0028): the page id is `tag-<id>`.
   if (head === w.tag && arg) return { area: 'public', screen: 'module', moduleId: `${TAG_PAGE}${arg}` }
-  if (head === w.post && arg) {
-    // A reader arriving cold came through neither a module nor the admin list,
-    // and `module` is the trail that makes sense to show them.
-    const from = (new URLSearchParams(search).get('from') as Origin | null) ?? 'module'
-    return { area: 'public', screen: 'article', slug: arg, from }
-  }
+  if (head === w.post && arg) return { area: 'public', screen: 'article', slug: arg, from: originOf(search) }
   return null
+}
+
+const ORIGINS: Origin[] = ['module', 'admin', 'archive', 'biz', 'bean', 'blog']
+
+/**
+ * The door a post was opened through. A reader arriving cold came through
+ * none, and `module` is the way back that makes sense to show them.
+ */
+function originOf(search: string): Origin {
+  const from = new URLSearchParams(search).get('from') as Origin | null
+  return from && ORIGINS.includes(from) ? from : 'module'
 }
 
 /** The address for a place. The exact inverse of `parsePath`. */
@@ -244,7 +258,7 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
   if (where.area === 'admin') {
     const action = actionOfScreen(w)[where.screen]
     if (action) return where.slug ? `${adPost}/${action}=${where.slug}` : `${adPost}/${action}`
-    if (where.screen === 'article') return where.slug ? `${blog}/${w.post}/${where.slug}?from=admin` : adHome
+    if (where.screen === 'article') return where.slug ? `/${POST}/${where.slug}?from=admin` : adHome
     if (where.screen === 'cms') return where.tab ? `/${pageOfTab(w)[where.tab]}` : adHome
     const page = screenPage(w)[where.screen]
     return page ? `/${page}` : adHome
@@ -270,7 +284,7 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
       // The door is worth carrying so the trail reads back the way in, but
       // `module` is the default and does not need saying.
       return where.slug
-        ? `${blog}/${w.post}/${where.slug}${where.from && where.from !== 'module' ? `?from=${where.from}` : ''}`
+        ? `/${POST}/${where.slug}${where.from && where.from !== 'module' ? `?from=${where.from}` : ''}`
         : blog
     default:
       return '/'

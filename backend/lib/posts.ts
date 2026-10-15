@@ -1,3 +1,5 @@
+import type { PostSite } from 'api-contract'
+
 // Row/JSON mapping + the status lifecycle transition table for `posts`.
 //
 // Schema source of truth: backend/supabase/migrations/0001_initial_schema.sql,
@@ -52,6 +54,7 @@ export const POST_COLUMNS = [
   'theme_color',
   'topic_id',
   'visibility',
+  'shown_on',
   'pull_quote',
   'further_reading',
   'published_at',
@@ -64,6 +67,9 @@ export const POST_STATUSES: PostStatus[] = ['draft', 'published', 'archived', 'd
 /** Who may read a post (migration 0027). The narrower of post and topic wins. */
 export type PostVisibility = 'public' | 'private'
 export const POST_VISIBILITIES: PostVisibility[] = ['public', 'private']
+
+/** The homes a post can appear on (0038); one store, shown where it is ticked. */
+export const POST_SITES: PostSite[] = ['biz', 'bean', 'blog']
 
 /**
  * A stored address: lowercase words joined by hyphens. Stored slugs belong to
@@ -112,6 +118,8 @@ export interface PostRow {
   theme_color: string | null
   topic_id: string | null
   visibility: PostVisibility
+  /** Which homes show it (0038). Optional: a database before 0038 has no such column. */
+  shown_on?: PostSite[] | null
   published_at: string | null
   deleted_at: string | null
   previous_status: string | null
@@ -133,7 +141,7 @@ export interface PostRow {
  * and cannot see the real schema.
  */
 export const POST_SUMMARY_COLUMNS =
-  'id, module_id, en, vi, lead, kind, date_label, status, template, hero_image_url, thumbnail_url, theme_color, topic_id, visibility, slug, sort_order, pinned, created_at, updated_at, published_at'
+  'id, module_id, en, vi, lead, kind, date_label, status, template, hero_image_url, thumbnail_url, theme_color, topic_id, visibility, shown_on, slug, sort_order, pinned, created_at, updated_at, published_at'
 
 export const POST_DETAIL_COLUMNS = '*'
 
@@ -259,6 +267,7 @@ interface PostSummary {
   /** The post's place on the topic tree (migration 0027); null until filed. */
   topic_id: string | null
   visibility: PostVisibility
+  shown_on: PostSite[]
   /** The stored address; null for drafts, which are addressed by derivation. */
   slug: string | null
   /**
@@ -304,6 +313,7 @@ export function toPostSummary(row: PostRow): PostSummary {
     theme_color: row.theme_color,
     topic_id: row.topic_id ?? null,
     visibility: row.visibility ?? 'public',
+    shown_on: row.shown_on ?? ['blog'],
     slug: row.slug ?? null,
     /*
      * Cover first, then whatever the post has inside it.

@@ -113,11 +113,13 @@ describe('routes — địa chỉ lạ', () => {
   })
 
   it('carries the door only when it is not the usual one', () => {
-    expect(toPath({ area: 'public', screen: 'article', slug: 's-p260817', from: 'module' })).toBe('/personal-blog/post/s-p260817')
+    expect(toPath({ area: 'public', screen: 'article', slug: 's-p260817', from: 'module' })).toBe('/p/s-p260817')
     expect(toPath({ area: 'public', screen: 'article', slug: 's-p260817', from: 'archive' }))
-      .toBe('/personal-blog/post/s-p260817?from=archive')
-    // Không nói gì thì mặc định là cửa module.
+      .toBe('/p/s-p260817?from=archive')
+    expect(parsePath('/p/s-p260817', '?from=biz')).toMatchObject({ screen: 'article', slug: 's-p260817', from: 'biz' })
+    // Không nói gì, hay nói một cửa lạ, thì mặc định là cửa module.
     expect(parsePath('/bean/post/s-p260817').from).toBe('module')
+    expect(parsePath('/p/s-p260817', '?from=xyz').from).toBe('module')
   })
 })
 
@@ -153,7 +155,7 @@ describe('routes — cây site: beanweirdo ở gốc, biz dưới /biz, bean dư
     expect(parsePath('/biz/business')).toMatchObject({ screen: 'portfolioPage', slug: 'business' })
     expect(parsePath('/bean')).toMatchObject({ screen: 'portfolioPage', site: 'bean' })
     expect(parsePath('/personal-blog')).toMatchObject({ screen: 'landing' })
-    expect(parsePath('/personal-blog/post/x-p260817')).toMatchObject({ screen: 'article', slug: 'x-p260817' })
+    expect(parsePath('/p/x-p260817')).toMatchObject({ screen: 'article', slug: 'x-p260817' })
     expect(parsePath('/bean/roasting')).toMatchObject({ screen: 'portfolioPage', slug: 'roasting', site: 'bean' })
     expect(toPath(parsePath('/bean/roasting'))).toBe('/bean/roasting')
   })
@@ -183,11 +185,13 @@ describe('routes — cây site: beanweirdo ở gốc, biz dưới /biz, bean dư
       ['/ghi', '/personal-blog/ghi'],
       ['/module/biochemistry', '/personal-blog/module/biochemistry'],
       ['/tag/heat', '/personal-blog/tag/heat'],
-      ['/post/sensory-p260817', '/personal-blog/post/sensory-p260817'],
+      ['/post/sensory-p260817', '/p/sensory-p260817'],
+      // A post's page left the blog on 2026-10-15: it is shown on biz and bean too.
+      ['/personal-blog/post/sensory-p260817', '/p/sensory-p260817'],
       // The blog sat under bean until 2026-10-15.
       ['/bean/details', '/personal-blog'],
       ['/bean/muc-luc', '/personal-blog/muc-luc'],
-      ['/bean/post/sensory-p260817', '/personal-blog/post/sensory-p260817'],
+      ['/bean/post/sensory-p260817', '/p/sensory-p260817'],
     ]
     for (const [from, to] of old) expect(toPath(parsePath(from)), from).toBe(to)
   })

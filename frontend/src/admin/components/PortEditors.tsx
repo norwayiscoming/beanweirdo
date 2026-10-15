@@ -8,6 +8,8 @@ import { ColorRow, STATUS_CHOICES } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useRowDrag } from '../lib/useRowDrag'
 import { freeSlug, titleSlug } from '../../lib/postSlug'
+import { portSiteOf } from '../../lib/routes'
+import type { PostSite } from 'api-contract'
 import { useTags } from '../../data/useTags'
 import {
   createNode,
@@ -251,7 +253,8 @@ export function Builder({
   const [draft, setDraft] = useState({ ...page, blocks: parseBlocks(page.blocks) })
   const [active, setActive] = useState<string | null>(null)
   const { tags } = useTags()
-  const postHref = usePostHref()
+  const site = portSiteOf(page, pages)
+  const postHref = usePostHref(site)
 
   const save = useCallback(
     (patch: Record<string, unknown>) => updateNode(page.id, patch).then(onSaved),
@@ -362,7 +365,7 @@ export function Builder({
                     ))}
                   </select>
                 </Field>
-                <BlockFields block={b} onChange={(p) => patchBlock(b.id, p)} src={src} tags={tags} />
+                <BlockFields block={b} onChange={(p) => patchBlock(b.id, p)} src={src} tags={tags} site={site} />
               </div>
             )}
           </div>
@@ -442,12 +445,17 @@ function sourceText(s: Source, modules: Record<string, string>): string {
       return 'ghim'
     case 'pick':
       return `${s.ids.length} bài chọn tay`
+    case 'site':
+      return `bài tick ${SITE_NAMES[s.site]}`
     default:
       return 'mới nhất'
   }
 }
 
+const SITE_NAMES: Record<PostSite, string> = { biz: 'biz', bean: 'bean', blog: 'personal blog' }
+
 const MODE_NAMES: Record<SourceMode, string> = {
+  site: 'Bài tick trang này',
   latest: 'Mới nhất',
   module: 'Theo module',
   tag: 'Theo tag',
@@ -460,15 +468,19 @@ function SourceFields({
   onChange,
   src,
   tags,
+  site,
 }: {
   source: Source
   onChange: (s: Source) => void
   src: Sources
   tags: { id: string; label: string }[]
+  /** The site of the page being edited — "bài tick trang này" starts on it. */
+  site: PostSite
 }) {
   const limit = 'limit' in source ? source.limit : 6
   const change = (mode: SourceMode) => {
-    if (mode === 'module') onChange({ mode, moduleId: src.moduleIds[0] ?? '', limit })
+    if (mode === 'site') onChange({ mode, site, limit })
+    else if (mode === 'module') onChange({ mode, moduleId: src.moduleIds[0] ?? '', limit })
     else if (mode === 'tag') onChange({ mode, tag: tags[0]?.id ?? '', limit })
     else if (mode === 'pick') onChange({ mode, ids: [] })
     else onChange({ mode, limit } as Source)
@@ -488,6 +500,14 @@ function SourceFields({
             <select style={small} value={source.moduleId} onChange={(e) => onChange({ ...source, moduleId: e.target.value })}>
               {src.moduleIds.map((id) => (
                 <option key={id} value={id}>{src.moduleTitles[id]}</option>
+              ))}
+            </select>
+          </Field>
+        ) : source.mode === 'site' ? (
+          <Field label="Trang">
+            <select style={small} value={source.site} onChange={(e) => onChange({ ...source, site: e.target.value as PostSite })}>
+              {(Object.keys(SITE_NAMES) as PostSite[]).map((id) => (
+                <option key={id} value={id}>{SITE_NAMES[id]}</option>
               ))}
             </select>
           </Field>
@@ -551,11 +571,13 @@ function BlockFields({
   onChange,
   src,
   tags,
+  site,
 }: {
   block: Block
   onChange: (p: Partial<Block>) => void
   src: Sources
   tags: { id: string; label: string }[]
+  site: PostSite
 }) {
   const text = (label: string, key: string, area = false) => {
     const v = String((block as Record<string, unknown>)[key] ?? '')
@@ -570,7 +592,7 @@ function BlockFields({
     )
   }
   const source = 'source' in block && (
-    <SourceFields source={block.source} onChange={(s) => onChange({ source: s } as Partial<Block>)} src={src} tags={tags} />
+    <SourceFields source={block.source} onChange={(s) => onChange({ source: s } as Partial<Block>)} src={src} tags={tags} site={site} />
   )
   switch (block.type) {
     case 'head':

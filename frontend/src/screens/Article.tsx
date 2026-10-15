@@ -1,7 +1,7 @@
 import { PostRenderer } from 'post-renderer'
 import { useIsMobile } from '../lib/useIsMobile'
 import { usePost } from '../data/usePost'
-import { postTitle, readMinutes } from '../lib/postText'
+import { readMinutes } from '../lib/postText'
 import {
   toArticleData,
   toBitesizeData,
@@ -12,11 +12,12 @@ import {
 } from '../lib/postToRenderer'
 import { findPage, useModules, usePagePosts } from '../data/useModules'
 import { ink, sans } from '../design/tokens'
-import { Breadcrumbs } from '../components/Breadcrumbs'
 import { useNav } from '../lib/nav'
 import { usePostAuthors } from '../data/usePostAuthors'
-import { AuthorCard, Byline } from '../components/Byline'
+import { AuthorCard, PostProps } from '../components/Byline'
 import { openModule } from '../lib/moduleTarget'
+import { shownOn } from '../portfolio/blocks'
+import { PostRail, type Homes } from './PostRail'
 
 const status = {
   fontFamily: sans,
@@ -39,8 +40,12 @@ const status = {
  * from Supabase (`posts` + its module + its siblings), the actual rendering
  * goes entirely through `post-renderer` for true WYSIWYG parity with the
  * admin app's preview.
+ *
+ * Beside it, a rail that leads back through the door the reader came in by
+ * and lists the post's own headings (`PostRail`). `homes` names biz's and
+ * bean's home pages for that way back.
  */
-export function Article() {
+export function Article({ homes }: { homes?: Homes } = {}) {
   const mobile = useIsMobile()
   const nav = useNav()
   const { data: modules, tagsOf } = useModules()
@@ -76,67 +81,66 @@ export function Article() {
   }
 
   const module_ = findPage(modules, post.module_id)
-  // Every template gets the same trail back. The renderer package knows
-  // nothing about routing, so the app hands it the finished element.
+  const moduleTitle = module_?.title ?? post.module_id
+  // Every template gets the same properties under its title. The renderer
+  // package knows nothing about the site, so the app hands it the finished element.
   const crumbs = (
-    <>
-      {/* The byline sits close under the trail rather than a full gap below it. */}
-      <Breadcrumbs style={{ opacity: 0.75, marginBottom: 14 }} trailing={postTitle(post)} moduleId={post.module_id} />
-      <Byline
-        authors={authors}
-        publishedAt={post.status === 'published' ? post.published_at : null}
-        minutes={readMinutes(post.body)}
-        tags={tagsOf?.(post.id) ?? []}
-      />
-    </>
+    <PostProps
+      authors={authors}
+      topic={module_?.title}
+      tags={tagsOf?.(post.id) ?? []}
+      shownOn={shownOn(post)}
+      publishedAt={post.status === 'published' ? post.published_at : null}
+      minutes={readMinutes(post.body)}
+      template={post.template}
+    />
   )
   const footer = <AuthorCard authors={authors} />
-  const moduleTitle = module_?.title ?? post.module_id
-
-  if (post.template === 'bitesize') {
-    return <PostRenderer template="bitesize" post={toBitesizeData(post, { mod: module_, tag: tagsOf?.(post.id)[0]?.label })} breadcrumb={crumbs} footer={footer} mobile={mobile} />
-  }
-  if (post.template === 'memo') {
-    return <PostRenderer template="memo" post={toMemoData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
-  }
-  if (post.template === 'longform') {
-    return <PostRenderer template="longform" post={toLongformData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
-  }
-  if (post.template === 'cards') {
-    return <PostRenderer template="cards" post={toCardsData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
-  }
-  if (post.template === 'report') {
-    return <PostRenderer template="report" post={toReportData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
-  }
-
   const related = siblings.data.filter((p) => p.id !== post.id)
   const position = siblings.data.findIndex((p) => p.id === post.id)
 
-  return (
-    <PostRenderer
-      mobile={mobile}
-      template="article"
-      post={toArticleData(post, moduleTitle, related, position, module_)}
-      breadcrumb={crumbs}
-      footer={footer}
-      renderEyebrow={(eyebrowModuleTitle) => (
-        // Through moduleTarget, like the index: Ghi 01 and Ghi 02 have their
-        // own screens, and the generic module page is a second, wrong door.
-        <span onClick={() => (module_ ? openModule(nav, module_) : nav.openModule(post.module_id))} style={{ cursor: 'pointer' }}>
-          ← {eyebrowModuleTitle}
-        </span>
-      )}
-      renderRelatedItem={(label, i) => {
-        const sibling = related[i]
-        return (
-          <span
-            onClick={sibling ? () => nav.openArticle(sibling.id, nav.articleFrom) : undefined}
-            style={{ cursor: sibling ? 'pointer' : 'default' }}
-          >
-            {label}
+  const body =
+    post.template === 'bitesize' ? (
+      <PostRenderer template="bitesize" post={toBitesizeData(post, { mod: module_, tag: tagsOf?.(post.id)[0]?.label })} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+    ) : post.template === 'memo' ? (
+      <PostRenderer template="memo" post={toMemoData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+    ) : post.template === 'longform' ? (
+      <PostRenderer template="longform" post={toLongformData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+    ) : post.template === 'cards' ? (
+      <PostRenderer template="cards" post={toCardsData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+    ) : post.template === 'report' ? (
+      <PostRenderer template="report" post={toReportData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+    ) : (
+      <PostRenderer
+        mobile={mobile}
+        template="article"
+        post={toArticleData(post, moduleTitle, related, position, module_)}
+        breadcrumb={crumbs}
+        footer={footer}
+        renderEyebrow={(eyebrowModuleTitle) => (
+          // Through moduleTarget, like the index: Ghi 01 and Ghi 02 have their
+          // own screens, and the generic module page is a second, wrong door.
+          <span onClick={() => (module_ ? openModule(nav, module_) : nav.openModule(post.module_id))} style={{ cursor: 'pointer' }}>
+            ← {eyebrowModuleTitle}
           </span>
-        )
-      }}
-    />
+        )}
+        renderRelatedItem={(label, i) => {
+          const sibling = related[i]
+          return (
+            <span
+              onClick={sibling ? () => nav.openArticle(sibling.id, nav.articleFrom) : undefined}
+              style={{ cursor: sibling ? 'pointer' : 'default' }}
+            >
+              {label}
+            </span>
+          )
+        }}
+      />
+    )
+
+  return (
+    <PostRail key={post.id} from={nav.articleFrom ?? 'module'} module={module_} homes={homes} mobile={mobile}>
+      {body}
+    </PostRail>
   )
 }
