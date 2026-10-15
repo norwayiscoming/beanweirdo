@@ -34,10 +34,10 @@ vi.mock('../../data/useModules', () => ({
   findPage: () => undefined,
 }))
 vi.mock('../../portfolio/data', () => ({ usePortSources: () => ({ posts: [], moduleTitles: {}, moduleIds: [], loading: false }) }))
-const portPage = (id: string, status: string, sort_order: number) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id: null, sort_order, home_of: id === 'Biz-hkd' ? 'biz' : id === 'Been-hkd' ? 'bean' : null })
+const portPage = (id: string, status: string, sort_order: number, parent_id: string | null = null) => ({ id, title: id, slug: id.toLowerCase(), status, parent_id, sort_order, home_of: id === 'Biz-hkd' ? 'biz' : id === 'Been-hkd' ? 'bean' : null })
 vi.mock('./PortEditors', () => ({
   usePortAdmin: () => ({
-    pages: [portPage('Biz-hkd', 'draft', 0), portPage('Been-hkd', 'draft', 0), portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3)],
+    pages: [portPage('Biz-hkd', 'draft', 0), portPage('Been-hkd', 'draft', 0), portPage('Alpha', 'published', 1), portPage('Beta', 'published', 2), portPage('Draft', 'draft', 3), portPage('Roast', 'published', 4, 'Been-hkd')],
     // Beta was put first on the top bar and given its own label; home sits second.
     content: { header: { brand: '', right: '', links: [{ key: 'page:Beta', label: 'Bê' }] }, home: { title: 'port', intro: '', features: [] }, footer: {}, about: {} },
     setContentStored: () => {},
@@ -92,8 +92,8 @@ const rowsOf = (list: string) => within(screen.getByRole('list', { name: list })
 const heading = () => screen.getByRole('heading', { level: 2 }).textContent
 const crumbs = () => screen.getByLabelText('Đang sửa').textContent
 
-/** Opens on bean, the tab most of these tests are about; `tab` picks another. */
-const renderScreen = async (tab = 'bean', openAuthors = false) => {
+/** Opens on personal blog, the tab most of these tests are about; `tab` picks another. */
+const renderScreen = async (tab = 'blog', openAuthors = false) => {
   localStorage.setItem('beanweirdo.config.tab', tab)
   render(
     <ConfigTree
@@ -105,7 +105,7 @@ const renderScreen = async (tab = 'bean', openAuthors = false) => {
     />,
   )
   await screen.findByRole('navigation', { name: 'Cây cấu hình' })
-  if (tab === 'bean' && !openAuthors) await waitFor(() => expect(card('Mục lục').textContent).toContain('2 subject'))
+  if (tab === 'blog' && !openAuthors) await waitFor(() => expect(card('Mục lục').textContent).toContain('2 subject'))
 }
 
 /** Opens a topic the way the owner does: the Mục lục card, then down the lists. */
@@ -127,13 +127,28 @@ const dropOn = (row: HTMLElement, clientY: number, types: ('dragOver' | 'drop')[
 const li = (el: HTMLElement) => el.closest('li') as HTMLElement
 
 describe('Cấu hình', () => {
-  it('opens on bean’s home, the block page the owner named; the blog’s front page is its "details" card', async () => {
+  it('opens personal blog on its home, the blog’s front page at /personal-blog', async () => {
     await renderScreen()
-    expect(card('Trang chủ bean').getAttribute('aria-current')).toBe('true')
-    await userEvent.click(card('details'))
-    expect(heading()).toBe('details')
+    expect(card('Trang chủ').getAttribute('aria-current')).toBe('true')
+    expect(heading()).toBe('Trang chủ')
+    expect(crumbs()).toBe('personal blog')
     expect(screen.getByText('copy:landing')).toBeTruthy()
-    expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/details')
+    expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/personal-blog')
+  })
+
+  it('gives bean a Mục lục of its own: the pages under its home, at /bean/<slug>, kept out of biz', async () => {
+    const { createFromPreset } = await import('./PortEditors')
+    vi.mocked(createFromPreset).mockResolvedValue({ id: 'n2', title: 'cupping', slug: 'cupping', status: 'draft' } as never)
+    await renderScreen('bean')
+    expect(card('Trang chủ bean').getAttribute('aria-current')).toBe('true')
+    expect(card('Mục lục').textContent).toContain('1 mục')
+    await userEvent.click(card('Mục lục'))
+    expect(rowsOf('Các mục')).toEqual(['Roast/bean/roast'])
+    // A page added at the top of bean's Mục lục is filed under bean's home.
+    await userEvent.click(screen.getByRole('button', { name: 'Thêm trang' }))
+    await userEvent.type(screen.getByLabelText('Thêm trang'), 'cupping')
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu' }))
+    await waitFor(() => expect(createFromPreset).toHaveBeenCalledWith('bibi', 'cupping', expect.anything(), [], 'Been-hkd'))
   })
 
   it('keeps only the cards on the left; what a card holds is listed on the right, and the crumbs go back', async () => {
@@ -142,9 +157,9 @@ describe('Cấu hình', () => {
     expect(within(tree()).queryByRole('textbox')).toBeNull()
 
     await openTopic('coffee', 'sensory')
-    expect(crumbs()).toBe('bean › Mục lục › coffee')
+    expect(crumbs()).toBe('personal blog › Mục lục › coffee')
     expect(screen.getByLabelText('Tên')).toHaveProperty('value', 'sensory')
-    expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/module/sensory')
+    expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/personal-blog/module/sensory')
     // The card stays lit while something inside it is open.
     expect(card('Mục lục').getAttribute('aria-current')).toBe('true')
 
@@ -258,7 +273,7 @@ describe('Cấu hình', () => {
     dropOn(beta, 15, ['drop'])
     await waitFor(() =>
       expect(api.updateSite).toHaveBeenCalledWith({
-        portfolio: { header: { brand: '', right: '', links: [{ key: 'about' }, { key: 'home' }, { key: 'page:Beta', label: 'Bê' }, { key: 'page:Alpha' }] } },
+        portfolio: { header: { brand: '', right: '', links: [{ key: 'about' }, { key: 'home' }, { key: 'page:Beta', label: 'Bê' }, { key: 'page:Alpha' }, { key: 'page:Roast' }] } },
       }),
     )
   })
@@ -276,7 +291,7 @@ describe('Cấu hình', () => {
     await renderScreen()
     await userEvent.click(card('Mục lục'))
     expect(screen.getByText('copy:index')).toBeTruthy()
-    expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/bean/muc-luc')
+    expect(screen.getByTitle(/xem trước/).getAttribute('src')).toBe('/personal-blog/muc-luc')
     for (const gone of ['Điều hướng', 'Mẫu', 'Lưu trữ', 'Cây chủ đề', 'Phần chung']) expect(within(tree()).queryByRole('button', { name: new RegExp(`^${gone}`) })).toBeNull()
   })
 
@@ -320,7 +335,6 @@ describe('Cấu hình', () => {
 
   it('keeps Xoá in the same place on a page that cannot be deleted, greyed with the reason', async () => {
     await renderScreen()
-    await userEvent.click(card('details'))
     await userEvent.click(screen.getByRole('button', { name: 'Thao tác' }))
     const del = screen.getByRole('menuitem', { name: /Xoá/ })
     expect(del).toHaveProperty('disabled', true)
@@ -343,7 +357,7 @@ describe('Cấu hình', () => {
 
   it('walks the cards with the arrow keys', async () => {
     await renderScreen()
-    card('Trang chủ bean').focus()
+    card('Trang chủ').focus()
     await userEvent.keyboard('{ArrowDown}')
     expect(document.activeElement).toBe(card('Mục lục'))
     await userEvent.keyboard('{ArrowDown}{ArrowUp}')

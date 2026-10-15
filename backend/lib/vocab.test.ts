@@ -10,13 +10,13 @@ describe('nodeColumns', () => {
     expect(nodeColumns({ look: '', parent_id: '' }, 'port')).toEqual({ look: null, parent_id: null })
   })
 
-  it('keeps root words away from port pages only, and leaves bean free', () => {
-    // Port pages live at /<slug>; these addresses belong to other pages.
-    for (const slug of ['about', 'portfolio', 'post', 'muc-luc', 'practice', 'ad-post']) {
+  it('keeps root words and the sites’ own prefixes away from port pages only', () => {
+    // A port page's old address is /<slug>, and a bean page's is /bean/<slug>; these belong to other pages.
+    for (const slug of ['about', 'portfolio', 'post', 'muc-luc', 'practice', 'ad-post', 'biz', 'bean', 'personal-blog', 'details']) {
       expect(nodeColumns({ slug }, 'port'), slug).toBeTypeOf('string')
       expect(nodeColumns({ slug }, 'blog'), slug).toEqual({ slug })
     }
-    expect(nodeColumns({ slug: 'bean' }, 'port')).toEqual({ slug: 'bean' })
+    expect(nodeColumns({ slug: 'roasting' }, 'port')).toEqual({ slug: 'roasting' })
   })
 })
 

@@ -6,7 +6,7 @@ import { portPagePath } from '../lib/routes'
 
 /**
  * The public portfolio pages: / (main page), /about, the child sites' homes
- * (/biz, /bean) and biz's pages (/biz/<slug>). Full width, without the site's
+ * (/biz, /bean) and their pages (/biz/<slug>, /bean/<slug>). Full width, without the site's
  * left rail — every page wears the portfolio's own header and footer (06.1, 06.17).
  */
 function NotFound() {
@@ -20,12 +20,15 @@ export function PortfolioPage() {
   const src = usePortSources()
   const postHref = usePostHref()
 
-  // A site's home opened by its slug (/biz-hkd, /biz/been-hkd) moves to the site's own address.
+  // A page opened at another site's address (a home by its slug, /biz-hkd; a
+  // bean page under /biz/<slug>, its address before bean had pages) moves to its own.
   useEffect(() => {
-    if (!page?.home_of || nav.portSite === page.home_of) return
-    window.history.replaceState({}, '', portPagePath(page))
+    if (!page || chrome.loading) return
+    const own = portPagePath(page, chrome.pages)
+    if (own === window.location.pathname) return
+    window.history.replaceState({}, '', own)
     window.dispatchEvent(new PopStateEvent('popstate'))
-  }, [page, nav.portSite])
+  }, [page, chrome.loading, chrome.pages])
 
   if (loading || chrome.loading) return null
   if (!page) return <NotFound />
@@ -66,7 +69,7 @@ export function PortfolioAbout() {
     <PortAbout
       design={design}
       chrome={buildChrome(chrome.content, chrome.pages, 'about')}
-      posts={chrome.pages.filter((p) => p.status === 'published').map((p) => ({ label: p.title, url: portPagePath(p) }))}
+      posts={chrome.pages.filter((p) => p.status === 'published').map((p) => ({ label: p.title, url: portPagePath(p, chrome.pages) }))}
     />
   )
 }

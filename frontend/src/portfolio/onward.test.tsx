@@ -25,15 +25,15 @@ const view = (blocks: Block[], onward?: { href: string; label: string }) =>
 
 describe('nút đi xuống một tầng của cây site', () => {
   it('đứng ngay dưới hero, trước mọi khối khác', () => {
-    const c = view([hero, about], { href: '/bean/details', label: 'details' })
+    const c = view([hero, about], { href: '/personal-blog', label: 'details' })
     const link = c.querySelector('a.onward') as HTMLAnchorElement
-    expect(link.getAttribute('href')).toBe('/bean/details')
+    expect(link.getAttribute('href')).toBe('/personal-blog')
     const order = [...c.querySelectorAll('[data-block], a.onward')].map((el) => el.getAttribute('data-block') ?? 'onward')
     expect(order).toEqual(['h', 'onward', 'a'])
   })
 
   it('lên đầu trang khi trang không mở bằng hero', () => {
-    const c = view([about], { href: '/bean/details', label: 'details' })
+    const c = view([about], { href: '/personal-blog', label: 'details' })
     const order = [...c.querySelectorAll('[data-block], a.onward')].map((el) => el.getAttribute('data-block') ?? 'onward')
     expect(order).toEqual(['onward', 'a'])
   })
