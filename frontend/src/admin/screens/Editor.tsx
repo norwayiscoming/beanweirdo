@@ -334,6 +334,23 @@ function EditorContent({ postId }: { postId: string }) {
       : 'Đã đăng · sửa gì cũng chỉ lưu nháp cho tới khi bấm Đăng'
     : `Tự lưu nháp khi rời khỏi ô soạn · trạng thái hiện tại: ${post.status}`
 
+  /** Waits for the saves in flight, publishes, says so, and goes back to the list. Rethrows a failure. */
+  async function publish() {
+    if (publishing) return
+    setPublishing(true)
+    const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
+    try {
+      await Promise.allSettled([...inFlight.current])
+      await transitionStatus(postId, 'publish')
+      card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
+      nav.goCms()
+    } catch (e) {
+      card.fail(e)
+      setPublishing(false)
+      throw e
+    }
+  }
+
   // Optimistic local update + fire-and-forget remote save. Functional
   // setState keeps this safe against the stale-closure bug this screen used
   // to have around hero uploads: every callback below reads the latest
@@ -562,23 +579,9 @@ function EditorContent({ postId }: { postId: string }) {
           */}
         <Button
           level="primary"
-          onClick={async () => {
-            if (published && !pending) {
-              toast.info('Không có thay đổi nào chưa đăng')
-              return
-            }
-            if (publishing) return
-            setPublishing(true)
-            const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
-            try {
-              await Promise.allSettled([...inFlight.current])
-              await transitionStatus(postId, 'publish')
-              card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
-              nav.goCms()
-            } catch (e) {
-              card.fail(e)
-              setPublishing(false)
-            }
+          onClick={() => {
+            if (published && !pending) toast.info('Không có thay đổi nào chưa đăng')
+            else void publish().catch(() => {})
           }}
           disabled={publishing}
         >
@@ -597,6 +600,9 @@ function EditorContent({ postId }: { postId: string }) {
         canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(postId)}
         onPatch={applyPatch}
+        onSave={async () => void (await Promise.all([...inFlight.current]))}
+        publishLabel={published ? (pending ? 'Đăng thay đổi' : null) : post.status === 'draft' ? 'Publish' : null}
+        onPublish={publish}
         onSlug={async (slug) => {
           try {
             const saved = await updatePost(postId, { slug })
