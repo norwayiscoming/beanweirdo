@@ -59,7 +59,7 @@ function joins(open: Kind, next: Kind, afterBlank: boolean): boolean {
  * Dải rỗng vẫn cho **một** khối: mặt soạn rỗng vẫn vẽ một đoạn văn trống, và
  * chỗ gọi cần một chỗ để chèn vào.
  */
-export function mdBlocks(text: string): string[] {
+function mdBlocks(text: string): string[] {
   const out: string[] = []
   let open: Kind | null = null
   let blank = false

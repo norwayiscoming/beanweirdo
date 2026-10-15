@@ -30,12 +30,9 @@ export type ReportProps = ReportOverrides & {
    * `PostRenderer`.
    */
   mobile?: boolean
-  /**
-   * The trail back to where this post is filed. Supplied by the app, so the
-   * renderer package stays independent of how routing works.
-   */
-  breadcrumb?: ReactNode
-  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  /** The page's own head; replaces the band and title. See `ArticleProps.head`. */
+  head?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `head`. */
   footer?: ReactNode
   post: ReportPostData
 }
@@ -59,13 +56,13 @@ function columnWidth(post: ReportPostData): number {
  * of a report's blocks — the admin app's insert-menu / contentEditable
  * editing chrome is not part of this shared package.
  */
-export function Report({ post, breadcrumb, footer, mobile = false, ...overrides }: ReportProps) {
+export function Report({ post, head, footer, mobile = false, ...overrides }: ReportProps) {
   const palette = paletteFrom(post.band?.bg ?? REPORT_BLUE, post.band?.fg)
   return (
     <div style={{ background: paper.cream, color: ink.base, minHeight: '100vh' }}>
+      {head === undefined && (
       <div style={{ background: palette.accent, color: palette.onAccent, padding: mobile ? '28px 20px 26px' : '44px 56px 40px' }}>
         <div style={frame(columnWidth(post))}>
-        {breadcrumb}
         <div
           style={{
             display: 'flex',
@@ -98,8 +95,9 @@ export function Report({ post, breadcrumb, footer, mobile = false, ...overrides 
         </div>
         </div>
       </div>
+      )}
 
-      <ReportBody post={post} palette={palette} overrides={overrides} mobile={mobile} footer={footer} />
+      <ReportBody post={post} palette={palette} overrides={overrides} mobile={mobile} footer={footer} head={head} />
     </div>
   )
 }
@@ -123,12 +121,14 @@ function ReportBody({
   overrides,
   mobile,
   footer,
+  head,
 }: {
   post: ReportPostData
   palette: Palette
   overrides: ReportOverrides
   mobile?: boolean
   footer?: ReactNode
+  head?: ReactNode
 }) {
   const notes = post.notes
   const withNotes = hasNotes(notes)
@@ -141,6 +141,7 @@ function ReportBody({
 
   return (
     <div style={{ padding: mobile ? '28px 20px 96px' : '44px 56px 96px' }}>
+    {head !== undefined && <div style={frame(columnWidth(post))}>{head}</div>}
     <div
       style={{
         ...frame(columnWidth(post)),

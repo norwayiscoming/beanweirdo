@@ -63,12 +63,6 @@ export function notesOn(notes: PostNotes | undefined, blockId: string | undefine
   return liveFieldNotes(notes).filter((n) => n.anchor === blockId)
 }
 
-/** Notes whose block is gone — the editor asks the writer where to put these. */
-export function orphanNotes(notes: PostNotes | undefined, blockIds: string[]): FieldNote[] {
-  const alive = new Set(blockIds)
-  return liveFieldNotes(notes).filter((n) => !alive.has(n.anchor))
-}
-
 /** True when anything at all is written — decides whether the column draws. */
 export function hasNotes(notes: PostNotes | undefined): boolean {
   return liveExplorations(notes).length > 0 || liveFieldNotes(notes).length > 0

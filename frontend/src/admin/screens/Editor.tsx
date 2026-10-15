@@ -3773,7 +3773,7 @@ function entriesFor(filter: string, mode: 'all' | 'things') {
 }
 
 /** Các mục của menu, phẳng, đúng thứ tự vẽ — để bàn phím đếm được mục thứ mấy. */
-export function menuNames(filter: string, mode: 'all' | 'things'): string[] {
+function menuNames(filter: string, mode: 'all' | 'things'): string[] {
   return entriesFor(filter, mode).flatMap((g) => g.items.map((e) => e.name))
 }
 

@@ -64,7 +64,7 @@ function depths(lines: Line[]): Map<number, number> {
  * Pasted text as list items, or `null` when there is nothing a list can do
  * better than the field itself — one plain line is just typing.
  */
-export function pastedToItems(text: string): PastedList | null {
+function pastedToItems(text: string): PastedList | null {
   const lines = text.replace(/\r\n?/g, '\n').split('\n').map(read).filter((l): l is Line => l !== null)
   if (lines.length === 0) return null
   if (lines.length === 1 && !lines[0].marked) return null
