@@ -22,6 +22,7 @@ import {
   type Variant,
 } from './lib/nav'
 import { Editor } from './admin/screens/Editor'
+import { AdminShell } from './admin/AdminShell'
 import { NewPostDialog } from './admin/components/NewPostDialog'
 import { Preview } from './admin/screens/Preview'
 import { Archive } from './screens/Archive'
@@ -208,7 +209,15 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
     )
   }
 
-  const body = (
+  // The back office wears its own frame (AdminShell) instead of the site's rail.
+  const admin = shown === 'cms' || shown === 'postEdit' || shown === 'postPreview'
+  const body = admin ? (
+    <AdminShell>
+      {shown === 'cms' && <Cms />}
+      {shown === 'postEdit' && postId && <Editor postId={postId} />}
+      {shown === 'postPreview' && postId && <Preview postId={postId} />}
+    </AdminShell>
+  ) : (
     /*
      * Trên mobile không có rail bên trái để tránh, mà có thanh dưới để tránh.
      * `paddingBottom` là bắt buộc: thiếu nó thì đoạn cuối mỗi trang chui xuống
@@ -221,9 +230,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       {shown === 'home' && <IndexScreen />}
       {shown === 'module' && <ModuleScreen />}
       {shown === 'archive' && <Archive />}
-      {shown === 'cms' && <Cms />}
-      {shown === 'postEdit' && postId && <Editor postId={postId} />}
-      {shown === 'postPreview' && postId && <Preview postId={postId} />}
     </div>
   )
 
@@ -241,7 +247,7 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       >
         {isPrivate(area) ? (
           <AuthGate>
-            <Sidebar />
+            {!admin && <Sidebar />}
             {body}
             {/* Bên trong AuthGate: nó ghi vào database, nên nó chỉ tồn tại ở
                 nơi đã đăng nhập, y như trước khi nó còn là một trang. */}

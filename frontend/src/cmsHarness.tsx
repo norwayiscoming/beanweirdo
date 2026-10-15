@@ -180,6 +180,7 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Res
 }
 
 const { Cms } = await import('./screens/Cms')
+const { AdminShell } = await import('./admin/AdminShell')
 const { Editor } = await import('./admin/screens/Editor')
 const { NavContext } = await import('./lib/nav')
 const { ToastProvider } = await import('./design/Toaster')
@@ -199,7 +200,7 @@ createRoot(document.getElementById('root')!).render(
   <NavContext.Provider value={nav}>
     <ToastProvider>
       {/* `?screen=edit` opens the post editor on the first post instead; `?screen=new` the "Bài mới" dialog. */}
-      {new URLSearchParams(location.search).get('screen') === 'edit' ? <Editor postId="p-a" /> : <Cms />}
+      <AdminShell>{new URLSearchParams(location.search).get('screen') === 'edit' ? <Editor postId="p-a" /> : <Cms />}</AdminShell>
       <NewPostDialog open={new URLSearchParams(location.search).get('screen') === 'new'} onClose={nop} onCreated={nop} />
     </ToastProvider>
   </NavContext.Provider>,

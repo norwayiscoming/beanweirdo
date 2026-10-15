@@ -37,18 +37,18 @@ export function DisplaySettings({
   const [site, setSite] = useRememberedTab('beanweirdo.display.site', SITES)
   return (
     <div>
-      <div style={{ margin: '26px 56px 0' }}>
+      <div style={{ margin: '26px 28px 0' }}>
         <SiteTabs tabs={SITES} labels={SITE_LABELS} value={site} onChange={setSite} />
       </div>
       {site === 'blog' ? (
         <>
           <BlogDesignPanel stored={design ?? {}} onSave={onSaveDesign} />
-          <div style={{ padding: '6px 56px 130px', maxWidth: 1180 }}>{blog}</div>
+          <div style={{ padding: '6px 28px 130px', maxWidth: 1180 }}>{blog}</div>
         </>
       ) : site === 'port' ? (
         <PortDesign />
       ) : (
-        <div style={{ padding: '26px 56px 130px', maxWidth: 1180 }}>{routes}</div>
+        <div style={{ padding: '26px 28px 130px', maxWidth: 1180 }}>{routes}</div>
       )}
     </div>
   )
@@ -56,7 +56,7 @@ export function DisplaySettings({
 
 function PortDesign() {
   const port = usePortAdmin()
-  if (port.error) return <div style={{ padding: '20px 56px', fontFamily: sans, fontSize: 12.5, color: '#8E1E42' }}>{port.error}</div>
+  if (port.error) return <div style={{ padding: '20px 28px', fontFamily: sans, fontSize: 12.5, color: '#8E1E42' }}>{port.error}</div>
   if (!port.loaded) return null
   return <DesignTab stored={port.stored} setStored={port.setStored} design={port.design} />
 }
@@ -121,7 +121,7 @@ function BlogDesignPanel({ stored, onSave }: { stored: BlogDesign; onSave: (patc
 
   // Port's layout, half for half: the page on the left, the tokens on the right.
   return (
-    <div ref={root} style={{ display: 'grid', gridTemplateColumns: stacked ? 'minmax(0,1fr)' : split.columns, alignItems: 'start', marginTop: 16 }}>
+    <div ref={root} style={{ display: 'grid', gridTemplateColumns: stacked ? 'minmax(0,1fr)' : split.columns, alignItems: 'start', margin: '16px 28px 0' }}>
       <div style={{ background: paper.white, border: `1px solid ${desk.line}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging ? 'none' : undefined, ...(stacked ? { height: '55vh', order: 2 } : { height: 'calc(100vh - 220px)', position: 'sticky', top: 0 }) }}>
         <ScaledPreview>
           <iframe ref={frame} title="xem trước Personal Blog" src="/" onLoad={dress} style={{ width: '100%', height: '100%', border: 0, display: 'block' }} />
