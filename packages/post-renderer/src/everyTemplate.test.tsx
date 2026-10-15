@@ -21,7 +21,7 @@ import { POST_TEMPLATES } from '../../../backend/lib/posts'
  */
 
 const BAND = { bg: 'rgb(1, 2, 3)', fg: 'rgb(4, 5, 6)' }
-const CRUMB = <div>đường-quay-lại</div>
+const HEAD = <div>đầu-trang-riêng</div>
 
 const CASES: Record<string, PostRendererProps> = {
   article: {
@@ -62,13 +62,13 @@ describe('rules every template obeys', () => {
   })
 
   for (const name of Object.keys(CASES)) {
-    it(`${name}: shows the trail back`, () => {
-      render(<PostRenderer {...CASES[name]} breadcrumb={CRUMB} />)
-      expect(screen.getByText('đường-quay-lại')).toBeInTheDocument()
+    it(`${name}: draws a page's own head in place of its title`, () => {
+      render(<PostRenderer {...CASES[name]} head={HEAD} />)
+      expect(screen.getByText('đầu-trang-riêng')).toBeInTheDocument()
     })
 
     it(`${name}: wears its module's colours`, () => {
-      const { container } = render(<PostRenderer {...CASES[name]} breadcrumb={CRUMB} />)
+      const { container } = render(<PostRenderer {...CASES[name]} />)
       const painted = Array.from(container.querySelectorAll<HTMLElement>('div')).some(
         (d) => d.style.background === BAND.bg || d.style.backgroundColor === BAND.bg,
       )

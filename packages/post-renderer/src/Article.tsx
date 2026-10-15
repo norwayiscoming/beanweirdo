@@ -72,11 +72,13 @@ export type ArticleProps = ArticleOverrides & {
    */
   mobile?: boolean
   /**
-   * The trail back to where this post is filed. Supplied by the app, so the
-   * renderer package stays independent of how routing works.
+   * The page's own head (cover, title, properties), supplied by a page that
+   * draws them itself — the post page shared by every site. Given one, the
+   * template drops its coloured band and title and puts this at the top of
+   * its text column, so the head lines up with the words below it.
    */
-  breadcrumb?: ReactNode
-  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  head?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `head`. */
   footer?: ReactNode
   post: ArticlePostData
 }
@@ -88,12 +90,16 @@ export type ArticleProps = ArticleOverrides & {
  * of the piece. Ported from frontend/src/screens/Article.tsx, parameterized
  * over `post` instead of the static article/articleMeta content modules.
  */
-export function Article({ post, breadcrumb, footer, mobile = false, ...overrides }: ArticleProps) {
+export function Article({ post, head, footer, mobile = false, ...overrides }: ArticleProps) {
   // Store elements paint themselves from the module's colours, the same way
   // they do on every other template; the band's fallback is repeated below.
   const palette = paletteFrom(post.band?.bg ?? garden.leaf, post.band?.fg)
+  // Under a page's own head the side column goes under the text, as on a
+  // phone: the page keeps one reading column, with its own rail on the left.
+  const stacked = mobile || head !== undefined
   return (
     <div>
+      {head === undefined && (
       <div
         style={{
           // The module's own colours, so a biochem essay and a sensory one do
@@ -117,7 +123,6 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
           * hero plate keep to the frame, so both line up with the body below.
           */}
         <div style={{ ...frame(layout.measure - 112), position: 'relative' }}>
-        {breadcrumb}
         <div style={{ ...label, opacity: 0.7, marginBottom: 24 }}>
           {overrides.renderEyebrow ? overrides.renderEyebrow(post.moduleTitle) : `← ${post.moduleTitle}`}
         </div>
@@ -202,8 +207,9 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
         </div>
         </div>
       </div>
+      )}
 
-      <div style={{ padding: '56px 56px 140px', maxWidth: layout.measure, margin: '0 auto' }}>
+      <div style={head === undefined ? { padding: '56px 56px 140px', maxWidth: layout.measure, margin: '0 auto' } : { ...frame(layout.reading), padding: mobile ? '28px 20px 96px' : '48px 0 140px' }}>
         <div
           style={{
             display: 'grid',
@@ -211,7 +217,7 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
              * B47 — cột phụ tháo xuống cuối bài. Cột 200–260px cạnh một cột
              * chữ trên màn 390 thì cả hai đều không đọc được.
              */
-            gridTemplateColumns: mobile
+            gridTemplateColumns: stacked
               ? 'minmax(0,1fr)'
               : `minmax(0,1fr) minmax(${layout.railMin}px,${layout.railMax}px)`,
             gap: 48,
@@ -219,7 +225,11 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
           }}
         >
           <div>
-            {/* two plates of unequal height, bottom-aligned to a common edge */}
+            {head}
+            {/* Under a page's own head an empty plate is not drawn: the reader
+                would see a placeholder, not a picture. */}
+            {(head === undefined || post.platePrimary.imageUrl || post.plateSecondary.imageUrl) && (
+            /* two plates of unequal height, bottom-aligned to a common edge */
             <div
               style={{
                 display: 'grid',
@@ -270,6 +280,7 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
                 />
               </div>
             </div>
+            )}
 
             {post.sections.map((s, i) => {
               /*
@@ -369,7 +380,10 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             {footer}
           </div>
 
+          {/* Under a page's own head the side column keeps only the pull quote:
+              the module's neighbours and its detail plate belong to the blog. */}
           <div style={{ position: 'sticky', top: 44, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {(head === undefined || post.pull.trim() !== '') && (
             <div
               style={{
                 background: ink.moss,
@@ -383,6 +397,10 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
             >
               {overrides.renderPullQuote ? overrides.renderPullQuote(post.pull) : post.pull}
             </div>
+            )}
+
+            {head === undefined && (
+            <>
 
             <div style={{ borderTop: `2px solid ${ink.base}`, paddingTop: 14 }}>
               <div style={{ ...label, color: ink.muted, marginBottom: 8 }}>{post.relatedHeading}</div>
@@ -432,6 +450,8 @@ export function Article({ post, breadcrumb, footer, mobile = false, ...overrides
                 </div>
               ))}
             </div>
+            </>
+            )}
           </div>
         </div>
       </div>

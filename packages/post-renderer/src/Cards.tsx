@@ -36,12 +36,9 @@ export type CardsProps = CardsOverrides & {
    * `PostRenderer`.
    */
   mobile?: boolean
-  /**
-   * The trail back to where this post is filed. Supplied by the app, so the
-   * renderer package stays independent of how routing works.
-   */
-  breadcrumb?: ReactNode
-  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  /** The page's own head; replaces the band and title. See `ArticleProps.head`. */
+  head?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `head`. */
   footer?: ReactNode
   post: CardsPostData
 }
@@ -144,7 +141,7 @@ function groupsOf(cards: CardData[], hues: Record<string, string> = {}): Group[]
 /** What sits between the side margins: the card list and its contents column. */
 const CONTENT_W = 1208
 
-export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }: CardsProps) {
+export function Cards({ post, head, footer, mobile = false, ...overrides }: CardsProps) {
   const [openIndexes, setOpenIndexes] = useState<Set<number>>(() => new Set())
   const [activeGroup, setActiveGroup] = useState<string | null>(null)
   const [hoverCard, setHoverCard] = useState<number | null>(null)
@@ -178,6 +175,11 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
 
   return (
     <div style={{ background: paper.cream, color: ink.base, minHeight: '100vh' }}>
+      {head !== undefined ? (
+        <div style={{ padding: mobile ? '28px 20px 4px' : '40px 56px 24px' }}>
+          <div style={frame(CONTENT_W)}>{head}</div>
+        </div>
+      ) : (
       <div
         style={{
           background: post.band?.bg ?? '#E4F0DF',
@@ -186,7 +188,6 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
         }}
       >
         <div style={frame(CONTENT_W)}>
-        {breadcrumb}
         <div
           style={{
             display: 'flex',
@@ -221,6 +222,7 @@ export function Cards({ post, breadcrumb, footer, mobile = false, ...overrides }
         </div>
         </div>
       </div>
+      )}
 
       <div
         style={{

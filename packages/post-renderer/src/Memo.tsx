@@ -63,12 +63,9 @@ type MemoProps = MemoOverrides & {
    */
   mobile?: boolean
   post: MemoPostData
-  /**
-   * The trail back to where this post is filed. Supplied by the app, so the
-   * renderer package stays independent of how routing works.
-   */
-  breadcrumb?: ReactNode
-  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  /** The page's own head; replaces the band and title. See `ArticleProps.head`. */
+  head?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `head`. */
   footer?: ReactNode
 }
 
@@ -199,7 +196,7 @@ const MEMO_VIEWS: Record<
  */
 export function Memo({
   post,
-  breadcrumb,
+  head,
   footer,
   mobile = false,
   renderTitle,
@@ -216,15 +213,15 @@ export function Memo({
     <div style={{ background: '#FCFCFA', color: '#172124', minHeight: '100vh', fontFamily: sans, fontWeight: 300 }}>
       {/* A memo is short and deliberately plain, so it gets the shallow band
           too — enough to say where it is filed, not enough to crowd the note. */}
-      <div
-        style={{
-          background: palette.accent,
-          color: palette.onAccent,
-          padding: mobile ? '18px 20px 16px' : '22px 56px 20px',
-        }}
-      >
-        <div style={frame(layout.reading)}>{breadcrumb}</div>
-      </div>
+      {head === undefined && (
+        <div
+          style={{
+            background: palette.accent,
+            color: palette.onAccent,
+            padding: mobile ? '18px 20px 16px' : '22px 56px 20px',
+          }}
+        />
+      )}
       <div style={{ padding: '40px 56px 0' }}>
         <div
           style={{
@@ -238,10 +235,14 @@ export function Memo({
             gridTemplateColumns: 'minmax(0,1fr)',
             gap: 28,
             alignItems: 'end',
-            borderBottom: `1px solid ${palette.ink}`,
-            paddingBottom: 26,
+            // The page's head closes on its own rule; a second one under it reads as a gap.
+            borderBottom: head === undefined ? `1px solid ${palette.ink}` : undefined,
+            paddingBottom: head === undefined ? 26 : 0,
           }}
         >
+          {head !== undefined ? (
+            <div>{head}</div>
+          ) : (
           <div>
             <h1
           lang="en"
@@ -274,6 +275,7 @@ export function Memo({
               </div>
             )}
           </div>
+          )}
 
           {post.specs && post.specs.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 6 }}>
@@ -299,7 +301,8 @@ export function Memo({
         </div>
       </div>
 
-      {(post.img || renderPlateAction) && (
+      {/* Under the page's head the cover is already drawn there. */}
+      {head === undefined && (post.img || renderPlateAction) && (
         <div style={{ padding: '30px 56px 0' }}>
           <div style={frame(layout.reading)}>
           {/*

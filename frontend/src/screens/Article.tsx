@@ -1,7 +1,7 @@
 import { PostRenderer } from 'post-renderer'
 import { useIsMobile } from '../lib/useIsMobile'
 import { usePost } from '../data/usePost'
-import { readMinutes } from '../lib/postText'
+import { postTitle, readMinutes } from '../lib/postText'
 import {
   toArticleData,
   toBitesizeData,
@@ -14,8 +14,8 @@ import { findPage, useModules, usePagePosts } from '../data/useModules'
 import { ink, sans } from '../design/tokens'
 import { useNav } from '../lib/nav'
 import { usePostAuthors } from '../data/usePostAuthors'
-import { AuthorCard, PostProps } from '../components/Byline'
-import { openModule } from '../lib/moduleTarget'
+import { AuthorCard } from '../components/Byline'
+import { PostHead } from '../components/PostHead'
 import { shownOn } from '../portfolio/blocks'
 import { PostRail, type Homes } from './PostRail'
 
@@ -37,7 +37,7 @@ const status = {
  */
 /**
  * A post, in whichever of the 3 real templates it's stored as. Data comes
- * from Supabase (`posts` + its module + its siblings), the actual rendering
+ * from Supabase (`posts` + its module), the actual rendering
  * goes entirely through `post-renderer` for true WYSIWYG parity with the
  * admin app's preview.
  *
@@ -61,8 +61,6 @@ export function Article({ homes }: { homes?: Homes } = {}) {
 
   const { data: post, loading, error } = usePost(effectivePostId)
   const authors = usePostAuthors(effectivePostId)
-  // Its neighbours are the posts of the page it is filed under, in that page's order.
-  const siblings = usePagePosts(findPage(modules, post?.module_id)?.id)
 
   if (needsFallback && fallback.loading) {
     return <div style={status}>Đang tải…</div>
@@ -82,10 +80,14 @@ export function Article({ homes }: { homes?: Homes } = {}) {
 
   const module_ = findPage(modules, post.module_id)
   const moduleTitle = module_?.title ?? post.module_id
-  // Every template gets the same properties under its title. The renderer
-  // package knows nothing about the site, so the app hands it the finished element.
-  const crumbs = (
-    <PostProps
+  // Every template opens with the same head: cover, title, properties. The
+  // renderer package knows nothing about the site, so the app hands it the
+  // finished element and the template draws only the body under it.
+  const head = (
+    <PostHead
+      title={postTitle(post)}
+      lead={post.lead}
+      cover={post.hero_image_url}
       authors={authors}
       topic={module_?.title}
       tags={tagsOf?.(post.id) ?? []}
@@ -96,45 +98,25 @@ export function Article({ homes }: { homes?: Homes } = {}) {
     />
   )
   const footer = <AuthorCard authors={authors} />
-  const related = siblings.data.filter((p) => p.id !== post.id)
-  const position = siblings.data.findIndex((p) => p.id === post.id)
 
   const body =
     post.template === 'bitesize' ? (
-      <PostRenderer template="bitesize" post={toBitesizeData(post, { mod: module_, tag: tagsOf?.(post.id)[0]?.label })} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+      <PostRenderer template="bitesize" post={toBitesizeData(post, { mod: module_, tag: tagsOf?.(post.id)[0]?.label })} head={head} footer={footer} mobile={mobile} />
     ) : post.template === 'memo' ? (
-      <PostRenderer template="memo" post={toMemoData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+      <PostRenderer template="memo" post={toMemoData(post, module_)} head={head} footer={footer} mobile={mobile} />
     ) : post.template === 'longform' ? (
-      <PostRenderer template="longform" post={toLongformData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+      <PostRenderer template="longform" post={toLongformData(post, module_)} head={head} footer={footer} mobile={mobile} />
     ) : post.template === 'cards' ? (
-      <PostRenderer template="cards" post={toCardsData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+      <PostRenderer template="cards" post={toCardsData(post, module_)} head={head} footer={footer} mobile={mobile} />
     ) : post.template === 'report' ? (
-      <PostRenderer template="report" post={toReportData(post, module_)} breadcrumb={crumbs} footer={footer} mobile={mobile} />
+      <PostRenderer template="report" post={toReportData(post, module_)} head={head} footer={footer} mobile={mobile} />
     ) : (
       <PostRenderer
         mobile={mobile}
         template="article"
-        post={toArticleData(post, moduleTitle, related, position, module_)}
-        breadcrumb={crumbs}
+        post={toArticleData(post, moduleTitle, [], -1, module_)}
+        head={head}
         footer={footer}
-        renderEyebrow={(eyebrowModuleTitle) => (
-          // Through moduleTarget, like the index: Ghi 01 and Ghi 02 have their
-          // own screens, and the generic module page is a second, wrong door.
-          <span onClick={() => (module_ ? openModule(nav, module_) : nav.openModule(post.module_id))} style={{ cursor: 'pointer' }}>
-            ← {eyebrowModuleTitle}
-          </span>
-        )}
-        renderRelatedItem={(label, i) => {
-          const sibling = related[i]
-          return (
-            <span
-              onClick={sibling ? () => nav.openArticle(sibling.id, nav.articleFrom) : undefined}
-              style={{ cursor: sibling ? 'pointer' : 'default' }}
-            >
-              {label}
-            </span>
-          )
-        }}
       />
     )
 

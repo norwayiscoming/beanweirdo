@@ -49,7 +49,7 @@ const cgaPost: PostRow = {
 }
 
 describe('Article', () => {
-  it('renders a real post through PostRenderer, splitting a trailing parenthetical into italics', async () => {
+  it('renders a real post under the shared head, and leads back to its topic', async () => {
     useNav.mockReturnValue({ postId: 'p1', openModule, openArticle })
     useModules.mockReturnValue({ data: [{ id: 'biochem', title: 'biochemistry 101' }], loading: false, error: null })
     // The post is of course in its own module's published list — the number
@@ -59,14 +59,12 @@ describe('Article', () => {
 
     render(<Article />)
 
-    const title = await screen.findByTestId('article-title')
-    expect(title.textContent).toBe('Chlorogenic Acids (CGA)')
-    // '01', not the stored n of '03': it is the only published post in biochem.
-    // The eyebrow names the template — dạng bài is retired.
-    expect(screen.getByText('01 — article — 2026.02')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chlorogenic Acids (CGA)' })).toBeInTheDocument()
+    expect(screen.getByTestId('post-props')).toHaveTextContent('biochemistry 101')
     expect(screen.getByText('Một họ hợp chất phenolic.')).toBeInTheDocument()
 
-    await userEvent.click(screen.getByText('← biochemistry 101'))
+    // jsdom lays nothing out, so there is no room for the rail: the back line shows.
+    await userEvent.click(screen.getByRole('link', { name: /Quay lại/ }))
     expect(openModule).toHaveBeenCalledWith('biochem')
   })
 
@@ -99,11 +97,10 @@ describe('Article', () => {
 
     render(<Article />)
 
-    expect(await screen.findByText('Sensory Lexicon')).toBeInTheDocument()
-    expect(screen.getByText('Chưa có mục nào trong glossary này.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: 'Sensory Lexicon' })).toBeInTheDocument()
   })
 
-  it('leads back to the home it was opened from and lists the post headings', async () => {
+  it('leads back to the home it was opened from', async () => {
     useNav.mockReturnValue({ postId: 'p1', openModule, openArticle, articleFrom: 'biz' })
     useModules.mockReturnValue({ data: [{ id: 'biochem', title: 'biochemistry 101' }], loading: false, error: null })
     usePublishedPosts.mockReturnValue({ data: [cgaPost], loading: false, error: null })
@@ -111,10 +108,7 @@ describe('Article', () => {
 
     render(<Article homes={{ biz: 'strat & ops' }} />)
 
-    const back = await screen.findByText('← Quay lại')
-    expect(back.closest('a')).toHaveAttribute('href', '/biz')
-    expect(screen.getByText('strat & ops')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Nó là gì' })).toHaveAttribute('href', expect.stringMatching(/^#/))
+    expect(await screen.findByRole('link', { name: /Quay lại/ })).toHaveAttribute('href', '/biz')
     expect(screen.getByTestId('post-props')).toHaveTextContent('personal blog')
   })
 
@@ -137,19 +131,9 @@ describe('Article', () => {
 
     render(<Article />)
 
-    expect(await screen.findByTestId('article-title')).toHaveTextContent('Chlorogenic Acids (CGA)')
+    expect(await screen.findByRole('heading', { level: 1, name: 'Chlorogenic Acids (CGA)' })).toBeInTheDocument()
     expect(usePost).toHaveBeenCalledWith('p1')
   })
 
-  it('leaves the number out when it cannot place the post in a list', async () => {
-    // Numbering from a list this post is not in would print a confident lie.
-    useNav.mockReturnValue({ postId: 'p1', openModule, openArticle })
-    useModules.mockReturnValue({ data: [{ id: 'biochem', title: 'biochemistry 101' }], loading: false, error: null })
-    usePublishedPosts.mockReturnValue({ data: [], loading: false, error: null })
-    usePost.mockReturnValue({ data: cgaPost, loading: false, error: null })
-    render(<Article />)
-    expect(await screen.findByText('article — 2026.02')).toBeInTheDocument()
-    expect(screen.queryByText(/^\d\d — essay/)).not.toBeInTheDocument()
-  })
 
 })

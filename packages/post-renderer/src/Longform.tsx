@@ -5,7 +5,7 @@ import { coverStyle, cropStyle, stripFocus } from './focus'
 import { ElementList } from './elements'
 import { paletteFrom, type Palette } from './palette'
 import { PlateCorner, plateHost, type PlateAction } from './plates'
-import { frame, layout, sans, serif, wrapTitle } from './tokens'
+import { layout, sans, serif, wrapTitle } from './tokens'
 import type { LongformBlock, LongformPostData, LongformRun } from './types'
 import { indentOf, normalizeBlocks } from './longformBlocks'
 import { markStyle } from './elements/codeStrike'
@@ -19,11 +19,11 @@ type LongformProps = LongformEdit & {
   mobile?: boolean
   post: LongformPostData
   /**
-   * The trail back to where this post is filed. Supplied by the app, so the
-   * renderer package stays independent of how routing works.
+   * The page's own head; replaces the band, cover, title and the floating
+   * index (the page has its own contents rail). See `ArticleProps.head`.
    */
-  breadcrumb?: ReactNode
-  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  head?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `head`. */
   footer?: ReactNode
 }
 
@@ -398,7 +398,7 @@ const TITLE_GAP = 30
  */
 export function Longform({
   post,
-  breadcrumb,
+  head,
   footer,
   mobile = false,
   renderText,
@@ -483,16 +483,15 @@ export function Longform({
       {/* A long read is still filed somewhere. The band is shallower than the
           other templates' — this page is a document, and a tall colour block
           at the top would push the first paragraph off the screen. */}
-      <div
-        style={{
-          background: palette.accent,
-          color: post.band?.fg ?? '#172124',
-          padding: mobile ? '18px 20px 16px' : '22px 56px 20px',
-        }}
-      >
-        {/* Lines up with the text column below, including the 56px it keeps clear for the index rail. */}
-        <div style={mobile ? undefined : { ...frame(layout.reading + 56), paddingRight: 56 }}>{breadcrumb}</div>
-      </div>
+      {head === undefined && (
+        <div
+          style={{
+            background: palette.accent,
+            color: post.band?.fg ?? '#172124',
+            padding: mobile ? '18px 20px 16px' : '22px 56px 20px',
+          }}
+        />
+      )}
       <div style={{ padding: mobile ? '28px 20px 130px' : '40px 56px 140px' }}>
       {/* Floating index: a rail of numbers that opens on hover. */}
       {/*
@@ -503,6 +502,8 @@ export function Longform({
         * mà không ai vào được. Dưới ngưỡng: dải vạch hẹp 30px, chạm để mở, và
         * một nền mờ phủ trang để chạm ra ngoài là đóng.
         */}
+      {head === undefined && (
+      <>
       {mobile && navOpen && (
         <div
           onClick={() => setNavOpen(false)}
@@ -656,6 +657,9 @@ export function Longform({
         </div>
       </div>
 
+      </>
+      )}
+
       {/*
         * B42 — cột chữ. Trên điện thoại bỏ căn giữa và bỏ chỗ chừa cho dải mục
         * lục bên phải: `paddingRight: 56` ở đó là để né dải ấy, mà dải trên
@@ -665,11 +669,12 @@ export function Longform({
         style={
           mobile
             ? { padding: '30px 20px 130px' }
-            : { display: 'grid', gridTemplateColumns: `minmax(0,${layout.reading}px)`, justifyContent: 'center', paddingRight: 56 }
+            : { display: 'grid', gridTemplateColumns: `minmax(0,${layout.reading}px)`, justifyContent: 'center', paddingRight: head === undefined ? 56 : 0 }
         }
       >
         <div>
-          {post.cover && (
+          {head}
+          {head === undefined && post.cover && (
             <div
               data-testid="lf-cover"
               style={{ ...coverStyle(post.cover), aspectRatio: '1200 / 628', margin: `0 0 ${TITLE_GAP + 10}px` }}
@@ -684,7 +689,7 @@ export function Longform({
             * có sẵn `h1` nên không lộ, nhưng chỉ cần xoá hết tiêu đề là gặp; và
             * một bài dán từ nguồn không có tiêu đề thì gặp ngay từ đầu.
             */}
-          {!prepared.some((p) => p.block.k === 'h1') && (
+          {head === undefined && !prepared.some((p) => p.block.k === 'h1') && (
             <>
               <h1 lang="en" style={{ ...wrapTitle, fontFamily: serif, fontWeight: 400, fontSize: 70, lineHeight: 0.94, letterSpacing: '-.03em', color: '#172124', margin: `0 0 ${post.subtitle ? 8 : TITLE_GAP}px` }}>
                 {post.title}
@@ -705,6 +710,8 @@ export function Longform({
             const isFolded = Boolean(folded[selfId]) || (b.k === 'h2' && parentFolded)
             const pad = padOf(b)
             const title = p.h1Index === 0
+            // The page's head already carries the title and subtitle.
+            if (title && head !== undefined) return null
             /*
              * Khoảng dưới khối tên bài. Bản export gốc luôn có một dòng `meta`
              * ngay dưới tên, và dòng ấy tự mang 26px xuống thân bài; bài nhân

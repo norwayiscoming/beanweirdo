@@ -5,7 +5,8 @@ import { listModulesCached } from '../lib/lists'
 import { ink, paper } from '../../design/tokens'
 import { Hover } from '../../lib/Hover'
 import type { AuthorRef } from 'api-contract'
-import { AuthorCard, PostProps } from '../../components/Byline'
+import { AuthorCard } from '../../components/Byline'
+import { PostHead } from '../../components/PostHead'
 import { shownOn } from '../../portfolio/blocks'
 import { readMinutes } from '../../lib/postText'
 import { useNav } from '../../lib/nav'
@@ -56,9 +57,12 @@ function PreviewContent({ postId }: { postId: string }) {
   const template = resolveTemplate(post)
   const mod = modules.find((m) => m.id === post.module_id)
   const source = post
-  // Same properties and author card as the public page, so the preview shows what readers will.
-  const breadcrumb = (
-    <PostProps
+  // Same head and author card as the public page, so the preview shows what readers will.
+  const head = (
+    <PostHead
+      title={post.en}
+      lead={post.lead}
+      cover={post.hero_image_url}
       authors={authors}
       topic={mod?.title}
       shownOn={shownOn(post)}
@@ -96,18 +100,18 @@ function PreviewContent({ postId }: { postId: string }) {
             Two of the five used to fall through to `article` here, so a memo
             previewed as an essay. */}
         {template === 'cards' ? (
-          <PostRenderer template="cards" breadcrumb={breadcrumb} footer={footer} post={toCardsData(source, mod)} />
+          <PostRenderer template="cards" head={head} footer={footer} post={toCardsData(source, mod)} />
         ) : template === 'report' ? (
-          <PostRenderer template="report" breadcrumb={breadcrumb} footer={footer} post={toReportData(source, mod)} />
+          <PostRenderer template="report" head={head} footer={footer} post={toReportData(source, mod)} />
         ) : template === 'longform' ? (
-          <PostRenderer template="longform" breadcrumb={breadcrumb} footer={footer} post={toLongformData(source, mod)} />
+          <PostRenderer template="longform" head={head} footer={footer} post={toLongformData(source, mod)} />
         ) : template === 'bitesize' ? (
-          <PostRenderer template="bitesize" breadcrumb={breadcrumb} footer={footer} post={toBitesizeData(source, { mod })} />
+          <PostRenderer template="bitesize" head={head} footer={footer} post={toBitesizeData(source, { mod })} />
         ) : template === 'memo' ? (
-          <PostRenderer template="memo" breadcrumb={breadcrumb} footer={footer} post={toMemoData(source, mod)} />
+          <PostRenderer template="memo" head={head} footer={footer} post={toMemoData(source, mod)} />
         ) : (
           <PostRenderer
-            template="article" breadcrumb={breadcrumb} footer={footer}
+            template="article" head={head} footer={footer}
             post={toArticleData(source, mod?.title ?? post.module_id, [], -1, mod)}
           />
         )}

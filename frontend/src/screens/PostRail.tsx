@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type MouseEvent, type 
 import { useNav, type Nav, type Origin } from '../lib/nav'
 import { toPath } from '../lib/routes'
 import { openModule } from '../lib/moduleTarget'
-import { SITE_CHIPS } from '../components/Byline'
+import { SITE_CHIPS } from '../components/PostHead'
 import type { PageRow } from '../data/useModules'
 import { sans } from '../design/tokens'
 
@@ -43,10 +43,15 @@ function backOf(from: Origin, nav: Nav, module: PageRow | undefined, homes: Home
 
 type Head = { id: string; text: string }
 
+const RAIL_W = 200
+const RAIL_GAP = 48
+
 /**
  * The post page's left rail (mock "B + cột trái của C"): the way back, then
- * the post's own headings. On a phone the rail gives way to one back link
- * above the post.
+ * the post's own headings, standing just left of the text column. The
+ * templates' text columns differ in width, so where that column starts is
+ * measured, not assumed. With no room beside it (a phone, a wide template on
+ * a narrow screen) the rail gives way to one back link above the post.
  */
 export function PostRail({
   from,
@@ -63,28 +68,51 @@ export function PostRail({
 }) {
   const nav = useNav()
   const back = backOf(from, nav, module, homes)
-  const body = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
   const [heads, setHeads] = useState<Head[]>([])
   const [on, setOn] = useState<string | null>(null)
+  // Where the rail stands: left edge and top, inside `box`. Null: no room;
+  // undefined: not measured yet, when neither the rail nor the back line shows,
+  // so the measuring is not thrown off by a line that is about to go.
+  const [spot, setSpot] = useState<{ left: number; top: number } | null>()
 
   // The headings are read off the rendered post rather than its data: six
-  // templates store sections six ways, but all of them draw h2/h3. The rail is
-  // keyed by post, so reading once on mount is enough.
+  // templates store sections six ways, but all of them draw h1–h3. The page's
+  // own head is left out (it is the title), and so are the fold marks
+  // long-form puts inside its headings. The rail is keyed by post, so reading
+  // once on mount is enough.
   useEffect(() => {
-    const els = Array.from(body.current?.querySelectorAll<HTMLElement>('h2, h3') ?? []).filter((el) => el.textContent?.trim())
+    const root = box.current
+    if (!root) return
+    const els = Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3')).filter(
+      (el) => !el.closest('[data-post-head]') && clean(el.textContent),
+    )
     els.forEach((el, i) => {
       if (!el.id) el.id = `muc-${i + 1}`
     })
-    setHeads(els.map((el) => ({ id: el.id, text: el.textContent!.trim() })))
-    if (!els.length) return
-    const spot = () => {
+    setHeads(els.map((el) => ({ id: el.id, text: clean(el.textContent) })))
+
+    const place = () => {
+      const head = root.querySelector<HTMLElement>('[data-post-head]')
+      if (!head) return setSpot(null)
+      const outer = root.getBoundingClientRect()
+      const at = head.getBoundingClientRect()
+      const left = at.left - outer.left - RAIL_GAP - RAIL_W
+      setSpot(left >= 16 ? { left, top: at.top - outer.top } : null)
+    }
+    const light = () => {
       let at: string | null = null
       for (const el of els) if (el.getBoundingClientRect().top < 120) at = el.id
       setOn(at)
     }
-    spot()
-    window.addEventListener('scroll', spot, { passive: true })
-    return () => window.removeEventListener('scroll', spot)
+    place()
+    light()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', light, { passive: true })
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', light)
+    }
   }, [])
 
   const goBack = (e: MouseEvent) => {
@@ -97,47 +125,49 @@ export function PostRail({
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  if (mobile)
-    return (
-      <div>
-        <a href={back.href} onClick={goBack} style={{ ...backLine, padding: '12px 16px' }}>
+  const beside = !mobile && spot
+  return (
+    <div ref={box} style={{ position: 'relative' }}>
+      {(mobile || spot === null) && (
+        <a href={back.href} onClick={goBack} style={{ ...backLine, padding: mobile ? '12px 20px' : '16px 56px 0' }}>
           <i style={{ ...dot, background: back.color }} />← Quay lại <b style={{ fontWeight: 500, color: 'var(--ink)' }}>{back.site}</b>
         </a>
-        {children}
-      </div>
-    )
-
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '200px minmax(0, 1fr)', columnGap: 32, padding: '0 0 0 32px' }}>
-      <aside aria-label="Trong bài này" style={rail}>
-        <a href={back.href} onClick={goBack} style={{ ...backBlock, borderLeftColor: back.color }}>
-          <small style={{ fontSize: 12 }}>← Quay lại</small>
-          <b style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{back.site}</b>
-          <small style={{ fontSize: 12 }}>{back.home}</small>
-        </a>
-        {heads.length > 0 && (
-          <>
-            <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Trong bài này</span>
-            {heads.map((h) => (
-              <a
-                key={h.id}
-                href={`#${h.id}`}
-                onClick={jump(h.id)}
-                aria-current={on === h.id ? 'location' : undefined}
-                style={{ ...tocLink, color: on === h.id ? 'var(--ink)' : 'var(--ink-2)', borderLeftColor: on === h.id ? back.color : LINE }}
-              >
-                {h.text}
-              </a>
-            ))}
-          </>
-        )}
-      </aside>
-      <div ref={body} style={{ minWidth: 0 }}>
-        {children}
-      </div>
+      )}
+      {children}
+      {beside && (
+        // Absolute, the full height of the post, so the inner box can stick while reading.
+        <div style={{ position: 'absolute', left: spot.left, top: spot.top, bottom: 0, width: RAIL_W }}>
+          <aside aria-label="Trong bài này" style={rail}>
+            <a href={back.href} onClick={goBack} style={{ ...backBlock, borderLeftColor: back.color }}>
+              <small style={{ fontSize: 12 }}>← Quay lại</small>
+              <b style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{back.site}</b>
+              <small style={{ fontSize: 12 }}>{back.home}</small>
+            </a>
+            {heads.length > 0 && (
+              <>
+                <span style={{ fontSize: 11, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--ink-3)', marginTop: 8 }}>Trong bài này</span>
+                {heads.map((h) => (
+                  <a
+                    key={h.id}
+                    href={`#${h.id}`}
+                    onClick={jump(h.id)}
+                    aria-current={on === h.id ? 'location' : undefined}
+                    style={{ ...tocLink, color: on === h.id ? 'var(--ink)' : 'var(--ink-2)', borderLeftColor: on === h.id ? back.color : LINE }}
+                  >
+                    {h.text}
+                  </a>
+                ))}
+              </>
+            )}
+          </aside>
+        </div>
+      )}
     </div>
   )
 }
+
+/** A heading's words without long-form's fold marks (▾ ▸). */
+const clean = (text: string | null) => (text ?? '').replace(/[▾▸]/g, '').trim()
 
 const LINE = 'rgba(127,127,127,.3)'
 
@@ -150,7 +180,6 @@ const rail: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 8,
-  padding: '32px 0',
   fontFamily: sans,
   fontSize: 13,
   lineHeight: 1.45,

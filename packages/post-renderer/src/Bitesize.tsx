@@ -121,8 +121,9 @@ export type BitesizeOverrides = {
 
 export type BitesizeProps = BitesizeOverrides & {
   post: BitesizePostData
-  breadcrumb?: ReactNode
-  /** Closes the reading column — the app's author card. Supplied by the app, like `breadcrumb`. */
+  /** The page's own head; replaces the title and its date line. See `ArticleProps.head`. */
+  head?: ReactNode
+  /** Closes the reading column — the app's author card. Supplied by the app, like `head`. */
   footer?: ReactNode
   mobile?: boolean
 }
@@ -434,7 +435,7 @@ export function BitesizeCard({
  */
 export function Bitesize({
   post,
-  breadcrumb,
+  head,
   footer,
   mobile = false,
   renderTitle,
@@ -461,7 +462,7 @@ export function Bitesize({
    */
   const clipDoc = clip && post.portrait && !mobile
   const clipNgang = clip && !post.portrait && !mobile
-  const title = (
+  const title = head ?? (
     <Title
       post={post}
       size={mobile ? 34 : titleSize(post.len, post.portrait, true)}
@@ -598,8 +599,7 @@ export function Bitesize({
           }}
         />
       ) : null}
-      {breadcrumb}
-      <Meta post={post} wide renderTag={renderTag} renderDate={renderDate} />
+      {head === undefined && <Meta post={post} wide renderTag={renderTag} renderDate={renderDate} />}
       {/*
         * Lề phải của thân bài giữ nguyên một đường từ trên xuống dưới.
         *
