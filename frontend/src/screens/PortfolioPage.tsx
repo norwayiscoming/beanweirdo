@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useNav } from '../lib/nav'
 import { PortAbout, PortHome, PortfolioView } from '../portfolio/PortfolioView'
 import { buildChrome, homeCards, onwardOf, usePortChrome, usePostHref, usePortSources, usePublicPort } from '../portfolio/data'
-import { portPagePath } from '../lib/routes'
+import { portPagePath, portSiteOf } from '../lib/routes'
 
 /**
  * The public portfolio pages: / (main page), /about, the child sites' homes
@@ -18,7 +18,7 @@ export function PortfolioPage() {
   const { page, design, loading } = usePublicPort(nav.slug, nav.portSite)
   const chrome = usePortChrome()
   const src = usePortSources()
-  const postHref = usePostHref()
+  const postHref = usePostHref(page && !chrome.loading ? portSiteOf(page, chrome.pages) : undefined)
 
   // A page opened at another site's address (a home by its slug, /biz-hkd; a
   // bean page under /biz/<slug>, its address before bean had pages) moves to its own.

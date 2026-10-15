@@ -1,7 +1,8 @@
-import type { CSSProperties } from 'react'
-import type { AuthorRef } from 'api-contract'
+import { Fragment, type CSSProperties, type ReactNode } from 'react'
+import type { AuthorRef, PostSite } from 'api-contract'
 import { serif, sans } from '../design/tokens'
 import type { Tag } from '../lib/tagColor'
+import { templateName } from '../lib/templateNames'
 import { TagBadges } from './TagBadges'
 
 /** The public read adds the bio for the card at the end; the admin's author list does not carry one. */
@@ -11,12 +12,6 @@ const MONTH_DAY_YEAR = (iso: string): string | null => {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return null
   return `${d.getDate()} tháng ${d.getMonth() + 1}, ${d.getFullYear()}`
-}
-
-/** "kris", "kris và kay", "kris, kay và an" — how a Vietnamese byline lists people. */
-function names(authors: BylineAuthor[]): string {
-  const all = authors.map((a) => a.name)
-  return all.length < 2 ? (all[0] ?? '') : `${all.slice(0, -1).join(', ')} và ${all[all.length - 1]}`
 }
 
 export function Avatar({ author, size, ring }: { author: BylineAuthor; size: number; ring?: boolean }) {
@@ -51,56 +46,104 @@ export function Avatar({ author, size, ring }: { author: BylineAuthor; size: num
   )
 }
 
+/** The sites a post can be ticked for, as the reader sees them, each with its dot colour. */
+export const SITE_CHIPS: Record<PostSite, { name: string; color: string }> = {
+  biz: { name: 'biz', color: '#5B7DB1' },
+  bean: { name: 'bean', color: '#B7795A' },
+  blog: { name: 'personal blog', color: '#2B4B33' },
+}
+
 /**
- * Who wrote it, when, and how long it takes — Medium's byline, drawn by the
- * app under the breadcrumb of every template so the six templates in
- * `post-renderer` did not each grow a slot for it. It inherits the band's ink.
+ * The post's properties, Notion style, under its title on every template:
+ * who wrote it, its topic and tags, which homes show it, the date and how long
+ * it reads (owner picked mock B, 2026-10-15). The six templates in
+ * `post-renderer` did not each grow a slot for it; it rides the breadcrumb
+ * slot and inherits the band's ink.
  *
- * Each part shows only when it has a value; with none of them it draws
- * nothing, so an old post with no author, date or tag looks as it did.
- * `updated_at` is left out on purpose: reordering or pinning a post moves it,
- * so it would claim edits nobody made.
+ * A row shows only when it has a value. `updated_at` is left out on purpose:
+ * reordering or pinning a post moves it, so it would claim edits nobody made.
  */
-export function Byline({
+export function PostProps({
   authors,
+  topic,
+  tags = [],
+  shownOn = [],
   publishedAt,
   minutes,
-  tags = [],
+  template,
 }: {
   authors: BylineAuthor[]
+  topic?: string | null
+  tags?: Tag[]
+  shownOn?: PostSite[]
   /** Only a published post has one worth printing; callers pass null for a draft. */
   publishedAt?: string | null
   minutes?: number | null
-  tags?: Tag[]
+  template?: string | null
 }) {
   const date = publishedAt ? MONTH_DAY_YEAR(publishedAt) : null
-  const facts = [minutes ? `${minutes} phút đọc` : null, date].filter(Boolean)
-  if (authors.length === 0 && facts.length === 0 && tags.length === 0) return null
-  return (
-    <div
-      data-testid="byline"
-      style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: sans, margin: '0 0 24px' }}
-    >
-      {authors.length > 0 && (
-        <span style={{ display: 'flex', flex: 'none' }}>
-          {authors.map((a, i) => (
-            <span key={a.id} style={{ marginLeft: i === 0 ? 0 : -12, display: 'flex' }}>
-              <Avatar author={a} size={40} ring={authors.length > 1} />
-            </span>
-          ))}
+  const read = [minutes ? `${minutes} phút` : null, templateName(template) || null].filter(Boolean).join(' · ')
+  const rows: [string, ReactNode][] = []
+  if (authors.length)
+    rows.push([
+      'Tác giả',
+      authors.map((a) => (
+        <span key={a.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <Avatar author={a} size={22} />
+          {a.name}
         </span>
-      )}
-      <div style={{ minWidth: 0 }}>
-        {authors.length > 0 && <div style={{ fontSize: 14, fontWeight: 500 }}>{names(authors)}</div>}
-        {(facts.length > 0 || tags.length > 0) && (
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '4px 10px', marginTop: 2, fontSize: 12.5 }}>
-            {facts.length > 0 && <span style={{ opacity: 0.7 }}>{facts.join(' · ')}</span>}
-            <TagBadges tags={tags} />
-          </div>
-        )}
-      </div>
-    </div>
+      )),
+    ])
+  if (topic) rows.push(['Chủ đề', topic])
+  if (tags.length) rows.push(['Tag', <TagBadges key="t" tags={tags} />])
+  if (shownOn.length)
+    rows.push([
+      'Hiện ở',
+      shownOn.map((s) => (
+        <span key={s} style={chip}>
+          <i style={{ width: 7, height: 7, borderRadius: 999, background: SITE_CHIPS[s].color }} />
+          {SITE_CHIPS[s].name}
+        </span>
+      )),
+    ])
+  if (date) rows.push(['Ngày', date])
+  if (read) rows.push(['Đọc', read])
+  if (!rows.length) return null
+  return (
+    <dl
+      data-testid="post-props"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '110px minmax(0, 1fr)',
+        gap: '8px 16px',
+        margin: '0 0 24px',
+        padding: '0 0 16px',
+        borderBottom: RULE,
+        fontFamily: sans,
+        fontSize: 14,
+        lineHeight: 1.5,
+      }}
+    >
+      {rows.map(([label, value]) => (
+        <Fragment key={label}>
+          <dt style={{ opacity: 0.65 }}>{label}</dt>
+          <dd style={{ margin: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px 10px', minWidth: 0 }}>{value}</dd>
+        </Fragment>
+      ))}
+    </dl>
   )
+}
+
+const RULE = '1px solid rgba(127,127,127,.3)'
+
+const chip: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 6,
+  border: RULE,
+  borderRadius: 999,
+  padding: '1px 10px',
+  fontSize: 13,
 }
 
 /** "Viết bởi" at the end of the post, one row per author with their bio — Medium's "Written by". */

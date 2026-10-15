@@ -82,7 +82,8 @@ describe('Article', () => {
 
     render(<Article />)
 
-    expect(await screen.findByText('Chưa có nội dung')).toBeInTheDocument()
+    // Also listed in the rail's "Trong bài này", hence the heading role.
+    expect(await screen.findByRole('heading', { name: 'Chưa có nội dung' })).toBeInTheDocument()
     expect(screen.getByText('Bài viết này đang được biên soạn — quay lại sau nhé.')).toBeInTheDocument()
   })
 
@@ -100,6 +101,21 @@ describe('Article', () => {
 
     expect(await screen.findByText('Sensory Lexicon')).toBeInTheDocument()
     expect(screen.getByText('Chưa có mục nào trong glossary này.')).toBeInTheDocument()
+  })
+
+  it('leads back to the home it was opened from and lists the post headings', async () => {
+    useNav.mockReturnValue({ postId: 'p1', openModule, openArticle, articleFrom: 'biz' })
+    useModules.mockReturnValue({ data: [{ id: 'biochem', title: 'biochemistry 101' }], loading: false, error: null })
+    usePublishedPosts.mockReturnValue({ data: [cgaPost], loading: false, error: null })
+    usePost.mockReturnValue({ data: { ...cgaPost, shown_on: ['biz', 'blog'] }, loading: false, error: null })
+
+    render(<Article homes={{ biz: 'strat & ops' }} />)
+
+    const back = await screen.findByText('← Quay lại')
+    expect(back.closest('a')).toHaveAttribute('href', '/biz')
+    expect(screen.getByText('strat & ops')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Nó là gì' })).toHaveAttribute('href', expect.stringMatching(/^#/))
+    expect(screen.getByTestId('post-props')).toHaveTextContent('personal blog')
   })
 
   it('shows a not-found message when no post matches', async () => {

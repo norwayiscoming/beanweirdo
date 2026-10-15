@@ -88,30 +88,63 @@ const FALLBACK_CHROME = (title: string): Chrome => ({
   links: [],
 })
 
+function TopBar({ chrome }: { chrome: Chrome }) {
+  const { header } = chrome.content
+  const links = chrome.links.filter((l) => !l.hidden)
+  return (
+    <header className="topbar">
+      <a className="brand" href={links[0]?.href ?? '#'}>{header.brand}</a>
+      <nav className="nav">
+        {links.map((l) => (
+          <a key={l.key} href={l.href} aria-current={l.key === chrome.current ? 'page' : undefined}>
+            <span className="mk">{l.label}</span>
+          </a>
+        ))}
+      </nav>
+      <span className="r">{header.right}</span>
+    </header>
+  )
+}
+
+function Foot({ chrome }: { chrome: Chrome }) {
+  const { footer } = chrome.content
+  return (
+    <footer className="footer">
+      <span>{footer.left}</span>
+      <span>{footer.right}</span>
+    </footer>
+  )
+}
+
 /** 06.1 Header and 06.17 Footer around a page body — every portfolio page wears them. */
 function PortFrame({ design, palette, chrome, children }: { design: Design; palette: string; chrome: Chrome; children: ReactNode }) {
   useAssets(design.fonts.library, design.fonts.files)
-  const vars = cssVars(design, palette) as CSSProperties
-  const { header, footer } = chrome.content
-  const links = chrome.links.filter((l) => !l.hidden)
   return (
-    <div className="pf" style={vars}>
-      <header className="topbar">
-        <a className="brand" href={links[0]?.href ?? '#'}>{header.brand}</a>
-        <nav className="nav">
-          {links.map((l) => (
-            <a key={l.key} href={l.href} aria-current={l.key === chrome.current ? 'page' : undefined}>
-              <span className="mk">{l.label}</span>
-            </a>
-          ))}
-        </nav>
-        <span className="r">{header.right}</span>
-      </header>
+    <div className="pf" style={cssVars(design, palette) as CSSProperties}>
+      <TopBar chrome={chrome} />
       {children}
-      <footer className="footer">
-        <span>{footer.left}</span>
-        <span>{footer.right}</span>
-      </footer>
+      <Foot chrome={chrome} />
+    </div>
+  )
+}
+
+/**
+ * The same header and footer around a page that is not built from port blocks
+ * (a post). The body sits outside `.pf`: its reset (`margin:0`, no list
+ * padding) would strip the post templates of the spacing they rely on.
+ */
+export function PortBars({ design, palette, chrome, children }: { design: Design; palette: string; chrome: Chrome; children: ReactNode }) {
+  useAssets(design.fonts.library, design.fonts.files)
+  // The tokens sit on the outer box so the body can use them too (var(--ink-2)…).
+  return (
+    <div style={{ ...(cssVars(design, palette) as CSSProperties), background: 'var(--paper)', color: 'var(--ink)', minHeight: '100vh' }}>
+      <div className="pf">
+        <TopBar chrome={chrome} />
+      </div>
+      {children}
+      <div className="pf">
+        <Foot chrome={chrome} />
+      </div>
     </div>
   )
 }

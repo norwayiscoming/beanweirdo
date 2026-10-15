@@ -22,6 +22,7 @@ import type {
   NodeResponse,
   PostAuthorsRequest,
   PostAuthorsResponse,
+  PostSite,
   Site,
 } from 'api-contract'
 import { supabase } from '../../lib/supabaseClient'
@@ -74,6 +75,8 @@ export type PostSummary = {
   pinned: boolean
   /** Chỗ trên cây chủ đề (migration 0027); null khi chưa xếp. */
   topic_id: string | null
+  /** Trang chủ nào hiện bài này (0038). Thiếu khi database chưa chạy 0038. */
+  shown_on?: PostSite[]
   /** Tag theme ids; only the list endpoint fills it (GET /api/posts). */
   keywords?: string[]
   /** Author ids in byline order; only the list endpoint fills it (GET /api/posts). */
@@ -333,6 +336,7 @@ export async function updatePost(
       pinned: boolean
       topic_id: string | null
       visibility: PostVisibility
+      shown_on: PostSite[]
       template: PostTemplate
       module_id: string
       /** Dạng bài. */

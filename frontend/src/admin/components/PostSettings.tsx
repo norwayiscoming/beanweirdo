@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { AuthorRef } from 'api-contract'
+import type { AuthorRef, PostSite } from 'api-contract'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { tagColor } from '../../lib/tagColor'
 import { titleSlug } from '../../lib/postSlug'
@@ -11,7 +11,7 @@ import { Button, IconButton } from '../../design/Button'
 import { IconClose } from '../../design/icons'
 import { AuthorPicker } from './AuthorPicker'
 import { ThemePicker } from './ThemePicker'
-import { Choice, DETAIL_CSS, desk } from './Detail'
+import { Choice, DETAIL_CSS, desk, Switch } from './Detail'
 
 /**
  * Everything about a post that is not its text, in one panel that slides in
@@ -37,6 +37,7 @@ export type SettingsPatch = Partial<{
   en: string
   topic_id: string | null
   visibility: PostVisibility
+  shown_on: PostSite[]
   module_id: string
   keywords: string[]
   template: string
@@ -45,6 +46,13 @@ export type SettingsPatch = Partial<{
 
 /** Wide enough for a topic path and the colour row without wrapping either. */
 export const SETTINGS_WIDTH = 380
+
+/** The homes a post can be shown on, in the order the switches stand (0038). */
+const SITES: { id: PostSite; label: string }[] = [
+  { id: 'biz', label: 'biz' },
+  { id: 'bean', label: 'bean' },
+  { id: 'blog', label: 'personal blog' },
+]
 
 /**
  * Subjects in order, each followed by every topic under it at any depth — the
@@ -129,6 +137,8 @@ export function PostSettings({
   onPublish: () => Promise<void>
 }) {
   const [keywords, setKeywords] = useState<Keyword[]>([])
+  // A post read before 0038 has no list: it is shown where every post was, on personal blog.
+  const shownOn = post.shown_on ?? ['blog']
   const [slugError, setSlugError] = useState<string | null>(null)
   /*
    * Fields write as they are left, but the owner (2026-10-15) could not tell
@@ -417,6 +427,21 @@ export function PostSettings({
       </Group>
 
       <Group title="Hiển thị">
+        {/* One store of posts for every site (owner, 2026-10-15): a switch only says which home shows it. */}
+        <Prop label="Hiện ở trang chủ" hint={shownOn.length ? undefined : 'Bài không hiện ở trang chủ nào.'}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {SITES.map((s) => (
+              <label key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 14 }}>
+                {s.label}
+                <Switch
+                  label={`Hiện ở ${s.label}`}
+                  value={shownOn.includes(s.id)}
+                  onChange={(on) => onPatch({ shown_on: SITES.map((x) => x.id).filter((id) => (id === s.id ? on : shownOn.includes(id))) })}
+                />
+              </label>
+            ))}
+          </div>
+        </Prop>
         <Prop label="Template" hint={canChangeTemplate ? undefined : 'Bài đã có chữ nên không đổi được nữa.'}>
           {canChangeTemplate ? (
             <select aria-label="Template" value={template} onChange={(e) => onPatch({ template: e.target.value })} style={{ width: '100%' }}>

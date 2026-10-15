@@ -5,6 +5,7 @@ import { useModules } from '../data/useModules'
 import { usePostAddresses } from '../data/usePostAddresses'
 import { portPagePath, toPath, type PortSite } from '../lib/routes'
 import { activeWords } from '../lib/routeWords'
+import type { Origin } from '../lib/nav'
 import type { Node } from 'api-contract'
 import { parseBlocks, type Block, type PortPost } from './blocks'
 import { resolveDesign, type Design } from './tokens'
@@ -26,6 +27,7 @@ const toPortPost = (p: PostRow): PortPost => ({
   pinned: p.pinned,
   hero_image_url: p.hero_image_url,
   published_at: p.published_at,
+  shown_on: p.shown_on,
 })
 
 /**
@@ -35,9 +37,10 @@ const toPortPost = (p: PostRow): PortPost => ({
  * directly sent almost every portfolio link to '#'. The address book already
  * derives every post's slug (and honours a hand-typed one), so ask it.
  */
-export function usePostHref(): (p: PortPost) => string {
+export function usePostHref(from?: Origin): (p: PortPost) => string {
   const { slugOf } = usePostAddresses()
-  return useCallback((p: PortPost) => toPath({ area: 'public', screen: 'article', slug: slugOf(p.id) }), [slugOf])
+  // The site the link sits on rides along, so the post page leads back to it.
+  return useCallback((p: PortPost) => toPath({ area: 'public', screen: 'article', slug: slugOf(p.id), from }), [slugOf, from])
 }
 
 /** Published posts and module names — what every block needs to render. */

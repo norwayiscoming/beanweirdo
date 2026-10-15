@@ -7,6 +7,7 @@ import {
   firstImageIn,
   POST_DETAIL_COLUMNS,
   POST_TEMPLATES,
+  POST_SITES,
   POST_VISIBILITIES,
   SLUG_RE,
   toPostDetail,
@@ -105,6 +106,8 @@ interface PatchPostBody {
   /** Place on the topic tree; must name an existing topic. */
   topic_id?: unknown
   visibility?: unknown
+  /** The homes that show the post (0038); any of biz, bean, blog, or none. */
+  shown_on?: unknown
   /** Only sensible while the body is empty — the editor enforces that. */
   template?: unknown
   /** Dạng bài (the `tags` vocabulary). */
@@ -141,6 +144,7 @@ const PATCHABLE = [
   'pinned',
   'topic_id',
   'visibility',
+  'shown_on',
   'template',
   'kind',
 ] as const satisfies readonly (keyof PatchPostBody & keyof PostRow)[]
@@ -158,6 +162,15 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
   if ('visibility' in patch && !(POST_VISIBILITIES as unknown[]).includes(patch.visibility)) {
     res.status(400).json({ error: `visibility must be one of: ${POST_VISIBILITIES.join(', ')}` })
     return
+  }
+  if ('shown_on' in patch) {
+    const on = patch.shown_on
+    if (!Array.isArray(on) || on.some((s) => !(POST_SITES as unknown[]).includes(s))) {
+      res.status(400).json({ error: `shown_on must be a list of: ${POST_SITES.join(', ')}` })
+      return
+    }
+    // One order, no repeats, so the stored list compares equal however the ticks were clicked.
+    patch.shown_on = POST_SITES.filter((s) => on.includes(s))
   }
   if ('template' in patch && !(POST_TEMPLATES as unknown[]).includes(patch.template)) {
     res.status(400).json({ error: `template must be one of: ${POST_TEMPLATES.join(', ')}` })

@@ -25,7 +25,7 @@ import { Editor } from './admin/screens/Editor'
 import { NewPostDialog } from './admin/components/NewPostDialog'
 import { Preview } from './admin/screens/Preview'
 import { Archive } from './screens/Archive'
-import { Article } from './screens/Article'
+import { PostPage } from './screens/PostPage'
 import { Cms } from './screens/Cms'
 import { Hours } from './screens/Hours'
 import { IndexScreen } from './screens/IndexScreen'
@@ -196,9 +196,11 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
 
   // The public port page is full width: it has its own topbar and footer, so it
   // skips the site's left rail.
-  if (shown === 'portfolioPage' || shown === 'portfolioHome' || shown === 'portfolioAbout') {
+  // A post's page (`/p/<slug>`) wears the same shared header, not the blog's frame.
+  if (shown === 'portfolioPage' || shown === 'portfolioHome' || shown === 'portfolioAbout' || shown === 'article') {
     return (
       <NavContext.Provider value={nav}>
+        {shown === 'article' && <PostPage />}
         {shown === 'portfolioPage' && <PortfolioPage />}
         {shown === 'portfolioHome' && <PortfolioHome />}
         {shown === 'portfolioAbout' && <PortfolioAbout />}
@@ -218,7 +220,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
       {shown === 'landing' && <Landing />}
       {shown === 'home' && <IndexScreen />}
       {shown === 'module' && <ModuleScreen />}
-      {shown === 'article' && <Article />}
       {shown === 'archive' && <Archive />}
       {shown === 'cms' && <Cms />}
       {shown === 'postEdit' && postId && <Editor postId={postId} />}

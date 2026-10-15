@@ -14,16 +14,16 @@ import { desk } from './Detail'
  * chips, so the two can never disagree about what is filtered.
  */
 
-export type Facet = 'topic' | 'kw' | 'author' | 'tpl' | 'status'
+export type Facet = 'topic' | 'kw' | 'author' | 'tpl' | 'site' | 'status'
 
-/** One exact filter: a topic, a tag, an author, a template or a status. */
+/** One exact filter: a topic, a tag, an author, a template, a home it shows on, or a status. */
 export type Token = { kind: Facet; id: string }
 
 /** Something the box can suggest; `path` is where a topic sits on the tree. */
 export type Suggestion = Token & { label: string; path?: string; color?: string; count: number }
 
-const FACET_LABEL: Record<Facet, string> = { topic: 'Chủ đề', kw: 'Tag', author: 'Tác giả', tpl: 'Template', status: 'Trạng thái' }
-const FACET_ORDER: Facet[] = ['topic', 'kw', 'author', 'tpl', 'status']
+const FACET_LABEL: Record<Facet, string> = { topic: 'Chủ đề', kw: 'Tag', author: 'Tác giả', tpl: 'Template', site: 'Hiện ở', status: 'Trạng thái' }
+const FACET_ORDER: Facet[] = ['topic', 'kw', 'author', 'tpl', 'site', 'status']
 
 /** Case- and accent-blind, so "kinh te" finds "Kinh tế". */
 export const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd')

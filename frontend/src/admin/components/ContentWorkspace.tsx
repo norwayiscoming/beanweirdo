@@ -24,7 +24,7 @@ import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { tagColor } from '../../lib/tagColor'
-import type { Author } from 'api-contract'
+import type { Author, PostSite } from 'api-contract'
 import { PostSearch, fold, freeWords, type Facet, type Suggestion, type Token } from './PostSearch'
 import { desk, Menu } from './Detail'
 import { Button, IconButton } from '../../design/Button'
@@ -49,7 +49,7 @@ import { radius } from '../../design/controls'
  * and a click on the same entry did a different thing in each.
  */
 
-type Vocab = 'topic' | 'tpl' | 'kw'
+type Vocab = 'topic' | 'tpl' | 'kw' | 'site'
 type Undo = { msg: string; revert?: () => Promise<unknown> }
 
 const isUndo = (u: unknown): u is Undo => !!u && typeof u === 'object' && typeof (u as Undo).msg === 'string'
@@ -57,6 +57,9 @@ const isUndo = (u: unknown): u is Undo => !!u && typeof u === 'object' && typeof
 /** Posts with no place on the tree yet — a filter of their own so none goes unseen. */
 const UNPLACED = '__unplaced'
 
+const SITE_LABEL: Record<PostSite, string> = { biz: 'biz', bean: 'bean', blog: 'personal blog' }
+// A post read before 0038 carries no list; it shows where every post did, on personal blog.
+const shownOn = (p: PostSummary) => p.shown_on ?? ['blog']
 const STATUS_LABEL: Record<PostStatus, string> = { draft: 'Nháp', published: 'Đã đăng', archived: 'Lưu trữ', deleted: 'Thùng rác' }
 
 const ACTIONS_BY_STATUS: Record<PostStatus, { label: string; action: StatusAction }[]> = {
@@ -256,7 +259,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const shown = useMemo(() => flattenTree(buildTree(sorted)), [sorted])
   const kwOf = (p: PostSummary) => p.keywords ?? []
   const postsOf = (vocab: Vocab, id: string, from = live) =>
-    from.filter((p) => (vocab === 'topic' ? inTopic(p, id) : vocab === 'tpl' ? p.template === id : kwOf(p).includes(id)))
+    from.filter((p) => (vocab === 'topic' ? inTopic(p, id) : vocab === 'tpl' ? p.template === id : vocab === 'site' ? shownOn(p).includes(id as PostSite) : kwOf(p).includes(id)))
 
   const authorById = useMemo(() => new Map(authors.map((a) => [a.id, a])), [authors])
   const kwName = (id: string) => keywords.find((k) => k.id === id)?.label ?? id
@@ -284,7 +287,9 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           ? (p.authors ?? []).includes(t.id)
           : t.kind === 'tpl'
             ? p.template === t.id
-            : p.status === t.id
+            : t.kind === 'site'
+              ? shownOn(p).includes(t.id as PostSite)
+              : p.status === t.id
   // Chips of one kind widen (this topic or that one); different kinds narrow
   // (this topic and that tag) — two topics ANDed would only ever match nothing.
   const kindsOn = [...new Set(tokens.map((t) => t.kind))]
@@ -312,7 +317,9 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           ? kwName(id)
           : vocab === 'author'
             ? authorById.get(id)?.name ?? id
-            : STATUS_LABEL[id as PostStatus]
+            : vocab === 'site'
+              ? SITE_LABEL[id as PostSite]
+              : STATUS_LABEL[id as PostStatus]
 
   const isOn = (kind: Facet, id: string) => tokens.some((t) => t.kind === kind && t.id === id)
   const add = (t: Token) => setTokens((o) => (o.some((x) => x.kind === t.kind && x.id === t.id) ? o : [...o, t]))
@@ -394,6 +401,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     ...keywords.map((k) => ({ kind: 'kw' as const, id: k.id, label: k.label, color: tagColor(k.id, k.color), count: postsOf('kw', k.id).length })),
     ...authors.map((a) => ({ kind: 'author' as const, id: a.id, label: a.name, count: live.filter((p) => (p.authors ?? []).includes(a.id)).length })),
     ...TEMPLATE_KEYS.map((t) => ({ kind: 'tpl' as const, id: t, label: templateName(t), count: postsOf('tpl', t).length })),
+    ...(Object.keys(SITE_LABEL) as PostSite[]).map((s) => ({ kind: 'site' as const, id: s, label: SITE_LABEL[s], count: postsOf('site', s).length })),
     ...(Object.keys(STATUS_LABEL) as PostStatus[]).map((st) => ({ kind: 'status' as const, id: st, label: STATUS_LABEL[st], count: posts.filter((p) => p.status === st).length })),
   ]
   const search = (

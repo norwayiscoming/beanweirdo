@@ -4,6 +4,7 @@ import { landingModules, useModules } from '../data/useModules'
 import type { ModuleImageFields } from '../admin/moduleForm'
 import { coverStyle } from '../lib/imageFocus'
 import { usePublishedPosts } from '../data/usePublishedPosts'
+import { shownOn } from '../portfolio/blocks'
 import { useSiteCopy } from '../data/useSiteCopy'
 import { garden, ink, layout, paper, prose, sans, serif, wrapTitle } from '../design/tokens'
 import type { ModuleLayout } from '../content/layouts'
@@ -393,7 +394,12 @@ export function Landing() {
   const { data: allModules, postsOf } = useModules()
   const modules = landingModules(allModules)
   // Each page lists what its rule pulls (migration 0028), not what is filed under it.
-  const postsByModule = useMemo(() => new Map(modules.map((m) => [m.id, postsOf(m.id)])), [modules, postsOf])
+  // This is the personal blog's home, so only posts ticked to show here (0038);
+  // the topic pages themselves still list everything filed under them.
+  const postsByModule = useMemo(
+    () => new Map(modules.map((m) => [m.id, postsOf(m.id).filter((p) => shownOn(p).includes('blog'))])),
+    [modules, postsOf],
+  )
   // The call to action counts every post on the site, wherever it is shown.
   const { data: posts } = usePublishedPosts()
   const { site, ready } = useSiteCopy()
