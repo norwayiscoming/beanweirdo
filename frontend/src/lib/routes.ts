@@ -25,7 +25,11 @@ export type Where = {
   tab?: CmsTab
   /** Which door an article was opened through — see `Origin`. */
   from?: Origin
-  /** A child site's home (`/biz`, `/bean`): the port page flagged `home_of` it (0035). */
+  /**
+   * Which child site a port page sits in. Alone it opens the site's home
+   * (`/biz`, `/bean`: the page flagged `home_of` it, 0035); with a slug it
+   * says the page was opened under `/bean/<slug>`.
+   */
   site?: PortSite
 }
 
@@ -129,6 +133,14 @@ const ABOUT = 'about'
 const BIZ = 'biz'
 
 /**
+ * The personal blog, a site beside biz and bean (owner, 2026-10-15): its front
+ * page is `/personal-blog`, everything else of the blog under it. Before, the
+ * blog lived under bean's prefix (`/bean/details`, `/bean/post/…`); those
+ * addresses still read and are rewritten here.
+ */
+const BLOG = 'personal-blog'
+
+/**
  * Where the portfolio lived before it became the root (`/portfolio/<slug>`).
  * Only read, never written: links to it are already out there.
  */
@@ -137,9 +149,9 @@ const OLD_PORTFOLIO = 'portfolio'
 /**
  * Where an address points.
  *
- * The site is a tree: beanweirdo at `/` (home and `/about`), then two child
- * sites, biz at `/biz/…` and bean at `/bean/…`, each with its home at its own
- * prefix. biz's pages were at `/<slug>` before; anything that is not another
+ * The site is a tree: beanweirdo at `/` (home and `/about`), then the child
+ * sites, biz at `/biz/…`, bean at `/bean/…` and the blog at `/personal-blog/…`,
+ * each with its home at its own prefix. biz's pages were at `/<slug>` before; anything that is not another
  * address is still read as one, and `useRoute` writes it back as `/biz/<slug>`.
  * One that does not exist says so, rather than quietly opening something else.
  */
@@ -192,8 +204,10 @@ function readPath(pathname: string, search: string, w: RouteWords): Where | null
 
   // ── public ───────────────────────────────────────────────────────────────
   if (head === BIZ) return seg[1] ? { area: 'public', screen: 'portfolioPage', slug: seg[1] } : { area: 'public', screen: 'portfolioPage', site: 'biz' }
+  if (head === BLOG) return seg[1] ? readBlog(seg.slice(1), search, w, false) : { area: 'public', screen: 'landing' }
   if (head === w.bean && !seg[1]) return { area: 'public', screen: 'portfolioPage', site: 'bean' }
-  if (head === w.bean) return readBlog(seg.slice(1), search, w, true)
+  // The blog's old home under bean wins over a bean page of the same name: those links are out there.
+  if (head === w.bean) return readBlog(seg.slice(1), search, w, true) ?? { area: 'public', screen: 'portfolioPage', slug: seg[1], site: 'bean' }
   // The blog used to sit at the root (`/post/<slug>`, `/muc-luc`…) and the
   // portfolio under `/portfolio`. Both moved; their old addresses still read,
   // and `useRoute` rewrites them to where they live now.
@@ -201,11 +215,11 @@ function readPath(pathname: string, search: string, w: RouteWords): Where | null
   return readBlog(seg, search, w, false)
 }
 
-/** The blog's pages, read from what follows `/bean/`. */
-function readBlog(seg: string[], search: string, w: RouteWords, nested: boolean): Where | null {
+/** The blog's pages, read from what follows `/personal-blog/` (or the old `/bean/`). */
+function readBlog(seg: string[], search: string, w: RouteWords, underBean: boolean): Where | null {
   const [head, arg] = seg
-  // Only under `/bean/`: at the root `details` was never an address.
-  if (nested && head === w.details && !arg) return { area: 'public', screen: 'landing' }
+  // `/bean/details` was the blog's front page until it got its own prefix.
+  if (underBean && head === w.details && !arg) return { area: 'public', screen: 'landing' }
   if (head === w.index) return { area: 'public', screen: 'home' }
   if (head === w.notes) return { area: 'public', screen: 'notes' }
   if (head === w.module && arg) return { area: 'public', screen: 'module', moduleId: moduleFromUrl(arg, w) }
@@ -225,7 +239,7 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
   if (where.area === 'practice') return `/${w.practice}`
   const adHome = `/${w.admin}`
   const adPost = `/${w.admin}-${w.adPost}`
-  const blog = `/${w.bean}`
+  const blog = `/${BLOG}`
 
   if (where.area === 'admin') {
     const action = actionOfScreen(w)[where.screen]
@@ -238,30 +252,57 @@ export function toPath(where: Where, w: RouteWords = activeWords()): string {
 
   switch (where.screen) {
     case 'landing':
-      return `${blog}/${w.details}`
+      return blog
     case 'home':
       return `${blog}/${w.index}`
     case 'notes':
       return `${blog}/${w.notes}`
     case 'portfolioPage':
-      if (where.site) return where.site === 'bean' ? blog : `/${BIZ}`
+      if (where.site && where.slug) return `/${where.site === 'bean' ? w.bean : BIZ}/${where.slug}`
+      if (where.site) return where.site === 'bean' ? `/${w.bean}` : `/${BIZ}`
       return where.slug ? `/${BIZ}/${where.slug}` : '/'
     case 'portfolioAbout':
       return `/${ABOUT}`
     case 'module':
       if (where.moduleId?.startsWith(TAG_PAGE)) return `${blog}/${w.tag}/${where.moduleId.slice(TAG_PAGE.length)}`
-      return where.moduleId ? `${blog}/${w.module}/${moduleToUrl(where.moduleId, w)}` : `${blog}/${w.details}`
+      return where.moduleId ? `${blog}/${w.module}/${moduleToUrl(where.moduleId, w)}` : blog
     case 'article':
       // The door is worth carrying so the trail reads back the way in, but
       // `module` is the default and does not need saying.
       return where.slug
         ? `${blog}/${w.post}/${where.slug}${where.from && where.from !== 'module' ? `?from=${where.from}` : ''}`
-        : `${blog}/${w.details}`
+        : blog
     default:
       return '/'
   }
 }
 
-/** A port page's address: a child site's home is the site's own address, any other page sits under biz. */
-export const portPagePath = (page: { slug: string; home_of?: PortSite | null }) =>
-  toPath(page.home_of ? { area: 'public', screen: 'portfolioPage', site: page.home_of } : { area: 'public', screen: 'portfolioPage', slug: page.slug })
+type PortPlace = { id: string; slug: string; parent_id?: string | null; home_of?: PortSite | null }
+
+/**
+ * The child site a port page belongs to: the site whose home it sits under.
+ * A page under no home is biz's — biz's pages were filed at the top before
+ * the homes were flagged, and bean's are filed under its home.
+ */
+export function portSiteOf(page: PortPlace, pages: PortPlace[]): PortSite {
+  const seen = new Set<string>()
+  for (let at: PortPlace | undefined = page; at && !seen.has(at.id); at = pages.find((x) => x.id === at!.parent_id)) {
+    if (at.home_of) return at.home_of
+    seen.add(at.id)
+  }
+  return 'biz'
+}
+
+/**
+ * A port page's address: a child site's home is the site's own address, any
+ * other page sits under its site (`/biz/<slug>`, `/bean/<slug>`). `pages` is
+ * what the page's ancestors are looked up in; without it the page reads as biz's.
+ */
+export const portPagePath = (page: PortPlace, pages: PortPlace[] = []) =>
+  toPath(
+    page.home_of
+      ? { area: 'public', screen: 'portfolioPage', site: page.home_of }
+      : portSiteOf(page, pages) === 'bean'
+        ? { area: 'public', screen: 'portfolioPage', slug: page.slug, site: 'bean' }
+        : { area: 'public', screen: 'portfolioPage', slug: page.slug },
+  )

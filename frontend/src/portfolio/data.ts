@@ -12,7 +12,7 @@ import { navLinks, resolveContent, type NavPage, type PortContent } from './cont
 import type { Chrome, HomeCard } from './PortfolioView'
 
 /** A node of site 'port' (0032), with its look resolved and its blocks parsed. */
-type PortPage = Pick<Node, 'id' | 'slug' | 'title' | 'intro' | 'status' | 'sort_order' | 'home_of'> & { look: string; blocks: Block[] }
+type PortPage = Pick<Node, 'id' | 'slug' | 'title' | 'intro' | 'status' | 'sort_order' | 'home_of' | 'parent_id'> & { look: string; blocks: Block[] }
 
 const toPortPost = (p: PostRow): PortPost => ({
   id: p.id,
@@ -77,10 +77,10 @@ export function usePublicPort(slug: string | null, site?: PortSite): { page: Por
     let alive = true
     setLoading(true)
     Promise.all([
-      site
-        ? supabase.from('nodes').select('*').eq('home_of', site).maybeSingle()
-        : slug
-          ? supabase.from('nodes').select('*').eq('site', 'port').eq('slug', slug).maybeSingle()
+      slug
+        ? supabase.from('nodes').select('*').eq('site', 'port').eq('slug', slug).maybeSingle()
+        : site
+          ? supabase.from('nodes').select('*').eq('home_of', site).maybeSingle()
           : Promise.resolve({ data: null }),
       supabase.from('portfolio_design').select('data').eq('id', true).maybeSingle(),
     ]).then(([p, d]: [{ data: Record<string, unknown> | null }, { data: { data: unknown } | null }]) => {
@@ -135,11 +135,12 @@ const toPortPage = (row: Record<string, unknown>): PortPage => ({
   status: row.status === 'published' || row.status === 'archived' ? row.status : 'draft',
   sort_order: Number(row.sort_order ?? 0),
   home_of: row.home_of === 'biz' || row.home_of === 'bean' ? row.home_of : null,
+  parent_id: typeof row.parent_id === 'string' ? row.parent_id : null,
 })
 
 /**
- * The way down from a port page into the blog it heads: bean's home (`/bean`)
- * leads to the blog's front page (`/bean/details`); no other page does.
+ * The way from bean's home (`/bean`) to the personal blog's front page
+ * (`/personal-blog`), which used to sit under it; no other page has one.
  */
 export function onwardOf(page: Pick<PortPage, 'home_of'>): { href: string; label: string } | undefined {
   if (page.home_of !== 'bean') return undefined
@@ -165,7 +166,7 @@ export function homeCards(content: PortContent, pages: PortPage[], design: Desig
     const page = live.find((p) => p.id === f.pageId)
     if (!page) return []
     return [{
-      href: portPagePath(page),
+      href: portPagePath(page, pages),
       title: page.title,
       label: f.label || design.palettes[page.look]?.name || '',
       intro: f.intro || page.intro,

@@ -73,7 +73,7 @@ describe('CMS hiện nội dung thật', () => {
     render(<Cms />)
     // Chữ của Mục lục nằm trong chính trang ấy ở Cấu hình.
     ;(await screen.findByText(/^cấu hình$/i)).click()
-    ;(await screen.findByRole('tab', { name: 'bean' })).click()
+    ;(await screen.findByRole('tab', { name: 'personal blog' })).click()
     ;(await screen.findByRole('button', { name: /^Mục lục/ })).click()
     // Ô đã có mặt, mang chữ mặc định, trong lúc mạng còn đang chờ.
     await waitFor(() => expect(screen.queryByDisplayValue(SITE_DEFAULTS.blurb)).not.toBeNull())

@@ -58,11 +58,12 @@ const STATUSES = ['draft', 'published', 'archived'] as const
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
 /**
- * Words a port page's slug may not take. Pages live at /biz/<slug> since
- * 2026-10-14, but their old root addresses (/<slug>) still forward there, so a
- * slug still must not shadow a root word.
+ * Words a port page's slug may not take. Pages live at /biz/<slug> and
+ * /bean/<slug>, but their old root addresses (/<slug>) still forward there, so
+ * a slug must not shadow a root word; and the blog's old addresses under
+ * /bean/ (/bean/details…) win over a bean page of the same name.
  */
-const RESERVED_SLUGS = ['about', 'portfolio', 'practice', 'ad', 'admin', 'post', 'module', 'tag', 'muc-luc', 'ghi']
+const RESERVED_SLUGS = ['about', 'portfolio', 'practice', 'ad', 'admin', 'post', 'module', 'tag', 'muc-luc', 'ghi', 'details', 'biz', 'bean', 'personal-blog']
 
 const NULLABLE = ['parent_id', 'look', 'accent', 'on_color', 'tint', 'tint2', 'image_url'] as const
 
