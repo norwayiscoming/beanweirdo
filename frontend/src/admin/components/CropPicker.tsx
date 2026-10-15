@@ -41,7 +41,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
  * tall on it is `(w * photo) / h` on screen, which is the conversion every
  * locked-ratio step below leans on.
  */
-export function fitRect(ratio: number, photo: number, cx = 50, cy = 50): Rect {
+function fitRect(ratio: number, photo: number, cx = 50, cy = 50): Rect {
   let w = 100
   let h = (w * photo) / ratio
   if (h > 100) {
@@ -60,7 +60,7 @@ type Handle = 'move' | 'nw' | 'ne' | 'sw' | 'se'
  * would run off the photo the height leads instead, so the rectangle stops at
  * the edge rather than changing shape to fit.
  */
-export function dragRect(from: Rect, handle: Handle, dx: number, dy: number, lock: number | null, photo: number): Rect {
+function dragRect(from: Rect, handle: Handle, dx: number, dy: number, lock: number | null, photo: number): Rect {
   if (handle === 'move') {
     return { ...from, x: clamp(from.x + dx, 0, 100 - from.w), y: clamp(from.y + dy, 0, 100 - from.h) }
   }

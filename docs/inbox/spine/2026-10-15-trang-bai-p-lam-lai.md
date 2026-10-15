@@ -30,3 +30,13 @@ PR: (số PR ghi ở mô tả PR; nhánh trên). Không đụng bảng, cột ha
 ## Đề xuất
 
 - Không có.
+
+## [ĐỔI HÀNH VI] Xoá test giao diện (chủ site yêu cầu 2026-10-15: "xoá hết mấy test UI đi cho nó nhanh")
+
+- Xoá toàn bộ 58 file `*.test.tsx` (test vẽ component), cùng `frontend/src/test/pagesMock.ts`
+  và gói `@testing-library/user-event` chỉ chúng dùng. Test hook (`*.test.ts` dùng
+  `renderHook`) và test logic giữ nguyên: 88 file, 877 test.
+- Bỏ `export` của các hàm chỉ test gọi; `findElements` (registry.ts) và `orphanNotes`
+  (notes.ts) không còn ai dùng nên xoá.
+- `CLAUDE.md` còn nhắc `Editor.contract.test.tsx` (luật Enter/Backspace của menu `+`):
+  file đó đã bị xoá, nên câu đó giờ sai — lane tài liệu sửa.

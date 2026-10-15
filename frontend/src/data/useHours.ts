@@ -13,7 +13,7 @@ import {
 import { KICKOFF, KINDS, STATS_DAYS, dateStr, dayBefore, type LogEntry } from '../content/hours'
 import { useUndoStack } from '../lib/useUndoStack'
 
-export type UseHoursResult = {
+type UseHoursResult = {
   logs: LogEntry[]
   /** The task system — every kind on file, shipped ones plus any added since. */
   kinds: string[]

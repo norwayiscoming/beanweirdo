@@ -22,8 +22,6 @@ export default defineConfig({
      */
     environment: 'node',
     environmentMatchGlobs: [
-      // Anything that renders JSX.
-      ['**/*.test.tsx', 'jsdom'],
       // Hooks: they need React's renderer, which needs a document.
       ['frontend/src/data/**/*.test.ts', 'jsdom'],
       ['frontend/src/lib/use*.test.ts', 'jsdom'],

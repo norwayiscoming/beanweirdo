@@ -147,7 +147,7 @@ export type BitesizeCardProps = BitesizeOverrides & {
  * — gói này không phụ thuộc được vào `frontend/`, nên bốn dòng ấy nằm hai nơi;
  * đổi bên nào thì đổi cả bên kia.
  */
-export function frameOf(post: Pick<BitesizePostData, 'media' | 'portrait'>): string {
+function frameOf(post: Pick<BitesizePostData, 'media' | 'portrait'>): string {
   if (post.media === 'img') return post.portrait ? '3/4' : '4/3'
   return post.portrait ? '9/16' : '16/9'
 }
@@ -159,7 +159,7 @@ const SUB_GUTTER = SUB_W + 30
 const SUB_MIN_H = 330
 
 /** Cỡ tiêu đề đi theo độ dài bài — bài dài đội tiêu đề lớn hơn. */
-export function titleSize(len: BitesizeLength, portrait: boolean, open: boolean): number {
+function titleSize(len: BitesizeLength, portrait: boolean, open: boolean): number {
   if (open) return 52
   if (portrait) return 23
   return len === 'dài' ? 40 : len === 'vừa' ? 34 : 27
