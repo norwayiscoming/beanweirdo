@@ -24,12 +24,6 @@ async function keywordsOf(supabase: Db, id: string): Promise<string[]> {
   return Array.isArray(data) ? (data as { keyword_id: string }[]).map((r) => r.keyword_id) : []
 }
 
-/** Addresses this post used to have and still forwards from (post_slugs). */
-async function oldSlugsOf(supabase: Db, id: string): Promise<string[]> {
-  const { data } = await supabase.from('post_slugs').select('slug').eq('post_id', id)
-  return Array.isArray(data) ? (data as { slug: string }[]).map((r) => r.slug) : []
-}
-
 /** Postgres errors a client caused, mapped to the status that says so. */
 function clientError(code: string | undefined): number | null {
   if (code === '23505') return 409 // unique: an address another post holds
@@ -84,9 +78,9 @@ async function handleGet(req: VercelRequest, res: VercelResponse, id: string): P
   }
   const authors = ((byline.data ?? []) as unknown as { authors: AuthorRef }[]).map((r) => toAuthorRef(r.authors))
 
-  const [keywords, old_slugs] = await Promise.all([keywordsOf(supabase, id), oldSlugsOf(supabase, id)])
+  const keywords = await keywordsOf(supabase, id)
   const post = toPostDetail({ ...(data as PostRow), ...(pending.data ?? {}) } as PostRow, keywords)
-  res.status(200).json({ post: { ...post, old_slugs, has_draft: pending.data !== null, authors } })
+  res.status(200).json({ post: { ...post, has_draft: pending.data !== null, authors } })
 }
 
 interface PatchPostBody {
@@ -115,12 +109,14 @@ interface PatchPostBody {
   template?: unknown
   /** Dạng bài (the `tags` vocabulary). */
   kind?: unknown
-  /** A new stored address; the old one is kept in post_slugs so links keep working. */
+  /**
+   * An address typed by hand, or null to go back to the one the title makes.
+   * The old address is not kept: the owner (2026-10-15) wants a link no post
+   * answers to gone, not forwarding.
+   */
   slug?: unknown
   /** Tag-theme ids; replaces the whole set. */
   keywords?: unknown
-  /** Old addresses to stop forwarding. */
-  forget_slugs?: unknown
 }
 
 /**
@@ -179,7 +175,7 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
   }
 
   const wantsSlug = Object.prototype.hasOwnProperty.call(body, 'slug')
-  if (wantsSlug && (typeof body.slug !== 'string' || !SLUG_RE.test(body.slug))) {
+  if (wantsSlug && body.slug !== null && (typeof body.slug !== 'string' || !SLUG_RE.test(body.slug))) {
     res.status(400).json({ error: 'slug must be lowercase letters and digits joined by hyphens' })
     return
   }
@@ -189,48 +185,15 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
     return
   }
 
-  const forget = Array.isArray(body.forget_slugs) ? body.forget_slugs.filter((x): x is string => typeof x === 'string') : []
-
-  if (Object.keys(patch).length === 0 && !wantsSlug && !wantsKeywords && forget.length === 0) {
+  if (Object.keys(patch).length === 0 && !wantsSlug && !wantsKeywords) {
     res.status(400).json({ error: 'No updatable fields provided' })
     return
   }
 
   const supabase = getSupabase()
 
-  if (wantsSlug) {
-    const next = body.slug as string
-    const { data: current, error: findError } = await supabase.from('posts').select('slug').eq('id', id).maybeSingle()
-    if (findError) {
-      res.status(500).json({ error: findError.message })
-      return
-    }
-    if (!current) {
-      res.status(404).json({ error: `Post '${id}' not found` })
-      return
-    }
-    // An old address of another post still forwards to that post, so it is
-    // not free to take — taking it would silently steal that post's links.
-    const { data: held } = await supabase.from('post_slugs').select('post_id').eq('slug', next).maybeSingle()
-    if (held && (held as { post_id: string }).post_id !== id) {
-      res.status(409).json({ error: `slug '${next}' still forwards to another post` })
-      return
-    }
-    const previous = (current as { slug: string | null }).slug
-    if (previous !== next) {
-      patch.slug = next
-      if (previous) {
-        const { error } = await supabase.from('post_slugs').upsert({ slug: previous, post_id: id }, { onConflict: 'slug' })
-        if (error) {
-          res.status(500).json({ error: error.message })
-          return
-        }
-      }
-      // Going back to an address this post used to have: it is current again,
-      // not a forward.
-      await supabase.from('post_slugs').delete().eq('slug', next).eq('post_id', id)
-    }
-  }
+  // A clash with another post's address is the unique index's to refuse (409).
+  if (wantsSlug) patch.slug = body.slug as string | null
 
   if (wantsKeywords) {
     const ids = [...new Set(body.keywords as string[])]
@@ -245,14 +208,6 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
         res.status(clientError(error.code) ?? 500).json({ error: error.message })
         return
       }
-    }
-  }
-
-  if (forget.length > 0) {
-    const { error } = await supabase.from('post_slugs').delete().eq('post_id', id).in('slug', forget)
-    if (error) {
-      res.status(500).json({ error: error.message })
-      return
     }
   }
 
@@ -352,11 +307,11 @@ async function handlePatch(req: VercelRequest, res: VercelResponse, id: string):
   }
 
   // Changing the address or the tags answers with the whole post, because the
-  // editor reads back `slug`, `old_slugs` and `keywords`; every other patch
-  // answers with only the columns it wrote (see above).
-  if (wantsSlug || wantsKeywords || forget.length > 0) {
+  // editor reads back `slug` and `keywords`; every other patch answers with
+  // only the columns it wrote (see above).
+  if (wantsSlug || wantsKeywords) {
     const { data: full } = await supabase.from('posts').select(POST_DETAIL_COLUMNS).eq('id', id).maybeSingle()
-    res.status(200).json({ post: { ...toPostDetail(full as PostRow, await keywordsOf(supabase, id)), old_slugs: await oldSlugsOf(supabase, id) } })
+    res.status(200).json({ post: toPostDetail(full as PostRow, await keywordsOf(supabase, id)) })
     return
   }
   res.status(200).json({ post: data })

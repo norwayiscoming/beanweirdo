@@ -16,7 +16,6 @@ import {
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useNav } from '../../lib/nav'
 import { TEMPLATE_KEYS, templateName } from '../../lib/templateNames'
-import { usePostAddresses } from '../../data/usePostAddresses'
 import { Avatar } from '../../components/Byline'
 import { tagBadge } from '../../components/TagBadges'
 import { postDescription } from '../../lib/postText'
@@ -194,7 +193,6 @@ function RailRow({
 
 export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const nav = useNav()
-  const addresses = usePostAddresses()
   const [topics, setTopics] = useState<Node[]>([])
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [authors, setAuthors] = useState<Author[]>([])
@@ -323,9 +321,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   // ── post actions ─────────────────────────────────────────────────────────
   const act = (id: string, action: StatusAction) =>
     run(async () => {
-      // Publishing fixes the post's address for good (migration 0027).
-      const slug = action === 'publish' ? addresses.slugToPublish(id, posts.find((p) => p.id === id)?.en) : undefined
-      await transitionStatus(id, action, ...(slug ? [slug] : []))
+      await transitionStatus(id, action)
     })
 
   const copy = (id: string) => {
@@ -379,8 +375,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     const name = BULK_STATUS.find((b) => b.action === action)?.label ?? action
     run(async () => {
       for (const p of ok) {
-        const slug = action === 'publish' ? addresses.slugToPublish(p.id, p.en) : undefined
-        await transitionStatus(p.id, action, ...(slug ? [slug] : []))
+        await transitionStatus(p.id, action)
       }
       return { msg: `${name} · ${ok.length}/${selected.length} bài` }
     })

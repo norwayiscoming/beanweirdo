@@ -572,7 +572,7 @@ function EditorContent({ postId }: { postId: string }) {
             const card = toast.busy(published ? 'Đang đăng các thay đổi…' : 'Đang đăng bài…')
             try {
               await Promise.allSettled([...inFlight.current])
-              await transitionStatus(postId, 'publish', addresses.slugToPublish(postId, post.en))
+              await transitionStatus(postId, 'publish')
               card.ok(published ? 'Đã đăng các thay đổi' : 'Đã đăng bài')
               nav.goCms()
             } catch (e) {
@@ -596,22 +596,16 @@ function EditorContent({ postId }: { postId: string }) {
         template={template}
         canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(postId)}
-        slugFromTitle={(t) => addresses.slugFromTitle(postId, t)}
         onPatch={applyPatch}
         onSlug={async (slug) => {
           try {
             const saved = await updatePost(postId, { slug })
-            setPost((prev) => (prev ? { ...prev, slug: saved.slug ?? null, old_slugs: saved.old_slugs } : prev))
+            setPost((prev) => (prev ? { ...prev, slug: saved.slug ?? null } : prev))
             return null
           } catch (e) {
             return (e as Error).message
           }
         }}
-        onForget={(slug) =>
-          void updatePost(postId, { forget_slugs: [slug] }).then((saved) =>
-            setPost((prev) => (prev ? { ...prev, old_slugs: saved.old_slugs } : prev)),
-          )
-        }
       />
 
       <CanvasFailure key={postId}>

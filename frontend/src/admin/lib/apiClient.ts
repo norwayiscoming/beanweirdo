@@ -97,8 +97,6 @@ export type PostVisibility = 'public' | 'private'
 export type PostDetail = PostSummary & {
   /** Tag theme (post_keywords). */
   keywords: string[]
-  /** Địa chỉ cũ vẫn chuyển tiếp về bài (post_slugs). */
-  old_slugs?: string[]
   body: SectionData[] | null
   hero_caption: string | null
   /**
@@ -339,12 +337,10 @@ export async function updatePost(
       module_id: string
       /** Dạng bài. */
       kind: string
-      /** Địa chỉ mới; địa chỉ cũ được giữ để chuyển tiếp. */
-      slug: string
+      /** Địa chỉ gõ tay; null là quay về địa chỉ theo tên bài. Địa chỉ cũ không giữ lại. */
+      slug: string | null
       /** Thay cả bộ tag theme. */
       keywords: string[]
-      /** Thôi chuyển tiếp các địa chỉ cũ này. */
-      forget_slugs: string[]
   }>,
 ): Promise<Partial<PostDetail> & { id: string }> {
   const result = await request<{ post: Partial<PostDetail> & { id: string } }>(`/api/posts/${id}`, {
@@ -364,12 +360,10 @@ export async function updatePost(
 export async function transitionStatus(
   id: string,
   action: StatusAction,
-  /** Với 'publish': địa chỉ cố định cho bài chưa có — xem usePostAddresses.slugToPublish. */
-  slug?: string,
 ): Promise<(Partial<PostDetail> & { id: string }) | { deleted: true }> {
   const result = await request<{ post: Partial<PostDetail> & { id: string } } | { deleted: true }>(
     `/api/posts/${id}/status`,
-    { method: 'POST', body: JSON.stringify(slug ? { action, slug } : { action }) },
+    { method: 'POST', body: JSON.stringify({ action }) },
   )
   return 'deleted' in result ? result : result.post
 }
