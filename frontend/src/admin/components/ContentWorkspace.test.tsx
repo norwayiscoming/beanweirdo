@@ -8,7 +8,7 @@ const editPost = vi.fn()
 vi.mock('../../lib/nav', () => ({
   useNav: () => ({ screen: 'cms', area: 'admin', postId: null, newPost: vi.fn(), editPost, previewPost: vi.fn(), goCms: vi.fn() }),
 }))
-vi.mock('../../data/usePostAddresses', () => ({ usePostAddresses: () => ({ slugToPublish: () => undefined }) }))
+vi.mock('../../data/usePostAddresses', () => ({ usePostAddresses: () => ({ slugToPublish: () => undefined, slugOf: (id: string) => id }) }))
 
 const post = (id: string, over: Record<string, unknown>) => ({
   id,
@@ -53,6 +53,7 @@ const api = vi.hoisted(() => ({
   deleteTag: vi.fn(),
   createTag: vi.fn(),
   listModules: vi.fn(),
+  getPost: vi.fn(),
 }))
 vi.mock('../lib/apiClient', () => api)
 
@@ -68,6 +69,8 @@ beforeEach(() => {
   api.listTags.mockResolvedValue([{ id: 'note', label: 'note' }, { id: 'book-film', label: 'book-film' }])
   api.transitionStatus.mockResolvedValue({})
   api.updatePost.mockResolvedValue({})
+  api.listModules.mockResolvedValue([])
+  api.getPost.mockImplementation((id: string) => Promise.resolve({ ...posts.find((p) => p.id === id), body: [], old_slugs: [], authors: [] }))
   api.listModules.mockResolvedValue([])
   api.deleteTag.mockResolvedValue({ deleted: 'book-film', moved: { posts: [], notes: [] } })
   api.createTag.mockImplementation((label: string) => Promise.resolve({ id: label, label }))
@@ -98,6 +101,15 @@ describe('ContentWorkspace', () => {
     expect(editPost).not.toHaveBeenCalled()
     await userEvent.click(screen.getByText('Một dòng xem trước'))
     expect(editPost).toHaveBeenCalledWith('Detachment')
+  })
+
+  it('edits a post\'s info from its info line without opening the post', async () => {
+    render(<ContentWorkspace />)
+    await userEvent.click(await screen.findByRole('button', { name: 'Sửa thông tin bài Detachment' }))
+    const panel = await screen.findByRole('complementary', { name: 'Thông tin bài' })
+    await userEvent.selectOptions(within(panel).getByLabelText('Chủ đề'), 'book-film')
+    expect(api.updatePost).toHaveBeenCalledWith('Detachment', { topic_id: 'book-film' })
+    expect(editPost).not.toHaveBeenCalled()
   })
 
   it('shows the trash on its own, with restore and permanent delete', async () => {

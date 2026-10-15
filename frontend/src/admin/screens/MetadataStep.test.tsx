@@ -36,12 +36,12 @@ describe('MetadataStep', () => {
     const onContinue = vi.fn()
     render(<MetadataStep onContinue={onContinue} />)
 
-    await waitFor(() => expect(screen.getByLabelText('Module')).toHaveValue('sensory'))
+    await waitFor(() => expect(screen.getByLabelText('Màu mượn từ')).toHaveValue('sensory'))
     // The template used to be a second step, on a page that had forgotten what
     // the post was about.
     await waitFor(() => expect(screen.getByLabelText('Template')).toHaveValue('t-article'))
 
-    await userEvent.selectOptions(screen.getByLabelText('Module'), 'roasting')
+    await userEvent.selectOptions(screen.getByLabelText('Màu mượn từ'), 'roasting')
     await userEvent.selectOptions(screen.getByLabelText('Template'), 't-longform')
     await pickTopic()
     await userEvent.type(screen.getByLabelText('Tiêu đề'), 'Senses of Flavors')
@@ -65,7 +65,7 @@ describe('MetadataStep', () => {
 
   it('needs a title, and asks for nothing in a particular language', async () => {
     render(<MetadataStep onContinue={vi.fn()} />)
-    await waitFor(() => expect(screen.getByLabelText('Module')).toHaveValue('sensory'))
+    await waitFor(() => expect(screen.getByLabelText('Màu mượn từ')).toHaveValue('sensory'))
 
     expect(screen.getByRole('button', { name: /soạn bài/i })).toBeDisabled()
     expect(screen.queryByLabelText(/\(EN\)|\(VI\)/)).toBeNull()
@@ -81,7 +81,7 @@ describe('MetadataStep — màu bài', () => {
   it('follows the module by default, and stores nothing for it', async () => {
     const onContinue = vi.fn()
     render(<MetadataStep onContinue={onContinue} />)
-    await waitFor(() => expect(screen.getByLabelText('Module')).toHaveValue('sensory'))
+    await waitFor(() => expect(screen.getByLabelText('Màu mượn từ')).toHaveValue('sensory'))
 
     await pickTopic()
     await userEvent.type(screen.getByLabelText('Tiêu đề'), 'Bài mới')
@@ -93,7 +93,7 @@ describe('MetadataStep — màu bài', () => {
   it('takes a colour of its own when one is picked', async () => {
     const onContinue = vi.fn()
     render(<MetadataStep onContinue={onContinue} />)
-    await waitFor(() => expect(screen.getByLabelText('Module')).toHaveValue('sensory'))
+    await waitFor(() => expect(screen.getByLabelText('Màu mượn từ')).toHaveValue('sensory'))
 
     // Every swatch is named the same way: whose colour it is, then the code.
     const other = await screen.findByLabelText('Roasting — #8A6420')
@@ -113,7 +113,7 @@ describe('MetadataStep — màu bài', () => {
 describe('MetadataStep — mã màu', () => {
   it('names every colour the same way: whose it is, then the code', async () => {
     render(<MetadataStep onContinue={vi.fn()} />)
-    await waitFor(() => expect(screen.getByLabelText('Module')).toHaveValue('sensory'))
+    await waitFor(() => expect(screen.getByLabelText('Màu mượn từ')).toHaveValue('sensory'))
 
     expect(screen.getByLabelText('Sensory — #F2A0A5')).toBeInTheDocument()
     expect(screen.getByLabelText('Roasting — #8A6420')).toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('MetadataStep — mã màu', () => {
   it('takes a code pasted in, and says it belongs to nobody', async () => {
     const onContinue = vi.fn()
     render(<MetadataStep onContinue={onContinue} />)
-    await waitFor(() => expect(screen.getByLabelText('Module')).toHaveValue('sensory'))
+    await waitFor(() => expect(screen.getByLabelText('Màu mượn từ')).toHaveValue('sensory'))
 
     const hex = screen.getByLabelText('mã màu')
     await userEvent.clear(hex)
@@ -139,7 +139,7 @@ describe('MetadataStep — mã màu', () => {
 
   it('holds still while a code is half-typed', async () => {
     render(<MetadataStep onContinue={vi.fn()} />)
-    await waitFor(() => expect(screen.getByLabelText('Module')).toHaveValue('sensory'))
+    await waitFor(() => expect(screen.getByLabelText('Màu mượn từ')).toHaveValue('sensory'))
 
     const hex = screen.getByLabelText('mã màu')
     await userEvent.clear(hex)

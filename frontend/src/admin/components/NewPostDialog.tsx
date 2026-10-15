@@ -46,10 +46,10 @@ export function NewPostDialog({
     }
   }, [open, onClose])
 
-  // Đưa tiêu điểm vào hộp thoại khi nó mở, để phím Tab đi tiếp bên trong chứ
-  // không lạc xuống danh sách đang bị che.
+  // Đưa tiêu điểm vào ô đầu tiên (Tiêu đề) khi hộp thoại mở: gõ được ngay, và
+  // phím Tab đi tiếp bên trong chứ không lạc xuống danh sách đang bị che.
   useEffect(() => {
-    if (open) panel.current?.focus()
+    if (open) (panel.current?.querySelector('input') ?? panel.current)?.focus()
   }, [open])
 
   if (!open) return null
@@ -120,7 +120,7 @@ export function NewPostDialog({
           </IconButton>
         </div>
 
-        <div style={{ padding: 20 }}>
+        <div style={{ padding: '20px 24px 24px' }}>
           {error && (
             <p
               role="alert"
