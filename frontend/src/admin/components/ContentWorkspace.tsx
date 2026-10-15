@@ -16,12 +16,10 @@ import {
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useNav } from '../../lib/nav'
 import { TEMPLATE_KEYS, templateName } from '../../lib/templateNames'
-import { usePostAddresses } from '../../data/usePostAddresses'
 import { Avatar } from '../../components/Byline'
 import { tagBadge } from '../../components/TagBadges'
 import { postDescription } from '../../lib/postText'
-import { MovePostDialog } from './MovePostDialog'
-import { ListPostSettings } from './ListPostSettings'
+import { ListPostSettings, prefetchPost } from './ListPostSettings'
 import { SectionHead } from './SectionHead'
 import { statusLabel } from './NodeFields'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
@@ -30,7 +28,7 @@ import type { Author } from 'api-contract'
 import { PostSearch, fold, freeWords, type Facet, type Suggestion, type Token } from './PostSearch'
 import { desk, Menu } from './Detail'
 import { Button, IconButton } from '../../design/Button'
-import { IconCalendar, IconClock, IconClose, IconPage, IconPencil, IconPlus } from '../../design/icons'
+import { IconCalendar, IconClock, IconClose, IconPage, IconPlus } from '../../design/icons'
 import { radius } from '../../design/controls'
 
 /**
@@ -127,8 +125,6 @@ const CSS = `
 .cw-meta{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin:8px 0 0 -8px;padding:4px 8px;border-radius:6px;border:1px solid transparent}
 .cw-meta:hover{background:#fff;border-color:${desk.line}}
 .cw-meta:focus-visible{outline:2px solid ${ink.green};outline-offset:2px}
-.cw-meta-edit{display:inline-flex;align-items:center;gap:4px;color:${ink.soft};opacity:0}
-.cw-meta:hover .cw-meta-edit,.cw-meta:focus-visible .cw-meta-edit{opacity:1}
 .cw-fact{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .cw-tab{all:unset;cursor:pointer;padding:12px 0 11px;font-family:${sans};font-size:14px;color:${ink.soft};white-space:nowrap}
 .cw-tab[aria-selected=true]{color:${ink.base};box-shadow:inset 0 -2px 0 ${ink.base}}
@@ -197,7 +193,6 @@ function RailRow({
 
 export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const nav = useNav()
-  const addresses = usePostAddresses()
   const [topics, setTopics] = useState<Node[]>([])
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [authors, setAuthors] = useState<Author[]>([])
@@ -208,7 +203,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<Undo | null>(null)
   const [busy, setBusy] = useState(false)
-  const [moving, setMoving] = useState<PostSummary | null>(null)
   /** The post whose info panel is open. */
   const [info, setInfo] = useState<string | null>(null)
 
@@ -327,9 +321,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   // ── post actions ─────────────────────────────────────────────────────────
   const act = (id: string, action: StatusAction) =>
     run(async () => {
-      // Publishing fixes the post's address for good (migration 0027).
-      const slug = action === 'publish' ? addresses.slugToPublish(id) : undefined
-      await transitionStatus(id, action, ...(slug ? [slug] : []))
+      await transitionStatus(id, action)
     })
 
   const copy = (id: string) => {
@@ -383,8 +375,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     const name = BULK_STATUS.find((b) => b.action === action)?.label ?? action
     run(async () => {
       for (const p of ok) {
-        const slug = action === 'publish' ? addresses.slugToPublish(p.id) : undefined
-        await transitionStatus(p.id, action, ...(slug ? [slug] : []))
+        await transitionStatus(p.id, action)
       }
       return { msg: `${name} · ${ok.length}/${selected.length} bài` }
     })
@@ -421,7 +412,11 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   // ── left column ──────────────────────────────────────────────────────────
   const unplaced = live.filter((p) => !p.topic_id).length
   const rail = (
-    <nav aria-label="Phân loại" className="cw-rail" style={{ background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, paddingBottom: 18 }}>
+    // No box of its own: one surface with the list, split by a rule, so the two
+    // columns can't end at different heights (owner, 2026-10-15). The inner
+    // part sticks, so the filters stay in reach down a long list.
+    <nav aria-label="Phân loại" className="cw-rail" style={{ borderRight: `1px solid ${desk.line}` }}>
+      <div style={{ position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingBottom: 18 }}>
       <SectionHead id="content.topics" title="Chủ đề">
         {shown.map(({ row: t, depth }) => (
             <div key={t.id}>
@@ -456,6 +451,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           />
         ))}
       </SectionHead>
+      </div>
     </nav>
   )
 
@@ -522,7 +518,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
               every fact look like the next one (owner, 2026-10-14). The whole
               line opens the post's info panel (owner, 2026-10-15); filtering by
               a fact lives in the left column and the search bar. */}
-          <button type="button" className="cw-meta" aria-label={`Sửa thông tin bài ${p.en}`} onClick={(e) => (own(e), setInfo(p.id))} style={{ fontFamily: sans, fontSize: 13.5, color: ink.strong }}>
+          <button type="button" className="cw-meta" aria-label={`Sửa thông tin bài ${p.en}`} onMouseEnter={() => prefetchPost(p.id)} onFocus={() => prefetchPost(p.id)} onClick={(e) => (own(e), setInfo(p.id))} style={{ fontFamily: sans, fontSize: 13.5, color: ink.strong }}>
             {by.length > 0 && (
               <span className="cw-fact" style={{ fontWeight: 500, color: ink.base }}>
                 <span style={{ display: 'flex' }}>
@@ -563,10 +559,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
                 </span>
               )
             })}
-            <span className="cw-meta-edit" aria-hidden>
-              <IconPencil size={13} />
-              Sửa
-            </span>
           </button>
         </div>
         {p.thumbnail_url ? (
@@ -574,16 +566,17 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         ) : (
           <span className="cw-cover" aria-hidden style={{ width: 112, height: 75, borderRadius: 2, background: '#F4F2EC' }} />
         )}
-        <span onClick={own} style={{ display: 'flex' }}>
+        <span onClick={own} onMouseEnter={() => prefetchPost(p.id)} style={{ display: 'flex' }}>
           <Menu
             small
             label={`Thao tác ${p.en}`}
+            // One entry per job: module, authors, topic and tags all live in
+            // the info panel, so the menu doesn't offer them again (owner, 2026-10-15).
             actions={[
+              { label: 'Sửa thông tin', onPick: () => setInfo(p.id) },
               { label: 'Nhân bản', onPick: () => copy(p.id) },
               // A pinned post leads every page that lists it (listingRule sortPosts).
               { label: p.pinned ? 'Bỏ ghim' : 'Ghim', onPick: () => run(() => updatePost(p.id, { pinned: !p.pinned })) },
-              { label: 'Chuyển module', onPick: () => setMoving(p) },
-              { label: 'Thông tin bài', onPick: () => setInfo(p.id) },
               ...ACTIONS_BY_STATUS[p.status].map((a) => ({
                 label: a.label,
                 onPick: () => act(p.id, a.action),
@@ -597,7 +590,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   }
 
   const list = (
-    <div style={{ minWidth: 0, display: 'grid', alignContent: 'start', background: desk.panel, border: `1px solid ${desk.line}`, borderRadius: radius, overflow: 'hidden' }}>
+    <div style={{ minWidth: 0, display: 'grid', alignContent: 'start' }}>
       {undo && (
         <div role="status" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', background: '#E7EFE3', padding: '8px 16px', fontFamily: sans, fontSize: 13, color: ink.base }}>
           <span>{undo.msg}</span>
@@ -659,13 +652,6 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
           onClear={() => setSel(new Set())}
         />
       )}
-      <MovePostDialog
-        post={moving}
-        onClose={() => setMoving(null)}
-        // Moving changes the post's public address and drops its hand-placed
-        // order (sort_order is 1..N within a module) — see handlePatch.
-        onMoved={(module_id) => (moving ? updatePost(moving.id, { module_id }).then(() => (setMoving(null), void load(), onChanged?.())) : undefined)}
-      />
       <ListPostSettings postId={info} topics={topics} onClose={closeInfo} onError={showError} />
     </div>
   )
@@ -684,9 +670,12 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0,240px) minmax(0,1fr)',
-          gap: 14,
           minHeight: 560,
-          alignItems: 'start',
+          background: desk.panel,
+          border: `1px solid ${desk.line}`,
+          borderRadius: radius,
+          // clip, not hidden: hidden would make this a scroll box and stop the rail sticking.
+          overflow: 'clip',
         }}
       >
         {rail}

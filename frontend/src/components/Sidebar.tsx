@@ -374,29 +374,23 @@ export function Sidebar() {
         }}
       >
         {/*
-          * Logo thật, thay cho chấm tròn hồng đứng tạm ở đây.
-          *
-          * Nó là một wordmark chữ nhật nên không ép vào ô 20×20 được — chữ
-          * "station" sẽ mất hẳn. Cho nó chiều cao 34px và tự co ngang.
-          */}
-        {/*
-          * Closed, the rail is 64px and the logo at 34px tall is 56 wide —
-          * starting at the row's 22px inset it ran 14px under the page. It
-          * shrinks to 27px tall (45 wide) and steps out to a 10px inset, so it
-          * sits whole inside the rail and grows back as the sheet opens.
+          * The square "ae" mark (same file as the iOS icon), not the wide
+          * "beaen" wordmark: the name is already spelled out right beside it.
+          * Closed, the rail is 64px, so the mark shrinks to 27px and steps out
+          * to a 10px inset to sit whole inside it.
           */}
         <img
-          src="/logo-bean.png"
-          alt="bean station"
-          width={56}
+          src="/icon-180.png"
+          alt="beaen"
+          width={34}
           height={34}
           style={{
             height: open ? 34 : 27,
-            width: 'auto',
+            width: open ? 34 : 27,
             marginLeft: open ? 0 : -12,
             flex: 'none',
             borderRadius: 3,
-            transition: 'height .3s cubic-bezier(.4,0,.2,1), margin-left .3s cubic-bezier(.4,0,.2,1)',
+            transition: 'height .3s cubic-bezier(.4,0,.2,1), width .3s cubic-bezier(.4,0,.2,1), margin-left .3s cubic-bezier(.4,0,.2,1)',
           }}
         />
         <div style={{ fontFamily: serif, fontSize: 23, letterSpacing: '-.01em' }}>

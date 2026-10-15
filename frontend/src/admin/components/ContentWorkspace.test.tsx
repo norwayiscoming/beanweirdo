@@ -8,7 +8,7 @@ const editPost = vi.fn()
 vi.mock('../../lib/nav', () => ({
   useNav: () => ({ screen: 'cms', area: 'admin', postId: null, newPost: vi.fn(), editPost, previewPost: vi.fn(), goCms: vi.fn() }),
 }))
-vi.mock('../../data/usePostAddresses', () => ({ usePostAddresses: () => ({ slugToPublish: () => undefined, slugOf: (id: string) => id }) }))
+vi.mock('../../data/usePostAddresses', () => ({ usePostAddresses: () => ({ slugOf: (id: string) => id }) }))
 
 const post = (id: string, over: Record<string, unknown>) => ({
   id,

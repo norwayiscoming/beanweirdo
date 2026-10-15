@@ -7,6 +7,7 @@ import { IconClose, IconGrip, IconPlus } from '../../design/icons'
 import { ColorRow, STATUS_CHOICES } from './NodeFields'
 import { ink, paper, sans, serif } from '../../design/tokens'
 import { useRowDrag } from '../lib/useRowDrag'
+import { freeSlug, titleSlug } from '../../lib/postSlug'
 import { useTags } from '../../data/useTags'
 import {
   createNode,
@@ -209,16 +210,7 @@ export function usePortAdmin() {
 
 // ── tab 1: port pages ───────────────────────────────────────────────────────
 
-function uniqueSlug(base: string, pages: Node[]) {
-  const taken = new Set(pages.map((p) => p.slug))
-  if (!taken.has(base)) return base
-  for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`
-}
-
-/** An address word from a name: accents off, đ as d, anything else a hyphen. */
-function toSlug(name: string): string {
-  return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-}
+const uniqueSlug = (base: string, pages: Node[]) => freeSlug(base, new Set(pages.map((p) => p.slug)))
 
 /** What a new port page can start from, wherever one is made. */
 export const PRESET_CHOICES: { value: PresetKey; label: string }[] = [
@@ -229,7 +221,7 @@ export const PRESET_CHOICES: { value: PresetKey; label: string }[] = [
 
 /** A new port page from a preset, named by the owner; it starts as a draft at the end of the list. */
 export async function createFromPreset(key: PresetKey, title: string, pages: Node[], moduleIds: string[], parentId: string | null = null): Promise<Node> {
-  const slug = uniqueSlug(toSlug(title) || (key === 'blank' ? 'trang' : key), pages)
+  const slug = uniqueSlug(titleSlug(title) || (key === 'blank' ? 'trang' : key), pages)
   return createNode({ site: 'port', slug, title, parent_id: parentId, blocks: preset(key, moduleIds), look: key === 'bibe' ? 'baen' : 'biz', status: 'draft' })
 }
 

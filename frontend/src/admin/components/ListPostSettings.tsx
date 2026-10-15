@@ -1,10 +1,31 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AuthorRef } from 'api-contract'
-import { getPost, updatePost, type Module, type Node, type PostDetail } from '../lib/apiClient'
+import { getPost, transitionStatus, updatePost, type Module, type Node, type PostDetail } from '../lib/apiClient'
 import { listModulesCached } from '../lib/lists'
 import { resolveTemplate } from '../lib/postData'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { PostSettings, type SettingsPatch } from './PostSettings'
+
+type Loaded = Awaited<ReturnType<typeof getPost>>
+const loads = new Map<string, { at: number; p: Promise<Loaded> }>()
+/** A hover long before the click (or before a trip into the editor) would show an old copy. */
+const FRESH_MS = 30_000
+
+/**
+ * Start reading a post before it is clicked, on hover or focus. Owner
+ * (2026-10-15) found the panel slow to open: it waited for this request after
+ * the click. A hover usually comes a few hundred ms before the click, which is
+ * most of the wait.
+ */
+export function prefetchPost(id: string): Promise<Loaded> {
+  const hit = loads.get(id)
+  if (hit && Date.now() - hit.at < FRESH_MS) return hit.p
+  const p = getPost(id)
+  loads.set(id, { at: Date.now(), p })
+  // A failed read must not stick: the next hover tries again.
+  p.catch(() => loads.delete(id))
+  return p
+}
 
 /**
  * The editor's "Thông tin bài" panel, opened on one post straight from the
@@ -32,15 +53,21 @@ export function ListPostSettings({
   const [post, setPost] = useState<PostDetail | null>(null)
   const [byline, setByline] = useState<AuthorRef[]>([])
   const [modules, setModules] = useState<Module[]>([])
+  const writes = useRef(new Set<Promise<unknown>>())
+  const [dirty, setDirty] = useState(false)
   // Mounted closed, opened a frame later, so the panel slides in as it does in the editor.
   const [shown, setShown] = useState(false)
 
   useEffect(() => {
     setPost(null)
+    setDirty(false)
     setShown(false)
     if (!postId) return
     let alive = true
-    Promise.all([getPost(postId), listModulesCached()])
+    // Edits made here would make a cached copy stale; read fresh next time.
+    const load = prefetchPost(postId)
+    loads.delete(postId)
+    Promise.all([load, listModulesCached()])
       .then(([{ authors, ...p }, mods]) => {
         if (!alive) return
         setByline(authors)
@@ -70,8 +97,12 @@ export function ListPostSettings({
   const patch = (p: SettingsPatch) => {
     // The panel's template is a free string; the editor casts the same way.
     setPost((prev) => (prev ? { ...prev, ...(p as Partial<PostDetail>) } : prev))
-    void updatePost(post.id, p as Parameters<typeof updatePost>[1]).catch((e: Error) => onError(e.message))
+    const w = updatePost(post.id, p as Parameters<typeof updatePost>[1])
+    writes.current.add(w)
+    void w.finally(() => writes.current.delete(w)).catch((e: Error) => onError(e.message))
+    setDirty(true)
   }
+  const live = post.status === 'published'
 
   return (
     <>
@@ -87,18 +118,22 @@ export function ListPostSettings({
         canChangeTemplate={!hasContent}
         derivedSlug={addresses.slugOf(post.id)}
         onPatch={patch}
+        onSave={async () => void (await Promise.all([...writes.current]))}
+        publishLabel={live ? (post.has_draft || dirty ? 'Đăng thay đổi' : null) : post.status === 'draft' ? 'Publish' : null}
+        onPublish={async () => {
+          await transitionStatus(post.id, 'publish')
+          // The list reloads on close and shows the post where it now lives.
+          onClose()
+        }}
         onSlug={async (slug) => {
           try {
             const saved = await updatePost(post.id, { slug })
-            setPost((prev) => (prev ? { ...prev, slug: saved.slug ?? null, old_slugs: saved.old_slugs } : prev))
+            setPost((prev) => (prev ? { ...prev, slug: saved.slug ?? null } : prev))
             return null
           } catch (e) {
             return (e as Error).message
           }
         }}
-        onForget={(slug) =>
-          void updatePost(post.id, { forget_slugs: [slug] }).then((saved) => setPost((prev) => (prev ? { ...prev, old_slugs: saved.old_slugs } : prev)))
-        }
       />
     </>
   )

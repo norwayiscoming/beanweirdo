@@ -147,15 +147,6 @@ function Routed({ where, go }: { where: Where; go: (next: Where) => void }) {
     window.dispatchEvent(new PopStateEvent('popstate'))
   }, [where, pageList])
 
-  useEffect(() => {
-    if (!where.slug || !postId || !posts.forwards(where.slug)) return
-    // The old addresses can arrive before the current ones; until the book
-    // knows this post's address there is nothing better to show than the old.
-    const current = posts.slugOf(postId)
-    if (current === postId) return
-    window.history.replaceState({}, '', toPath({ ...where, slug: current }))
-    window.dispatchEvent(new PopStateEvent('popstate'))
-  }, [where, postId, posts])
   const articleFrom: Origin = where.from ?? 'admin'
 
   const openModule = useCallback((id: string) => at({ screen: 'module', moduleId: id }), [at])

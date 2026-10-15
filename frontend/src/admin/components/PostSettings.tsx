@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AuthorRef } from 'api-contract'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { tagColor } from '../../lib/tagColor'
+import { titleSlug } from '../../lib/postSlug'
+import { proseOf } from '../../lib/postText'
 import { createKeyword, listKeywords, type Keyword, type Module, type PostDetail, type PostTemplate, type PostVisibility, type Node } from '../lib/apiClient'
 import { TEMPLATE_LABEL } from '../../content/templates'
 import { ink, sans } from '../../design/tokens'
-import { IconButton } from '../../design/Button'
+import { Button, IconButton } from '../../design/Button'
 import { IconClose } from '../../design/icons'
 import { AuthorPicker } from './AuthorPicker'
 import { ThemePicker } from './ThemePicker'
@@ -21,6 +23,10 @@ import { Choice, DETAIL_CSS, desk } from './Detail'
  * panel (2026-10-14): one button opens it, the page stays visible beside it,
  * so a change of colour or topic shows on the page at once.
  *
+ * Name first, then address, then byline: the owner (2026-10-15) wants what a
+ * post is called and where it lives settled before anything else, and found
+ * no way at all to rename a post whose template draws no title field.
+ *
  * Everything but the address and the authors goes through the editor's own
  * patch, so it saves and undoes like any other field. The address does not:
  * the server can refuse it (taken, or still forwarding to another post), and
@@ -28,6 +34,7 @@ import { Choice, DETAIL_CSS, desk } from './Detail'
  * module and pin, without waiting for "Đăng thay đổi".
  */
 export type SettingsPatch = Partial<{
+  en: string
   topic_id: string | null
   visibility: PostVisibility
   module_id: string
@@ -96,7 +103,9 @@ export function PostSettings({
   derivedSlug,
   onPatch,
   onSlug,
-  onForget,
+  onSave,
+  publishLabel,
+  onPublish,
 }: {
   open: boolean
   onClose: () => void
@@ -111,13 +120,29 @@ export function PostSettings({
   /** The address the post is reached at while nothing is stored. */
   derivedSlug: string
   onPatch: (patch: SettingsPatch) => void
-  /** Resolves to an error message, or null when the address was taken. */
-  onSlug: (slug: string) => Promise<string | null>
-  /** Stop an old address forwarding to this post. */
-  onForget?: (slug: string) => void
+  /** Null goes back to the title's address. Resolves to an error message, or null when it was taken. */
+  onSlug: (slug: string | null) => Promise<string | null>
+  /** Settles once every write the parent has started has landed; rejects when one failed. */
+  onSave: () => Promise<void>
+  /** The publish button's word, or null when nothing is waiting to go on the page. */
+  publishLabel: string | null
+  onPublish: () => Promise<void>
 }) {
   const [keywords, setKeywords] = useState<Keyword[]>([])
   const [slugError, setSlugError] = useState<string | null>(null)
+  /*
+   * Fields write as they are left, but the owner (2026-10-15) could not tell
+   * whether a change had landed without reloading. The footer says so, and
+   * "Lưu" is the moment to find out: it leaves the field being typed in (its
+   * write starts), waits for every write, then reports.
+   */
+  const [note, setNote] = useState<'idle' | 'dirty' | 'saving' | 'publishing' | { saved: Date } | { error: string }>('idle')
+  const slugWrites = useRef(new Set<Promise<unknown>>())
+  const track = <T,>(p: Promise<T>) => {
+    slugWrites.current.add(p)
+    void p.finally(() => slugWrites.current.delete(p)).catch(() => {})
+    return p
+  }
   const panel = useRef<HTMLElement>(null)
   // Closed, the panel is only slid off screen: keep Tab and screen readers out of it.
   useEffect(() => {
@@ -141,10 +166,70 @@ export function PostSettings({
     if (!wearing.includes(made.id)) onPatch({ keywords: [...wearing, made.id] })
   }
 
+  /*
+   * With nothing typed, the address is the title's (`slugsFor`) and moves when
+   * the title does. The book behind `derivedSlug` was read when the screen
+   * opened, so a rename made here shows through the title itself.
+   */
+  const fromTitle = titleSlug(post.en)
+  const address = post.slug ?? (fromTitle || derivedSlug)
+  const firstHeading = proseOf(post.body).find((p) => p.h)?.text
+
   async function commitSlug(value: string) {
-    const v = value.trim()
-    if (!v || v === (post.slug ?? derivedSlug)) return setSlugError(null)
-    setSlugError(await onSlug(v))
+    // Typed the way a title is written, stored the way an address must be.
+    const v = titleSlug(value)
+    if (!v || v === address) return setSlugError(null)
+    setSlugError(await track(onSlug(v)))
+  }
+
+  /** Leave the field in hand, so its write starts, then wait for every write. */
+  async function settle() {
+    if (panel.current?.contains(document.activeElement)) (document.activeElement as HTMLElement).blur()
+    await new Promise((r) => setTimeout(r))
+    await Promise.all([...slugWrites.current])
+    await onSave()
+  }
+
+  async function save() {
+    setNote('saving')
+    try {
+      await settle()
+      setNote({ saved: new Date() })
+    } catch (e) {
+      setNote({ error: (e as Error).message })
+    }
+  }
+
+  async function publish() {
+    setNote('publishing')
+    try {
+      await settle()
+      await onPublish()
+      setNote({ saved: new Date() })
+    } catch (e) {
+      setNote({ error: (e as Error).message })
+    }
+  }
+
+  const live = post.status === 'published'
+  const noteText =
+    note === 'dirty'
+      ? 'Có thay đổi, bấm Lưu.'
+      : note === 'saving'
+        ? 'Đang lưu…'
+        : note === 'publishing'
+          ? 'Đang đăng…'
+          : note === 'idle'
+            ? live
+              ? 'Bài đã đăng: sửa gì cũng vào nháp tới khi bấm Đăng.'
+              : 'Bài nháp.'
+            : 'error' in note
+              ? `Chưa lưu được: ${note.error}`
+              : `Đã lưu lúc ${note.saved.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}${live && publishLabel ? ', chưa lên trang.' : '.'}`
+
+  function commitTitle(value: string) {
+    const t = value.trim()
+    if (t && t !== post.en) onPatch({ en: t })
   }
 
   return (
@@ -154,6 +239,8 @@ export function PostSettings({
       aria-hidden={!open}
       className="cfg-detail"
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
+      onInput={() => setNote('dirty')}
+      onChange={() => setNote('dirty')}
       style={{
         position: 'fixed',
         top: 0,
@@ -167,7 +254,7 @@ export function PostSettings({
         transform: open ? 'none' : 'translateX(100%)',
         transition: 'transform .2s ease, box-shadow .2s ease',
         overflowY: 'auto',
-        padding: '14px 16px 32px',
+        padding: '14px 16px 0',
         display: 'flex',
         flexDirection: 'column',
         gap: 8,
@@ -185,7 +272,98 @@ export function PostSettings({
         </IconButton>
       </div>
 
+      <Group title="Tên & người viết">
+        <Prop
+          label="Tên bài"
+          hint={
+            firstHeading && firstHeading !== post.en ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>Heading đầu bài: «{firstHeading}»</span>
+                <Button size="sm" onClick={() => commitTitle(firstHeading)}>
+                  Dùng làm tên
+                </Button>
+              </span>
+            ) : post.status === 'published' ? (
+              'Bài đã đăng: tên mới lên trang khi bấm Đăng thay đổi.'
+            ) : undefined
+          }
+        >
+          <input
+            aria-label="Tên bài"
+            key={post.en}
+            defaultValue={post.en}
+            onBlur={(e) => {
+              commitTitle(e.target.value)
+              // An empty name is refused; show the one that stands.
+              if (!e.target.value.trim()) e.target.value = post.en
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                e.currentTarget.value = post.en
+              }
+            }}
+            style={{ width: '100%', fontSize: 15 }}
+          />
+        </Prop>
+        <Prop
+          label="Slug"
+          hint={
+            slugError ? (
+              <span role="alert" style={{ color: ink.danger }}>
+                {slugError}
+              </span>
+            ) : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>{post.slug ? 'Đặt tay, không đổi theo tên. Enter để lưu, Esc để bỏ.' : 'Theo tên bài, không dấu, nối bằng "-"; đổi tên thì đổi theo. Gõ để đặt khác.'}</span>
+                {post.slug && (
+                  <Button size="sm" onClick={() => void track(onSlug(null)).then(setSlugError)}>
+                    Theo tên bài
+                  </Button>
+                )}
+              </span>
+            )
+          }
+        >
+          <input
+            aria-label="Slug"
+            key={address}
+            defaultValue={post.slug ?? ''}
+            placeholder={address}
+            onBlur={(e) => void commitSlug(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') {
+                // The field's own undo, not the panel's close.
+                e.stopPropagation()
+                e.currentTarget.value = post.slug ?? ''
+                setSlugError(null)
+              }
+            }}
+            style={{ width: '100%' }}
+          />
+        </Prop>
+        <Prop label="Tác giả" hint="Thứ tự ở đây là thứ tự trên dòng tác giả.">
+          <AuthorPicker key={post.id} postId={post.id} initial={byline} />
+        </Prop>
+      </Group>
+
       <Group title="Vị trí">
+        {/*
+          * Named for what it still does. Where a post shows on the blog is the
+          * topic's job now; the module only lends its colour, and the list of
+          * an old page with no rule.
+          */}
+        <Prop label="Màu mượn từ" hint="Màu mặc định lấy từ module này. Bài hiện ở đâu là do Chủ đề.">
+          <select aria-label="Module" value={post.module_id} onChange={(e) => onPatch({ module_id: e.target.value })} style={{ width: '100%' }}>
+            {modules.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.title}
+              </option>
+            ))}
+          </select>
+        </Prop>
         <Prop label="Chủ đề" hint="Bài hiện ở mục này trong Mục lục.">
           <select aria-label="Chủ đề" value={post.topic_id ?? ''} onChange={(e) => onPatch({ topic_id: e.target.value || null })} style={{ width: '100%' }}>
             {!post.topic_id && <option value="">—</option>}
@@ -238,12 +416,6 @@ export function PostSettings({
         </Prop>
       </Group>
 
-      <Group title="Người viết">
-        <Prop label="Tác giả" hint="Thứ tự ở đây là thứ tự trên dòng tác giả.">
-          <AuthorPicker key={post.id} postId={post.id} initial={byline} />
-        </Prop>
-      </Group>
-
       <Group title="Hiển thị">
         <Prop label="Template" hint={canChangeTemplate ? undefined : 'Bài đã có chữ nên không đổi được nữa.'}>
           {canChangeTemplate ? (
@@ -258,20 +430,6 @@ export function PostSettings({
             <span style={{ fontSize: 14 }}>{TEMPLATE_LABEL[template]}</span>
           )}
         </Prop>
-        {/*
-          * Named for what it still does. Where a post shows on the blog is the
-          * topic's job now; the module only lends its colour, the address a post
-          * gets until one is typed, and the list of an old page with no rule.
-          */}
-        <Prop label="Màu mượn từ" hint="Màu mặc định và địa chỉ tự sinh lấy từ module này. Bài hiện ở đâu là do Chủ đề.">
-          <select aria-label="Module" value={post.module_id} onChange={(e) => onPatch({ module_id: e.target.value })} style={{ width: '100%' }}>
-            {modules.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.title}
-              </option>
-            ))}
-          </select>
-        </Prop>
         <Prop label="Màu bài">
           <ThemePicker
             value={post.theme_color}
@@ -281,9 +439,6 @@ export function PostSettings({
             onChange={(theme_color) => onPatch({ theme_color })}
           />
         </Prop>
-      </Group>
-
-      <Group title="Địa chỉ & quyền xem">
         <Prop label="Quyền xem">
           <Choice
             label="Quyền xem"
@@ -295,53 +450,35 @@ export function PostSettings({
             onChange={(visibility) => onPatch({ visibility })}
           />
         </Prop>
-        <Prop
-          label="Địa chỉ"
-          hint={
-            slugError ? (
-              <span role="alert" style={{ color: ink.danger }}>
-                {slugError}
-              </span>
-            ) : (
-              'Để trống thì dùng địa chỉ tự sinh. Enter để lưu, Esc để bỏ.'
-            )
-          }
-        >
-          <input
-            aria-label="Địa chỉ"
-            key={post.slug ?? derivedSlug}
-            defaultValue={post.slug ?? ''}
-            placeholder={derivedSlug}
-            onBlur={(e) => void commitSlug(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur()
-              if (e.key === 'Escape') {
-                // The field's own undo, not the panel's close.
-                e.stopPropagation()
-                e.currentTarget.value = post.slug ?? ''
-                setSlugError(null)
-              }
-            }}
-            style={{ width: '100%' }}
-          />
-        </Prop>
-        {(post.old_slugs ?? []).length > 0 && (
-          <Prop label="Địa chỉ cũ" hint="Vẫn chuyển về bài này. Bỏ đi thì địa chỉ ấy trống lại.">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {(post.old_slugs ?? []).map((s) => (
-                <span key={s} style={{ ...chip, border: `1px solid ${desk.field}`, background: desk.panel, borderRadius: 6 }}>
-                  {s}
-                  {onForget && (
-                    <IconButton size="sm" label={`bỏ địa chỉ cũ ${s}`} onClick={() => onForget(s)} style={{ width: 20, height: 20 }}>
-                      <IconClose size={12} />
-                    </IconButton>
-                  )}
-                </span>
-              ))}
-            </div>
-          </Prop>
-        )}
       </Group>
+      <footer
+        style={{
+          position: 'sticky',
+          bottom: 0,
+          marginTop: 'auto',
+          marginInline: -16,
+          padding: '10px 16px 14px',
+          background: desk.panel,
+          borderTop: `1px solid ${desk.line}`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <span role="status" style={{ fontSize: 12, color: typeof note === 'object' && 'error' in note ? ink.danger : ink.soft }}>
+          {noteText}
+        </span>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <Button onClick={() => void save()} disabled={note === 'saving' || note === 'publishing'}>
+            Lưu
+          </Button>
+          {publishLabel && (
+            <Button level="primary" onClick={() => void publish()} disabled={note === 'saving' || note === 'publishing'}>
+              {publishLabel}
+            </Button>
+          )}
+        </div>
+      </footer>
     </aside>
   )
 }

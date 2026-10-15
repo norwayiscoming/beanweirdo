@@ -74,7 +74,8 @@ describe('màn sửa bài', () => {
     expect(screen.getByText('Đang tải...')).toBeTruthy()
 
     await waitFor(() => expect(screen.queryByText('Đang tải...')).toBeNull())
-    expect(screen.getByDisplayValue('taste modality: sơn la')).toBeTruthy()
+    // Twice: on the page, and in the closed "Thông tin bài" panel's name field.
+    expect(screen.getAllByDisplayValue('taste modality: sơn la').length).toBeGreaterThan(0)
   })
 
   /*
