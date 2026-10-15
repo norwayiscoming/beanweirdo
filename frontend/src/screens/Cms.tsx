@@ -1,14 +1,11 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Breadcrumbs } from '../components/Breadcrumbs'
 import { resolveSite, SITE_DEFAULTS, type SiteCopy, type SiteOverrides } from '../content/site'
 import {
   listModules,
-  listPosts,
   updateModule,
   updateSite,
   uploadImage,
   type Module,
-  type PostSummary,
 } from '../admin/lib/apiClient'
 import { getSite } from '../admin/lib/apiClient'
 import { forgetModules } from '../admin/lib/lists'
@@ -26,7 +23,7 @@ import { Hover } from '../lib/Hover'
 import { ContentWorkspace } from '../admin/components/ContentWorkspace'
 import { ConfigTree } from '../admin/components/ConfigTree'
 import { DisplaySettings } from '../admin/components/DisplaySettings'
-import { DETAIL_CSS, desk } from '../admin/components/Detail'
+import { DETAIL_CSS } from '../admin/components/Detail'
 import { useNav } from '../lib/nav'
 
 const sectionHead: CSSProperties = {
@@ -90,12 +87,6 @@ const nameRow = 'minmax(0,1fr) 112px 124px 128px'
 const nameRowPlain = 'minmax(0,1fr) 112px'
 
 
-/** The three tabs, named once so the site map and the tab bar cannot drift. Tác giả lives in Cấu hình since 2026-10-14; `/ad-authors` opens it there. */
-const TABS = [
-  { k: 'posts', t: 'Nội dung' },
-  { k: 'pages', t: 'Cấu hình' },
-  { k: 'display', t: 'Cài đặt hiển thị' },
-] as const
 
 /** Names where a field turns up on the site — identification, not instruction. */
 function Where({ children }: { children: ReactNode }) {
@@ -353,16 +344,13 @@ export function Cms() {
   const tab = nav.cmsTab
   const [site, setSite] = useState<SiteOverrides>({})
   const [modules, setModules] = useState<Module[]>([])
-  // The site map names what Templates holds, so it has to know.
-  const [posts, setPosts] = useState<PostSummary[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [s, m, p] = await Promise.all([getSite(), listModules(), listPosts('all')])
+      const [s, m] = await Promise.all([getSite(), listModules()])
       setSite(s)
       setModules(m)
-      setPosts(p)
       setError(null)
     } catch (e) {
       setError((e as Error).message)
@@ -798,71 +786,13 @@ export function Cms() {
     )
   }
 
-  const postCount = posts.length
-
   return (
-    // Every tab sits on the same desk and takes its fields' frames from DETAIL_CSS (owner chose style C, 2026-10-13).
-    <div className="cfg-detail" style={{ background: desk.ground, color: ink.base, minHeight: '100vh' }}>
+    // The frame (sidebar, top line) is AdminShell's; fields take their frames from DETAIL_CSS.
+    <div className="cfg-detail" style={{ color: ink.base }}>
       <style>{DETAIL_CSS}</style>
-      <div style={{ background: '#DDEBF0', color: '#0E2C38', padding: '44px 56px 30px' }}>
-        <Breadcrumbs style={{ opacity: 0.75 }} />
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            justifyContent: 'space-between',
-            gap: 44,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <h1
-              style={{
-                fontFamily: serif,
-                fontWeight: 400,
-                fontSize: 70,
-                lineHeight: 1,
-                letterSpacing: '-.04em',
-                margin: 0,
-              }}
-            >
-              Content
-            </h1>
-            <div
-              style={{
-                fontFamily: sans,
-                fontWeight: 400,
-                fontSize: 13.5,
-                lineHeight: 1.5,
-                marginTop: 10,
-                maxWidth: 430,
-                opacity: 0.85,
-              }}
-            >
-              Mọi thứ trong khu quản trị: bài viết, trang và cách site hiển thị.
-            </div>
-          </div>
-          <div
-            style={{
-              fontFamily: sans,
-              fontSize: 13,
-              opacity: 0.7,
-              paddingBottom: 8,
-            }}
-          >
-            {modules.length} module · {postCount} bài
-          </div>
-        </div>
-
-        <div role="tablist" aria-label="Khu quản trị" className="ab-tabs" style={{ marginTop: 26 }}>
-          {TABS.map((x) => (
-            <button type="button" role="tab" key={x.k} aria-selected={tab === x.k || (tab === 'authors' && x.k === 'pages')} onClick={() => nav.goCms(x.k)} className="ab-tab">
-              {x.t}
-            </button>
-          ))}
-        </div>
-      </div>
+      {(tab === 'posts' || tab === 'display') && (
+        <h1 style={{ fontFamily: serif, fontWeight: 500, fontSize: 34, lineHeight: 1.15, margin: 0, padding: '8px 28px 4px' }}>{tab === 'posts' ? 'Nội dung' : 'Cài đặt hiển thị'}</h1>
+      )}
 
       {error && (
         <div
@@ -871,7 +801,7 @@ export function Cms() {
             color: '#8E1E42',
             fontFamily: sans,
             fontSize: 12.5,
-            padding: '10px 56px',
+            padding: '10px 28px',
           }}
         >
           {error}

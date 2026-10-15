@@ -36,7 +36,7 @@ import { tagColor } from '../../lib/tagColor'
 import { Builder, ContentTab, PRESET_CHOICES, createFromPreset, usePortAdmin, useSplit, type PortPart } from './PortEditors'
 import { ScaledPreview, useWidth } from './ScaledPreview'
 import { TagBadges } from '../../components/TagBadges'
-import { SiteTabs, useRememberedTab } from './SiteTabs'
+import { CONFIG_SITE_LABELS as SITE_LABELS, Item, useAdminFrame, type ConfigSite } from '../AdminShell'
 import { AuthorsPanel } from './AuthorsPanel'
 import {
   describePage,
@@ -98,9 +98,7 @@ import {
 
 type Group = 'root-toc' | 'biz-pages' | 'bean-pages' | 'frame' | 'topics' | 'tags' | 'authors' | 'modules'
 
-const SITES = ['root', 'biz', 'bean', 'blog'] as const
-type SiteId = (typeof SITES)[number]
-const SITE_LABELS: Record<SiteId, string> = { root: 'beanweirdo', biz: 'biz', bean: 'bean', blog: 'personal blog' }
+type SiteId = ConfigSite
 
 type Picked =
   | BlogSelected
@@ -121,27 +119,9 @@ const ROW = 'data-cfg-row'
 
 function Card({ title, note, on, onClick }: { title: string; note: string; on: boolean; onClick: () => void }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        background: on ? desk.soft : desk.panel,
-        border: `1px solid ${on ? ink.moss : desk.line}`,
-        boxShadow: on ? `inset 3px 0 0 ${ink.moss}` : 'none',
-        borderRadius: radius,
-      }}
-    >
-      <button
-        type="button"
-        {...{ [ROW]: '' }}
-        aria-current={on || undefined}
-        onClick={onClick}
-        style={{ all: 'unset', flex: 1, minWidth: 0, padding: '12px 14px 13px', cursor: 'pointer' }}
-      >
-        <div style={{ fontFamily: sans, fontWeight: 600, fontSize: 15, lineHeight: 1.25, color: ink.base }}>{title}</div>
-        <div style={{ fontFamily: sans, fontSize: 13, lineHeight: 1.45, color: ink.soft, marginTop: 4 }}>{note}</div>
-      </button>
-    </div>
+    <Item depth={1} on={on} onClick={onClick} {...{ [ROW]: '' }}>
+      <span title={note}>{title}</span>
+    </Item>
   )
 }
 
@@ -216,10 +196,8 @@ export function ConfigTree({
   const src = usePortSources()
   const [layout, setLayout] = useState<Layout | null>(null)
   const [vocab, setVocab] = useState<Vocab>({ topics: [], keywords: [], kinds: [] })
-  const [remembered, setSiteTab] = useRememberedTab('beanweirdo.config.tab', SITES)
-  // Landing from /ad-authors shows the root tab until another tab is picked.
-  const [landed, setLanded] = useState(openAuthors)
-  const site = landed ? 'root' : remembered
+  const frame = useAdminFrame()
+  const site = frame.site
   // Without its home page (not loaded yet) a block-page site opens on its Mục lục.
   const homeOf = (id: SiteId): Picked => {
     if (id === 'root') return { kind: 'port-part', part: 'home' }
@@ -229,13 +207,27 @@ export function ConfigTree({
     return { kind: 'group', id: id === 'bean' ? 'bean-pages' : 'biz-pages' }
   }
   const [picked, setPicked] = useState<Picked>(() => (openAuthors ? { kind: 'group', id: 'authors' } : homeOf(site)))
-  const openSite = (id: SiteId) => {
-    setLanded(false)
-    setSiteTab(id)
-    setPicked(homeOf(id))
+  // The site is picked in the sidebar; opening another one starts on its home.
+  // `/ad-authors` lands on the root site's authors card, which a site change must not reset.
+  const shownSite = useRef(site)
+  const keepPick = useRef(false)
+  useEffect(() => {
+    if (openAuthors && site !== 'root') {
+      keepPick.current = true
+      frame.openSite('root')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (shownSite.current === site) return
+    shownSite.current = site
+    if (keepPick.current) {
+      keepPick.current = false
+      return
+    }
+    setPicked(homeOf(site))
     setDragging(null)
     setDropAt(null)
-  }
+  }, [site]) // eslint-disable-line react-hooks/exhaustive-deps
   const [err, setErr] = useState<string | null>(null)
   // The delete panel is open for one pick, so another pick closes it and a
   // row's "Xoá…" can open its item with the panel already showing.
@@ -249,19 +241,18 @@ export function ConfigTree({
   const [portRound, setPortRound] = useState(0)
   const [undo, setUndo] = useState<{ msg: string; saving: boolean; revert: () => Promise<unknown> } | null>(null)
 
-  // Both dividers drag, and each width is remembered: the tree for long names, the fields for long forms.
-  const treeSplit = useSplit('cfg-tree', 264, 'left', 200, 520)
+  // The divider drags and its width is remembered, for long forms.
   const split = useSplit('cfg-v1', 520, 'left', 360, 900)
   const [root, width] = useWidth<HTMLDivElement>()
-  // Wide: tree, fields, preview side by side. Narrower: the preview goes under the fields. Phone: one column.
-  const columns = width === 0 || width >= 1180 ? 3 : width >= 860 ? 2 : 1
+  // Wide: fields and preview side by side. Narrower: the preview goes under the fields.
+  const wide = width === 0 || width >= 960
   const [slot, setSlot] = useState<HTMLDivElement | null>(null)
   const editor = useRef<HTMLDivElement>(null)
   // Side by side, the fields scroll on their own; stacked, a pick far down the
   // tree would open its fields out of sight, so bring them into view.
   useEffect(() => {
     const top = editor.current?.getBoundingClientRect().top ?? 0
-    if (columns < 3 && (top < 0 || top > window.innerHeight - 80)) editor.current?.scrollIntoView?.({ block: 'start' })
+    if (!wide && (top < 0 || top > window.innerHeight - 80)) editor.current?.scrollIntoView?.({ block: 'start' })
   }, [picked]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -543,8 +534,7 @@ export function ConfigTree({
       return <Card key={c.title} title={c.title} note={c.note} on={g ? groupOf(picked) === g : on(c.picked)} onClick={pick(c.picked)} />
     }
     return (
-      <section aria-label={SITE_LABELS[id]} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, color: ink.muted, padding: '0 2px 2px' }}>{path}</div>
+      <section aria-label={SITE_LABELS[id]} title={path} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {home && card(home)}
         {toc && card({ title: toc.title, note: toc.note, picked: { kind: 'group', id: toc.id } })}
         {cards.map(card)}
@@ -552,15 +542,15 @@ export function ConfigTree({
     )
   }
 
-  const tree = (
-    <nav
-      aria-label="Cây cấu hình"
-      onKeyDown={walk}
-      style={{ display: 'flex', flexDirection: 'column', gap: 8, ...(columns === 1 ? {} : { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto' }), padding: '0 4px 24px 0' }}
-    >
-      {siteTree(spec)}
-    </nav>
-  )
+  // Drawn in the sidebar, under the open site.
+  const tree = frame.slot
+    ? createPortal(
+        <nav aria-label="Cây cấu hình" onKeyDown={walk} style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '2px 0 6px' }}>
+          {siteTree(spec)}
+        </nav>,
+        frame.slot,
+      )
+    : null
 
   // ── the right side: one template for every item (`Detail.tsx`) and the public page beside it ──
   let crumbs: Crumb[] = []
@@ -1007,29 +997,23 @@ export function ConfigTree({
         )
       : null
 
-  const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging || treeSplit.dragging ? 'none' : undefined } as const
+  const previewStyle = { background: paper.white, border: `1px solid ${paper.rule}`, borderRadius: radius, overflow: 'hidden', pointerEvents: split.dragging ? 'none' : undefined } as const
 
   return (
-    // The desk: every panel of the detail and every card of the tree sits on it.
-    <div style={{ background: desk.ground }}>
-      <div style={{ padding: columns === 1 ? '24px 16px 0' : '28px 32px 0' }}>
-        <SiteTabs tabs={SITES} labels={SITE_LABELS} value={site} onChange={openSite} />
-      </div>
-      <div
+    <div
       ref={root}
       style={{
         display: 'grid',
-        gridTemplateColumns: columns === 3 ? `${treeSplit.size}px 7px ${split.columns}` : columns === 2 ? treeSplit.columns : 'minmax(0, 1fr)',
-        // Each cell keeps its own height, which is what lets the tree and the preview stick.
+        gridTemplateColumns: wide ? split.columns : 'minmax(0, 1fr)',
+        // Each cell keeps its own height, which is what lets the preview stick.
         alignItems: 'start',
         columnGap: 12,
         rowGap: 20,
-        padding: columns === 1 ? '16px 16px 90px' : '20px 32px 120px',
+        padding: wide ? '8px 28px 120px' : '8px 16px 90px',
       }}
     >
-      <div style={columns === 2 ? { gridRow: '1 / span 2' } : undefined}>{tree}</div>
-      {columns > 1 && <div style={{ alignSelf: 'stretch', ...(columns === 2 ? { gridRow: '1 / span 2' } : {}) }}>{treeSplit.handle}</div>}
-      <div ref={editor} className="cfg-detail" style={{ minWidth: 0, scrollMarginTop: 16, ...(columns === 3 ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
+      {tree}
+      <div ref={editor} className="cfg-detail" style={{ minWidth: 0, scrollMarginTop: 16, ...(wide ? { position: 'sticky', top: 0, maxHeight: '100vh', overflowY: 'auto', paddingRight: 8 } : {}) }}>
         {header}
         {body}
         {undo && (
@@ -1054,18 +1038,13 @@ export function ConfigTree({
           </div>
         )}
       </div>
-      {columns === 3 && split.handle}
+      {wide && split.handle}
       <div
         ref={setSlot}
         aria-label="Xem trước"
-        style={{
-          ...previewStyle,
-          ...(columns === 3 ? { position: 'sticky', top: 0, height: 'calc(100vh - 40px)' } : { height: '70vh' }),
-          ...(columns === 2 ? { gridColumn: 3 } : {}),
-        }}
+        style={{ ...previewStyle, ...(wide ? { position: 'sticky', top: 0, height: 'calc(100vh - 40px)' } : { height: '70vh' }) }}
       />
       {previewPane}
-      </div>
     </div>
   )
 }
