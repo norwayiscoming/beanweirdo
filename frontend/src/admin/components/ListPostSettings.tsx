@@ -6,6 +6,27 @@ import { resolveTemplate } from '../lib/postData'
 import { usePostAddresses } from '../../data/usePostAddresses'
 import { PostSettings, type SettingsPatch } from './PostSettings'
 
+type Loaded = Awaited<ReturnType<typeof getPost>>
+const loads = new Map<string, { at: number; p: Promise<Loaded> }>()
+/** A hover long before the click (or before a trip into the editor) would show an old copy. */
+const FRESH_MS = 30_000
+
+/**
+ * Start reading a post before it is clicked, on hover or focus. Owner
+ * (2026-10-15) found the panel slow to open: it waited for this request after
+ * the click. A hover usually comes a few hundred ms before the click, which is
+ * most of the wait.
+ */
+export function prefetchPost(id: string): Promise<Loaded> {
+  const hit = loads.get(id)
+  if (hit && Date.now() - hit.at < FRESH_MS) return hit.p
+  const p = getPost(id)
+  loads.set(id, { at: Date.now(), p })
+  // A failed read must not stick: the next hover tries again.
+  p.catch(() => loads.delete(id))
+  return p
+}
+
 /**
  * The editor's "Thông tin bài" panel, opened on one post straight from the
  * post list.
@@ -40,7 +61,10 @@ export function ListPostSettings({
     setShown(false)
     if (!postId) return
     let alive = true
-    Promise.all([getPost(postId), listModulesCached()])
+    // Edits made here would make a cached copy stale; read fresh next time.
+    const load = prefetchPost(postId)
+    loads.delete(postId)
+    Promise.all([load, listModulesCached()])
       .then(([{ authors, ...p }, mods]) => {
         if (!alive) return
         setByline(authors)
