@@ -1,6 +1,6 @@
 # Kho bài chung, tick trang chủ, trang bài /p/
 
-- **PR:** (chưa mở) · nhánh `claude/config-one-tree-539wvd`
+- **PR:** #103 · nhánh `claude/config-one-tree-539wvd`
 - **Migration:** `0038_post_shown_on.sql`. Chủ site chạy **trước** khi merge: code mới đọc cột `posts.shown_on`, thiếu cột thì danh sách bài lỗi.
 
 Chủ site 2026-10-15: một kho bài cho biz, bean và personal blog; mỗi bài có cờ cho từng site, "true ở đâu thì appear ở trang chủ cái đó"; tick chỉ có nghĩa là hiện ở trang chủ nào (chọn phương án a). Trang bài trung lập theo mock "B + cột trái của C", header chung với port; "oke rồi làm đi".
