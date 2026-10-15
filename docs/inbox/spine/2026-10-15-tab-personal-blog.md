@@ -1,6 +1,6 @@
 # Tab personal blog, blog ra /personal-blog
 
-- **PR:** (số PR điền khi mở) · nhánh `claude/config-one-tree-539wvd`
+- **PR:** #99 · nhánh `claude/config-one-tree-539wvd`
 - **Migration:** không có.
 
 Chủ site 2026-10-15: "tách riêng phần mục lục ra 1 cái tab ngang hàng với bean và biz tên là personal blog … cấu trúc tương tự các trang kia bao gồm trang chủ, mục lục,… đều có thể scale up đủ crud". Sau đó: "đổi địa chỉ công khai của trang /bean/details -> thành /personal-blog … ngang hàng bean rồi mà".
