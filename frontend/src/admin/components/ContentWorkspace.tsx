@@ -324,7 +324,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
   const act = (id: string, action: StatusAction) =>
     run(async () => {
       // Publishing fixes the post's address for good (migration 0027).
-      const slug = action === 'publish' ? addresses.slugToPublish(id) : undefined
+      const slug = action === 'publish' ? addresses.slugToPublish(id, posts.find((p) => p.id === id)?.en) : undefined
       await transitionStatus(id, action, ...(slug ? [slug] : []))
     })
 
@@ -379,7 +379,7 @@ export function ContentWorkspace({ onChanged }: { onChanged?: () => void }) {
     const name = BULK_STATUS.find((b) => b.action === action)?.label ?? action
     run(async () => {
       for (const p of ok) {
-        const slug = action === 'publish' ? addresses.slugToPublish(p.id) : undefined
+        const slug = action === 'publish' ? addresses.slugToPublish(p.id, p.en) : undefined
         await transitionStatus(p.id, action, ...(slug ? [slug] : []))
       }
       return { msg: `${name} · ${ok.length}/${selected.length} bài` }

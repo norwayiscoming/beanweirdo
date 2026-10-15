@@ -73,12 +73,34 @@ export function uniqueSlug(parts: SlugParts, taken: Iterable<string>, w: RouteWo
   return `${base}-${Date.now().toString(36).slice(-4)}${suffix}`
 }
 
+/**
+ * An address word from a title: accents off, đ as d, anything else a hyphen —
+ * "Cà phê đặc" → `ca-phe-dac`. Empty when the title has no letter or digit.
+ */
+export function titleSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+/** `base`, or `base-2`, `base-3`… — the first one nobody holds. */
+export function freeSlug(base: string, taken: ReadonlySet<string>): string {
+  if (!taken.has(base)) return base
+  for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`
+}
+
 /** A post as far as its address is concerned. */
 export type Addressable = {
   id: string
   module_id: string
   created_at: string
   status?: string
+  /** The title; only the back office's rows carry it, to name a post at its first publish. */
+  en?: string
   /** Set by hand in the CMS; wins over the generated one. */
   slug?: string | null
 }

@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { AuthorRef } from 'api-contract'
 import { ancestorsOf, buildTree, flattenTree } from '../../lib/contentTree'
 import { tagColor } from '../../lib/tagColor'
+import { titleSlug } from '../../lib/postSlug'
+import { proseOf } from '../../lib/postText'
 import { createKeyword, listKeywords, type Keyword, type Module, type PostDetail, type PostTemplate, type PostVisibility, type Node } from '../lib/apiClient'
 import { TEMPLATE_LABEL } from '../../content/templates'
 import { ink, sans } from '../../design/tokens'
-import { IconButton } from '../../design/Button'
+import { Button, IconButton } from '../../design/Button'
 import { IconClose } from '../../design/icons'
 import { AuthorPicker } from './AuthorPicker'
 import { ThemePicker } from './ThemePicker'
@@ -21,6 +23,10 @@ import { Choice, DETAIL_CSS, desk } from './Detail'
  * panel (2026-10-14): one button opens it, the page stays visible beside it,
  * so a change of colour or topic shows on the page at once.
  *
+ * Name first, then address, then byline: the owner (2026-10-15) wants what a
+ * post is called and where it lives settled before anything else, and found
+ * no way at all to rename a post whose template draws no title field.
+ *
  * Everything but the address and the authors goes through the editor's own
  * patch, so it saves and undoes like any other field. The address does not:
  * the server can refuse it (taken, or still forwarding to another post), and
@@ -28,6 +34,7 @@ import { Choice, DETAIL_CSS, desk } from './Detail'
  * module and pin, without waiting for "Đăng thay đổi".
  */
 export type SettingsPatch = Partial<{
+  en: string
   topic_id: string | null
   visibility: PostVisibility
   module_id: string
@@ -94,6 +101,7 @@ export function PostSettings({
   template,
   canChangeTemplate,
   derivedSlug,
+  slugFromTitle,
   onPatch,
   onSlug,
   onForget,
@@ -110,6 +118,8 @@ export function PostSettings({
   canChangeTemplate: boolean
   /** The address the post is reached at while nothing is stored. */
   derivedSlug: string
+  /** The address a title makes for this post, kept clear of every other post's. */
+  slugFromTitle: (title: string) => string | undefined
   onPatch: (patch: SettingsPatch) => void
   /** Resolves to an error message, or null when the address was taken. */
   onSlug: (slug: string) => Promise<string | null>
@@ -141,10 +151,33 @@ export function PostSettings({
     if (!wearing.includes(made.id)) onPatch({ keywords: [...wearing, made.id] })
   }
 
+  /*
+   * A draft with no stored address takes its title's at its first publish
+   * (`slugToPublish`), so its address already "is" the title's. A post on the
+   * page with no stored address keeps the dated one its readers have: nothing
+   * would forward from it, so only an explicit choice replaces it.
+   */
+  const draft = post.status === 'draft'
+  const fromTitle = slugFromTitle(post.en)
+  const address = post.slug ?? (draft ? (fromTitle ?? derivedSlug) : derivedSlug)
+  const firstHeading = proseOf(post.body).find((p) => p.h)?.text
+
   async function commitSlug(value: string) {
-    const v = value.trim()
-    if (!v || v === (post.slug ?? derivedSlug)) return setSlugError(null)
+    // Typed the way a title is written, stored the way an address must be.
+    const v = titleSlug(value)
+    if (!v || v === address) return setSlugError(null)
     setSlugError(await onSlug(v))
+  }
+
+  function commitTitle(value: string) {
+    const t = value.trim()
+    if (!t || t === post.en) return
+    // An address made from the old title follows the new one; the server
+    // keeps the old address forwarding here. One typed by hand stays.
+    const follows = post.slug != null && post.slug === fromTitle
+    onPatch({ en: t })
+    const next = slugFromTitle(t)
+    if (follows && next && next !== post.slug) void commitSlug(next)
   }
 
   return (
@@ -185,7 +218,122 @@ export function PostSettings({
         </IconButton>
       </div>
 
+      <Group title="Tên & người viết">
+        <Prop
+          label="Tên bài"
+          hint={
+            firstHeading && firstHeading !== post.en ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>Heading đầu bài: «{firstHeading}»</span>
+                <Button size="sm" onClick={() => commitTitle(firstHeading)}>
+                  Dùng làm tên
+                </Button>
+              </span>
+            ) : post.status === 'published' ? (
+              'Bài đã đăng: tên mới lên trang khi bấm Đăng thay đổi.'
+            ) : undefined
+          }
+        >
+          <input
+            aria-label="Tên bài"
+            key={post.en}
+            defaultValue={post.en}
+            onBlur={(e) => {
+              commitTitle(e.target.value)
+              // An empty name is refused; show the one that stands.
+              if (!e.target.value.trim()) e.target.value = post.en
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') {
+                e.stopPropagation()
+                e.currentTarget.value = post.en
+              }
+            }}
+            style={{ width: '100%', fontSize: 15 }}
+          />
+        </Prop>
+        <Prop
+          label="Slug"
+          hint={
+            slugError ? (
+              <span role="alert" style={{ color: ink.danger }}>
+                {slugError}
+              </span>
+            ) : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <span>
+                  {!post.slug && draft
+                    ? 'Tự lấy theo tên bài, không dấu, nối bằng "-". Gõ để đặt khác.'
+                    : !post.slug
+                      ? 'Đang dùng địa chỉ tự sinh theo ngày.'
+                      : post.slug === fromTitle
+                        ? 'Theo tên bài: đổi tên thì slug đổi theo, địa chỉ cũ vẫn dẫn về bài.'
+                        : 'Đặt tay. Enter để lưu, Esc để bỏ.'}
+                </span>
+                {fromTitle && fromTitle !== address && (
+                  <Button size="sm" onClick={() => void commitSlug(fromTitle)}>
+                    Lấy theo tên
+                  </Button>
+                )}
+              </span>
+            )
+          }
+        >
+          <input
+            aria-label="Slug"
+            key={address}
+            defaultValue={post.slug ?? ''}
+            placeholder={address}
+            onBlur={(e) => void commitSlug(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur()
+              if (e.key === 'Escape') {
+                // The field's own undo, not the panel's close.
+                e.stopPropagation()
+                e.currentTarget.value = post.slug ?? ''
+                setSlugError(null)
+              }
+            }}
+            style={{ width: '100%' }}
+          />
+        </Prop>
+        {(post.old_slugs ?? []).length > 0 && (
+          <Prop label="Địa chỉ cũ" hint="Vẫn chuyển về bài này. Bỏ đi thì địa chỉ ấy trống lại.">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {(post.old_slugs ?? []).map((s) => (
+                <span key={s} style={{ ...chip, border: `1px solid ${desk.field}`, background: desk.panel, borderRadius: 6 }}>
+                  {s}
+                  {onForget && (
+                    <IconButton size="sm" label={`bỏ địa chỉ cũ ${s}`} onClick={() => onForget(s)} style={{ width: 20, height: 20 }}>
+                      <IconClose size={12} />
+                    </IconButton>
+                  )}
+                </span>
+              ))}
+            </div>
+          </Prop>
+        )}
+        <Prop label="Tác giả" hint="Thứ tự ở đây là thứ tự trên dòng tác giả.">
+          <AuthorPicker key={post.id} postId={post.id} initial={byline} />
+        </Prop>
+      </Group>
+
       <Group title="Vị trí">
+        {/*
+          * Named for what it still does. Where a post shows on the blog is the
+          * topic's job now; the module only lends its colour, the address a post
+          * gets until one is typed, and the list of an old page with no rule.
+          */}
+        <Prop label="Màu mượn từ" hint="Màu mặc định và địa chỉ tự sinh theo ngày lấy từ module này. Bài hiện ở đâu là do Chủ đề.">
+          <select aria-label="Module" value={post.module_id} onChange={(e) => onPatch({ module_id: e.target.value })} style={{ width: '100%' }}>
+            {modules.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.title}
+              </option>
+            ))}
+          </select>
+        </Prop>
         <Prop label="Chủ đề" hint="Bài hiện ở mục này trong Mục lục.">
           <select aria-label="Chủ đề" value={post.topic_id ?? ''} onChange={(e) => onPatch({ topic_id: e.target.value || null })} style={{ width: '100%' }}>
             {!post.topic_id && <option value="">—</option>}
@@ -238,12 +386,6 @@ export function PostSettings({
         </Prop>
       </Group>
 
-      <Group title="Người viết">
-        <Prop label="Tác giả" hint="Thứ tự ở đây là thứ tự trên dòng tác giả.">
-          <AuthorPicker key={post.id} postId={post.id} initial={byline} />
-        </Prop>
-      </Group>
-
       <Group title="Hiển thị">
         <Prop label="Template" hint={canChangeTemplate ? undefined : 'Bài đã có chữ nên không đổi được nữa.'}>
           {canChangeTemplate ? (
@@ -258,20 +400,6 @@ export function PostSettings({
             <span style={{ fontSize: 14 }}>{TEMPLATE_LABEL[template]}</span>
           )}
         </Prop>
-        {/*
-          * Named for what it still does. Where a post shows on the blog is the
-          * topic's job now; the module only lends its colour, the address a post
-          * gets until one is typed, and the list of an old page with no rule.
-          */}
-        <Prop label="Màu mượn từ" hint="Màu mặc định và địa chỉ tự sinh lấy từ module này. Bài hiện ở đâu là do Chủ đề.">
-          <select aria-label="Module" value={post.module_id} onChange={(e) => onPatch({ module_id: e.target.value })} style={{ width: '100%' }}>
-            {modules.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.title}
-              </option>
-            ))}
-          </select>
-        </Prop>
         <Prop label="Màu bài">
           <ThemePicker
             value={post.theme_color}
@@ -281,9 +409,6 @@ export function PostSettings({
             onChange={(theme_color) => onPatch({ theme_color })}
           />
         </Prop>
-      </Group>
-
-      <Group title="Địa chỉ & quyền xem">
         <Prop label="Quyền xem">
           <Choice
             label="Quyền xem"
@@ -295,52 +420,6 @@ export function PostSettings({
             onChange={(visibility) => onPatch({ visibility })}
           />
         </Prop>
-        <Prop
-          label="Địa chỉ"
-          hint={
-            slugError ? (
-              <span role="alert" style={{ color: ink.danger }}>
-                {slugError}
-              </span>
-            ) : (
-              'Để trống thì dùng địa chỉ tự sinh. Enter để lưu, Esc để bỏ.'
-            )
-          }
-        >
-          <input
-            aria-label="Địa chỉ"
-            key={post.slug ?? derivedSlug}
-            defaultValue={post.slug ?? ''}
-            placeholder={derivedSlug}
-            onBlur={(e) => void commitSlug(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur()
-              if (e.key === 'Escape') {
-                // The field's own undo, not the panel's close.
-                e.stopPropagation()
-                e.currentTarget.value = post.slug ?? ''
-                setSlugError(null)
-              }
-            }}
-            style={{ width: '100%' }}
-          />
-        </Prop>
-        {(post.old_slugs ?? []).length > 0 && (
-          <Prop label="Địa chỉ cũ" hint="Vẫn chuyển về bài này. Bỏ đi thì địa chỉ ấy trống lại.">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {(post.old_slugs ?? []).map((s) => (
-                <span key={s} style={{ ...chip, border: `1px solid ${desk.field}`, background: desk.panel, borderRadius: 6 }}>
-                  {s}
-                  {onForget && (
-                    <IconButton size="sm" label={`bỏ địa chỉ cũ ${s}`} onClick={() => onForget(s)} style={{ width: 20, height: 20 }}>
-                      <IconClose size={12} />
-                    </IconButton>
-                  )}
-                </span>
-              ))}
-            </div>
-          </Prop>
-        )}
       </Group>
     </aside>
   )

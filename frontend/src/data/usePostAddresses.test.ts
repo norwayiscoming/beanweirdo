@@ -52,4 +52,12 @@ describe('addressBook — địa chỉ cố định (migration 0027)', () => {
     // A post that already has an address keeps it.
     expect(addressBook([{ ...rows[1], slug: 'x' }]).slugToPublish(rows[1].id)).toBeUndefined()
   })
+
+  it('names a post by its title at its first publish, stepping around addresses held', () => {
+    const book = addressBook([...rows, { ...rows[1], id: 'other', slug: 'ca-phe-dac' }])
+    expect(book.slugToPublish(rows[0].id, 'Cà phê Đặc!')).toBe('ca-phe-dac-2')
+    expect(book.slugFromTitle(rows[0].id, 'Đường & sữa')).toBe('duong-sua')
+    // No letter in the title: the dated address, as before.
+    expect(book.slugToPublish(rows[0].id, '…')).toBe('ghi-p260824')
+  })
 })
