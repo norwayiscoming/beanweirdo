@@ -908,7 +908,7 @@ export function ConfigTree({
           <>
             {errorLine}
             <Section title="Thanh trên" note={`theo thứ tự thanh trên · ${dragNote(false)}`}>
-              <ItemList label="Thanh trên" items={tocList(rootToc, rootToc.items)} />
+              <ItemList label="Thanh trên" items={tocList(rootToc, rootToc.items)} add={addPortPage(undefined)} />
             </Section>
           </>
         )
